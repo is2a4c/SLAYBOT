@@ -48,7 +48,8 @@ module.exports = {
     if (cooldownCache.has(key)) {
       const difference = (Date.now() - cooldownCache.get(key)) * 0.001;
       if (difference < message.client.config.STATS.XP_COOLDOWN) {
-        return statsDb.save();
+        await statsDb.save();
+        return;
       }
       cooldownCache.delete(key);
     }

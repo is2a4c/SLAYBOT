@@ -44,7 +44,7 @@ module.exports = {
 };
 
 async function weather(place) {
-  const response = await getJson(`http://api.weatherstack.com/current?access_key=${API_KEY}&query=${place}`);
+  const response = await getJson(`https://api.weatherstack.com/current?access_key=${API_KEY}&query=${place}`);
   if (!response.success) return MESSAGES.API_ERROR;
 
   const json = response.data;

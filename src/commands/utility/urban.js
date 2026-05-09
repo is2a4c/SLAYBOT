@@ -43,7 +43,7 @@ module.exports = {
 };
 
 async function urban(word) {
-  const response = await getJson(`http://api.urbandictionary.com/v0/define?term=${word}`);
+  const response = await getJson(`https://api.urbandictionary.com/v0/define?term=${word}`);
   if (!response.success) return MESSAGES.API_ERROR;
 
   const json = response.data;

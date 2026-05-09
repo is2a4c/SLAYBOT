@@ -116,6 +116,7 @@ module.exports = {
   // Image Configuration
   IMAGE: {
     enabled: true,
+    BASE_API: process.env.STRANGE_API_URL || "https://api.strangeapi.com",
   },
 
   // Moderation Configuration

@@ -12,7 +12,7 @@ module.exports = async (client, message) => {
 
   // command handler
   let isCommand = false;
-  if (PREFIX_COMMANDS.ENABLED) {
+  if (PREFIX_COMMANDS.enabled) {
     // check for bot mentions
     if (message.content.includes(`${client.user.id}`)) {
       message.channel.safeSend(`> My prefix is \`${settings.prefix}\``);

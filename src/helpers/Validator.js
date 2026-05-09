@@ -43,7 +43,7 @@ module.exports = class Validator {
     }
 
     // Music
-    if (config.MUSIC.ENABLED) {
+    if (config.MUSIC.enabled) {
       if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
         warn("env: SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET are missing. Spotify music links won't work");
       }

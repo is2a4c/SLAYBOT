@@ -63,7 +63,7 @@ module.exports = class BotClient extends Client {
       : undefined;
 
     // Giveaways
-    if (this.config.GIVEAWAYS.ENABLED) this.giveawaysManager = giveawaysHandler(this);
+    if (this.config.GIVEAWAYS.enabled) this.giveawaysManager = giveawaysHandler(this);
 
     // Logger
     this.logger = Logger;
@@ -79,7 +79,7 @@ module.exports = class BotClient extends Client {
    * Initialize music manager after client login (requires client.user.id)
    */
   initMusicManager() {
-    if (this.config.MUSIC.ENABLED && !this.musicManager) {
+    if (this.config.MUSIC.enabled && !this.musicManager) {
       try {
         this.musicManager = lavaclient(this);
         this.logger.success("Music manager initialized");
@@ -319,7 +319,7 @@ module.exports = class BotClient extends Client {
           (x) =>
             x.username === search ||
             x.username.toLowerCase().includes(search.toLowerCase()) ||
-            x.tag?.toLowerCase().includes(search.toLowerCase())
+            (x.globalName || x.username).toLowerCase().includes(search.toLowerCase())
         )
         .forEach((user) => users.push(user));
     }

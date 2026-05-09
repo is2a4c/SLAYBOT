@@ -1,22 +1,28 @@
-const { getJson } = require("@helpers/HttpUtils");
-const { success, warn, error } = require("@helpers/Logger");
+const { success, warn, error, debug } = require("@helpers/Logger");
+const { execSync } = require("child_process");
 
 module.exports = class BotUtils {
   /**
    * Check if the bot is up to date
    */
   static async checkForUpdates() {
-    const response = await getJson("https://api.github.com/repos/PashaBritva/SLAYBOT/releases/latest");
-    if (!response.success) return error("VersionCheck: Failed to check for bot updates");
-    if (response.data) {
+    try {
+      const tags = execSync("git ls-remote --tags --sort=-v:refname https://github.com/PashaBritva/SLAYBOT.git", {
+        encoding: "utf8",
+        timeout: 10000,
+      });
+      const latestTag = tags.match(/refs\/tags\/v?([\d.]+)/)?.[1];
+      if (!latestTag) return;
       if (
-        require("@root/package.json").version.replace(/[^0-9]/g, "") >= response.data.tag_name.replace(/[^0-9]/g, "")
+        require("@root/package.json").version.replace(/[^0-9]/g, "") >= latestTag.replace(/[^0-9]/g, "")
       ) {
         success("VersionCheck: Your discord bot is up to date");
       } else {
-        warn(`VersionCheck: ${response.data.tag_name} update is available`);
+        warn(`VersionCheck: v${latestTag} update is available`);
         warn("download: https://github.com/PashaBritva/SLAYBOT/releases/latest");
       }
+    } catch {
+      debug("VersionCheck: Could not check for updates");
     }
   }
 

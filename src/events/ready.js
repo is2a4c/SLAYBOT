@@ -9,7 +9,7 @@ module.exports = async (client) => {
   client.logger.success(`Logged in as ${client.user.tag}! (${client.user.id})`);
 
   // Update Bot Presence (before music init to ensure it runs even if music crashes)
-  if (client.config.PRESENCE.ENABLED) {
+  if (client.config.PRESENCE.enabled) {
     presenceHandler(client);
   }
 
@@ -17,7 +17,7 @@ module.exports = async (client) => {
   client.initMusicManager();
 
   // Initialize Giveaways Manager
-  if (client.config.GIVEAWAYS.ENABLED) {
+  if (client.config.GIVEAWAYS.enabled) {
     client.logger.log("Initializing giveaways manager...");
     client.giveawaysManager._init().then((_) => client.logger.success("Giveaway Manager initialized"));
   }
