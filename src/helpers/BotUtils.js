@@ -1,4 +1,4 @@
-const { success, warn, error, debug } = require("@helpers/Logger");
+const { success, warn, debug } = require("@helpers/Logger");
 const { execSync } = require("child_process");
 
 module.exports = class BotUtils {
