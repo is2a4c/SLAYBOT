@@ -124,10 +124,7 @@ async function performAutomod(message, settings) {
     const key = author.id + "|" + message.guildId;
     if (antispamCache.has(key)) {
       let antispamInfo = antispamCache.get(key);
-      if (
-        antispamInfo.content === content &&
-        Date.now() - antispamInfo.timestamp < MESSAGE_SPAM_THRESHOLD
-      ) {
+      if (antispamInfo.content === content && Date.now() - antispamInfo.timestamp < MESSAGE_SPAM_THRESHOLD) {
         fields.push({ name: "AntiSpam Detection", value: "✓", inline: true });
         shouldDelete = true;
         strikesTotal += 1;

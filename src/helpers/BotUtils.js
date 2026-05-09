@@ -13,9 +13,7 @@ module.exports = class BotUtils {
       });
       const latestTag = tags.match(/refs\/tags\/v?([\d.]+)/)?.[1];
       if (!latestTag) return;
-      if (
-        require("@root/package.json").version.replace(/[^0-9]/g, "") >= latestTag.replace(/[^0-9]/g, "")
-      ) {
+      if (require("@root/package.json").version.replace(/[^0-9]/g, "") >= latestTag.replace(/[^0-9]/g, "")) {
         success("VersionCheck: Your discord bot is up to date");
       } else {
         warn(`VersionCheck: v${latestTag} update is available`);
