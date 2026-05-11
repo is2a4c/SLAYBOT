@@ -46,8 +46,12 @@ const shouldModerate = (message) => {
 async function performAutomod(message, settings) {
   const { automod } = settings;
 
-  if (automod.wh_channels.includes(message.channelId)) return;
-  if (!automod.debug && !shouldModerate(message)) return;
+  if (automod.wh_channels.includes(message.channelId)) {
+    return { triggered: false, deleted: false, strikes: 0 };
+  }
+  if (!automod.debug && !shouldModerate(message)) {
+    return { triggered: false, deleted: false, strikes: 0 };
+  }
 
   const { channel, member, guild, content, author, mentions } = message;
   const logChannel = settings.modlog_channel ? channel.guild.channels.cache.get(settings.modlog_channel) : null;
@@ -147,11 +151,15 @@ async function performAutomod(message, settings) {
   }
 
   // delete message if deletable
+  let deleted = false;
   if (shouldDelete && message.deletable) {
-    message
-      .delete()
-      .then(() => channel.safeSend("> Auto-Moderation! Message deleted", 5))
-      .catch(() => {});
+    try {
+      await message.delete();
+      deleted = true;
+      channel.safeSend("> Auto-Moderation! Message deleted", 5);
+    } catch {
+      // ignore message deletion failure
+    }
   }
 
   if (strikesTotal > 0) {
@@ -208,6 +216,12 @@ async function performAutomod(message, settings) {
 
     await memberDb.save();
   }
+
+  return {
+    triggered: strikesTotal > 0,
+    deleted,
+    strikes: strikesTotal,
+  };
 }
 
 module.exports = {

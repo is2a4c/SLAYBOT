@@ -16,8 +16,8 @@
     "format": "prettier --write \"**/*.js\" --ignore-unknown",
     "format:check": "prettier --check \"**/*.js\" --ignore-unknown",
     "docker:build": "docker build -t slaybot .",
-    "docker:run": "docker-compose up -d",
-    "docker:stop": "docker-compose down",
+    "docker:run": "docker compose up -d",
+    "docker:stop": "docker compose down",
     "debug:load": "node --trace-warnings scripts/debug-load.js"
   },
   "homepage": "https://github.com/PashaBritva/SLAYBOT#readme",

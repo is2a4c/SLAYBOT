@@ -35,13 +35,18 @@ module.exports = {
    * @param {import("discord.js").Message} message
    * @param {boolean} isCommand
    * @param {object} settings
+   * @param {{ skipXp?: boolean }} [options]
    */
-  async trackMessageStats(message, isCommand, settings) {
+  async trackMessageStats(message, isCommand, settings, options = {}) {
+    const { skipXp = false } = options;
     const statsDb = await getMemberStats(message.guildId, message.member.id);
     if (isCommand) statsDb.commands.prefix++;
     statsDb.messages++;
 
-    // TODO: Ignore possible bot commands
+    if (skipXp) {
+      await statsDb.save();
+      return;
+    }
 
     // Cooldown check to prevent Message Spamming
     const key = `${message.guildId}|${message.member.id}`;

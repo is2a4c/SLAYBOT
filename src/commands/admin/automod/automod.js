@@ -227,6 +227,7 @@ module.exports = {
 
 async function getStatus(settings, guild) {
   const { automod } = settings;
+  const antiAttachmentsEnabled = getAntiAttachmentsEnabled(automod);
 
   const logChannel = settings.modlog_channel
     ? guild.channels.cache.get(settings.modlog_channel).toString()
@@ -236,7 +237,7 @@ async function getStatus(settings, guild) {
   let desc = stripIndent`
     ❯ **Max Lines**: ${automod.max_lines || "NA"}
     ❯ **Anti-Massmention**: ${automod.anti_massmention > 0 ? "✓" : "✕"}
-    ❯ **Anti-Attachment**: ${automod.anti_attachment ? "✓" : "✕"}
+    ❯ **Anti-Attachment**: ${antiAttachmentsEnabled ? "✓" : "✕"}
     ❯ **Anti-Links**: ${automod.anti_links ? "✓" : "✕"}
     ❯ **Anti-Invites**: ${automod.anti_invites ? "✓" : "✕"}
     ❯ **Anti-Spam**: ${automod.anti_spam ? "✓" : "✕"}
@@ -271,6 +272,13 @@ async function getStatus(settings, guild) {
     );
 
   return { embeds: [embed] };
+}
+
+function getAntiAttachmentsEnabled(automod) {
+  // Keep backward compatibility if legacy data used the old typo'd key.
+  if (typeof automod.anti_attachments === "boolean") return automod.anti_attachments;
+  if (typeof automod.anti_attachment === "boolean") return automod.anti_attachment;
+  return false;
 }
 
 async function setStrikes(settings, strikes) {

@@ -58,17 +58,19 @@ docker build -t slaybot .
 # Скопируй .env.example → .env и заполни значения
 npm run docker:run
 # или
-docker-compose up -d
+docker compose up -d
 ```
 
-### With Dashboard
-```bash
-docker-compose --profile dashboard up -d
-```
+`docker-compose.yml` поднимает 2 сервиса: `bot` и `mongo`.
+- `BOT_TOKEN` обязателен в `.env`
+- `MONGO_CONNECTION` можно не задавать: по умолчанию используется `mongodb://mongo:27017/slaybot`
+- Секреты не хранятся в репозитории: только в локальном `.env`
 
 ### Stop
 ```bash
 npm run docker:stop
+# или
+docker compose down
 ```
 
 ---

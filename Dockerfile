@@ -19,8 +19,8 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Install curl for healthchecks
-RUN apk add --no-cache curl
+# Install proc tools for process-level healthchecks
+RUN apk add --no-cache procps
 
 # Copy built artifacts from builder
 COPY --from=builder /app /app
@@ -37,8 +37,10 @@ USER botuser
 EXPOSE 8080
 
 # Healthcheck
+# Discord-only bot has no local HTTP endpoint by default, so we validate that
+# the main bot process is alive inside the container.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s \
-  CMD node -e "console.log('Bot process running')" || exit 1
+  CMD pgrep -f "node bot.js" >/dev/null || exit 1
 
 # Start the bot
 CMD ["node", "bot.js"]
