@@ -143,7 +143,7 @@ module.exports = {
   PRESENCE: {
     enabled: true,
     TYPE: "PLAYING", // PLAYING, LISTENING, WATCHING, COMPETING, CUSTOM
-    STATUS: "online", // online, idle, dnd, invisible
+    STATUS: "idle", // online, idle, dnd, invisible
     MESSAGE: ["SLAYBOT", "Discord.js v14"],
   },
 
