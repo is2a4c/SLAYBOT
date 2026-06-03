@@ -85,7 +85,7 @@ module.exports = class BotClient extends Client {
         this.logger.success("Music manager initialized");
       } catch (ex) {
         this.logger.error("Failed to initialize music manager", ex);
-        this.config.MUSIC.ENABLED = false;
+        this.config.MUSIC.enabled = false;
       }
     }
   }

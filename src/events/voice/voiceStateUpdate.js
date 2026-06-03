@@ -9,8 +9,8 @@ module.exports = async (client, oldState, newState) => {
   // Track voice stats
   trackVoiceStats(oldState, newState);
 
-  // Erela.js
-  if (client.config.MUSIC.ENABLED) {
+  // Lavalink
+  if (client.config.MUSIC.enabled && client.musicManager) {
     const guild = oldState.guild;
 
     // if nobody left the channel in question, return.

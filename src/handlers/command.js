@@ -138,11 +138,13 @@ module.exports = {
     }
 
     try {
-      await interaction.deferReply({ ephemeral: cmd.slashCommand.ephemeral });
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ ephemeral: cmd.slashCommand.ephemeral });
+      }
       const settings = await getSettings(interaction.guild);
       await cmd.interactionRun(interaction, { settings });
     } catch (ex) {
-      await interaction.followUp("Oops! An error occurred while running the command");
+      await respondToInteractionError(interaction);
       interaction.client.logger.error("interactionRun", ex);
     } finally {
       if (cmd.cooldown > 0) applyCooldown(interaction.user.id, cmd);
@@ -222,4 +224,22 @@ function getRemainingCooldown(memberId, cmd) {
     return cmd.cooldown - remaining;
   }
   return 0;
+}
+
+/**
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction
+ */
+async function respondToInteractionError(interaction) {
+  const response = {
+    content: "Oops! An error occurred while running the command",
+    ephemeral: true,
+  };
+
+  try {
+    if (interaction.deferred) return await interaction.editReply(response);
+    if (interaction.replied) return await interaction.followUp(response);
+    return await interaction.reply(response);
+  } catch (ex) {
+    interaction.client.logger.error("Failed to send slash command error response", ex);
+  }
 }
