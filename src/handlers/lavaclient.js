@@ -18,7 +18,7 @@ module.exports = (client) => {
   });
 
   const lavaclient = new Cluster({
-    nodes: client.config.MUSIC.LAVALINK_NODES,
+    nodes: normalizeNodes(client.config.MUSIC.LAVALINK_NODES, client),
     sendGatewayPayload: (id, payload) => client.guilds.cache.get(id)?.shard?.send(payload),
     userId: client.user.id,
   });
@@ -82,3 +82,28 @@ module.exports = (client) => {
 
   return lavaclient;
 };
+
+function normalizeNodes(nodes, client) {
+  return nodes.map((node) => {
+    if (!/^https?:\/\//i.test(node.host) && !/^wss?:\/\//i.test(node.host)) return node;
+
+    try {
+      const url = new URL(node.host);
+      if (url.pathname && url.pathname !== "/") {
+        client.logger.warn(
+          `Lavalink node "${node.id || url.hostname}" has a URL path; only host, port and protocol are used`
+        );
+      }
+
+      return {
+        ...node,
+        host: url.hostname,
+        port: node.port || Number(url.port) || (url.protocol === "https:" || url.protocol === "wss:" ? 443 : 80),
+        secure: node.secure ?? (url.protocol === "https:" || url.protocol === "wss:"),
+      };
+    } catch (ex) {
+      client.logger.warn(`Invalid Lavalink node host "${node.host}". Using it as configured`);
+      return node;
+    }
+  });
+}

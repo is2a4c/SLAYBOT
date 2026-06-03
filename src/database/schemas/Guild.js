@@ -5,6 +5,13 @@ const { getUser } = require("./User");
 const { PermissionFlagsBits } = require("discord.js");
 
 const cache = new FixedSizeMap(CACHE_SIZE.GUILDS);
+const MAX_WARN_ACTIONS = ["TIMEOUT", "KICK", "BAN"];
+
+function normalizeMaxWarnAction(action) {
+  if (!action) return action;
+  if (action === "MUTE") return "TIMEOUT";
+  return MAX_WARN_ACTIONS.includes(action) ? action : "KICK";
+}
 
 const Schema = new mongoose.Schema({
   _id: String,
@@ -67,7 +74,7 @@ const Schema = new mongoose.Schema({
   max_warn: {
     action: {
       type: String,
-      enum: ["TIMEOUT", "KICK", "BAN"],
+      enum: MAX_WARN_ACTIONS,
       default: "KICK",
     },
     limit: { type: Number, default: 5 },
@@ -117,6 +124,13 @@ const Schema = new mongoose.Schema({
   },
 });
 
+Schema.pre("validate", function (next) {
+  if (this.max_warn?.action) {
+    this.max_warn.action = normalizeMaxWarnAction(this.max_warn.action);
+  }
+  next();
+});
+
 const Model = mongoose.models["guild"] ? mongoose.model("guild") : mongoose.model("guild", Schema);
 
 module.exports = {
@@ -131,7 +145,13 @@ module.exports = {
     if (cached) return cached;
 
     let guildData = await Model.findById(guild.id);
-    if (!guildData) {
+    if (guildData) {
+      const normalizedAction = normalizeMaxWarnAction(guildData.max_warn?.action);
+      if (normalizedAction && normalizedAction !== guildData.max_warn.action) {
+        guildData.max_warn.action = normalizedAction;
+        await guildData.save();
+      }
+    } else {
       guild
         .fetchOwner()
         .then(async (owner) => {
@@ -159,18 +179,22 @@ module.exports = {
         inviteUrl = null;
       }
 
-      guildData = new Model({
-        _id: guild.id,
-        data: {
-          name: guild.name,
-          region: guild.preferredLocale,
-          owner: guild.ownerId,
-          joinedAt: guild.joinedAt,
-          inviteUrl: inviteUrl,
+      guildData = await Model.findOneAndUpdate(
+        { _id: guild.id },
+        {
+          $setOnInsert: {
+            _id: guild.id,
+            data: {
+              name: guild.name,
+              region: guild.preferredLocale,
+              owner: guild.ownerId,
+              joinedAt: guild.joinedAt,
+              inviteUrl: inviteUrl,
+            },
+          },
         },
-      });
-
-      await guildData.save();
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
     }
     cache.add(guild.id, guildData);
     return guildData;
