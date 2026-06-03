@@ -61,11 +61,16 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
+          script_stop: true
           script: |
+            set -e
+
             cd ${{ secrets.DEPLOY_PATH || '/opt/slaybot' }}
 
-            # Pull latest code
-            git pull origin main
+            # Sync latest code. This overwrites tracked local edits such as config.js,
+            # but keeps untracked runtime files like .env intact.
+            git fetch origin main
+            git reset --hard origin/main
 
             # Install dependencies
             npm ci --omit=dev
