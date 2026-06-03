@@ -7,6 +7,7 @@ const {
 } = require("discord.js");
 const prettyMs = require("pretty-ms");
 const { EMBED_COLORS, MUSIC } = require("@root/config");
+const { loadTracks, normalizeLoadResult, toError, toQueueTrack } = require("@helpers/LavalinkUtils");
 
 const search_prefix = {
   YT: "ytsearch",
@@ -48,8 +49,8 @@ module.exports = {
   async interactionRun(interaction) {
     const query = interaction.options.getString("query");
     const response = await search(interaction, query);
-    if (response) await interaction.followUp(response);
-    else interaction.deleteReply();
+    if (response) await interaction.safeFollowUp(response);
+    else interaction.deleteReply().catch(() => {});
   },
 };
 
@@ -74,10 +75,14 @@ async function search({ member, guild, channel }, query) {
 
   let res;
   try {
-    res = await musicManager.rest.loadTracks(
-      /^https?:\/\//.test(query) ? query : `${search_prefix[MUSIC.DEFAULT_SOURCE]}:${query}`
+    res = normalizeLoadResult(
+      await loadTracks(
+        musicManager,
+        /^https?:\/\//.test(query) ? query : `${search_prefix[MUSIC.DEFAULT_SOURCE]}:${query}`
+      )
     );
   } catch (err) {
+    guild.client.logger.error("Search Exception", toError(err));
     return "🚫 There was an error while searching";
   }
 
@@ -87,7 +92,7 @@ async function search({ member, guild, channel }, query) {
   const loadType = res.tracks.length > 0 ? res.loadType : "NO_MATCHES";
   switch (loadType) {
     case "LOAD_FAILED":
-      guild.client.logger.error("Search Exception", res.exception);
+      guild.client.logger.error("Search Exception", new Error(res.exception?.message || "Unknown error"));
       return "🚫 There was an error while searching";
 
     case "NO_MATCHES":
@@ -210,6 +215,9 @@ async function search({ member, guild, channel }, query) {
       }
     }
   }
+
+  if (!tracks) return "🚫 An error occurred while searching";
+  tracks = tracks.map(toQueueTrack);
 
   // create a player and/or join the member's vc
   if (!player?.connected) {

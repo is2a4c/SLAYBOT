@@ -2,6 +2,7 @@ const { EmbedBuilder, ApplicationCommandOptionType } = require("discord.js");
 const prettyMs = require("pretty-ms");
 const { EMBED_COLORS, MUSIC } = require("@root/config");
 const { SpotifyItemType } = require("@lavaclient/spotify");
+const { loadTracks, normalizeLoadResult, toError, toQueueTrack } = require("@helpers/LavalinkUtils");
 
 const search_prefix = {
   YT: "ytsearch",
@@ -43,7 +44,7 @@ module.exports = {
   async interactionRun(interaction) {
     const query = interaction.options.getString("query");
     const response = await play(interaction, query);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 
@@ -107,13 +108,14 @@ async function play({ member, guild, channel }, query) {
 
       if (!tracks) guild.client.logger.debug({ query, item });
     } else {
-      const res = await mm.rest.loadTracks(
-        /^https?:\/\//.test(query) ? query : `${search_prefix[MUSIC.DEFAULT_SOURCE]}:${query}`
+      const res = normalizeLoadResult(
+        await loadTracks(mm, /^https?:\/\//.test(query) ? query : `${search_prefix[MUSIC.DEFAULT_SOURCE]}:${query}`)
       );
+
       switch (res.loadType) {
         case "LOAD_FAILED":
-          guild.client.logger.error("Search Exception", res.exception?.message || "Unknown error");
-          return "🚫 There was an error while searching" + (res.exception?.message || "Unknown error");
+          guild.client.logger.error("Search Exception", new Error(res.exception?.message || "Unknown error"));
+          return "🚫 There was an error while searching: " + (res.exception?.message || "Unknown error");
 
         case "NO_MATCHES":
           return `No results found matching ${query}`;
@@ -138,11 +140,12 @@ async function play({ member, guild, channel }, query) {
       if (!tracks) guild.client.logger.debug({ query, res });
     }
   } catch (error) {
-    guild.client.logger.error("Search Exception", typeof error === "object" ? JSON.stringify(error) : error);
+    guild.client.logger.error("Search Exception", toError(error));
     return "🚫 An error occurred while searching for the song";
   }
 
   if (!tracks) return "🚫 An error occurred while searching for the song";
+  tracks = tracks.map(toQueueTrack);
 
   if (tracks.length === 1) {
     const track = tracks[0];

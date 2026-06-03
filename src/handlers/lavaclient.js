@@ -19,27 +19,31 @@ module.exports = (client) => {
 
   const lavaclient = new Cluster({
     nodes: normalizeNodes(client.config.MUSIC.LAVALINK_NODES, client),
-    sendGatewayPayload: (id, payload) => client.guilds.cache.get(id)?.shard?.send(payload),
-    userId: client.user.id,
+    discord: {
+      userId: client.user.id,
+      sendGatewayCommand: (id, payload) => client.guilds.cache.get(id)?.shard?.send(payload),
+    },
   });
+
+  addLegacyPlayerAliases(lavaclient, client);
 
   client.ws.on("VOICE_SERVER_UPDATE", (data) => lavaclient.handleVoiceUpdate(data));
   client.ws.on("VOICE_STATE_UPDATE", (data) => lavaclient.handleVoiceUpdate(data));
 
-  lavaclient.on("nodeConnect", (node, event) => {
-    client.logger.log(`Node "${node.id}" connected`);
+  lavaclient.on("nodeConnected", (node, event) => {
+    client.logger.log(`Node "${node.identifier}" connected`);
   });
 
-  lavaclient.on("nodeDisconnect", (node, event) => {
-    client.logger.log(`Node "${node.id}" disconnected`);
+  lavaclient.on("nodeDisconnected", (node, event) => {
+    client.logger.log(`Node "${node.identifier}" disconnected`);
   });
 
   lavaclient.on("nodeError", (node, error) => {
-    client.logger.error(`Node "${node.id}" encountered an error: ${error.message}.`, error);
+    client.logger.error(`Node "${node.identifier}" encountered an error: ${error.message}.`, error);
   });
 
-  lavaclient.on("nodeDebug", (node, message) => {
-    client.logger.debug(`Node "${node.id}" debug: ${message}`);
+  lavaclient.on("nodeDebug", (node, event) => {
+    client.logger.debug(`Node "${node.identifier}" debug: ${event.message || event}`);
   });
 
   lavaclient.on("nodeTrackStart", (_node, queue, song) => {
@@ -77,33 +81,76 @@ module.exports = (client) => {
 
   lavaclient.on("nodeQueueFinish", async (_node, queue) => {
     queue.data.channel.safeSend("Queue has ended.");
-    await client.musicManager.destroyPlayer(queue.player.guildId).then(queue.player.disconnect());
+    queue.player.disconnect();
+    await client.musicManager.destroyPlayer(queue.player.id);
   });
 
+  lavaclient.connect();
   return lavaclient;
 };
 
 function normalizeNodes(nodes, client) {
   return nodes.map((node) => {
-    if (!/^https?:\/\//i.test(node.host) && !/^wss?:\/\//i.test(node.host)) return node;
+    if (node.info) return node;
 
-    try {
-      const url = new URL(node.host);
-      if (url.pathname && url.pathname !== "/") {
-        client.logger.warn(
-          `Lavalink node "${node.id || url.hostname}" has a URL path; only host, port and protocol are used`
-        );
+    let host = node.host;
+    let port = node.port;
+    let tls = Boolean(node.secure);
+
+    if (/^https?:\/\//i.test(host) || /^wss?:\/\//i.test(host)) {
+      try {
+        const url = new URL(host);
+        if (url.pathname && url.pathname !== "/") {
+          client.logger.warn(
+            `Lavalink node "${node.id || node.identifier || url.hostname}" has a URL path; only host, port and protocol are used`
+          );
+        }
+
+        host = url.hostname;
+        port = port || Number(url.port) || (url.protocol === "https:" || url.protocol === "wss:" ? 443 : 80);
+        tls = node.secure ?? (url.protocol === "https:" || url.protocol === "wss:");
+      } catch (ex) {
+        client.logger.warn(`Invalid Lavalink node host "${node.host}". Using it as configured`);
       }
-
-      return {
-        ...node,
-        host: url.hostname,
-        port: node.port || Number(url.port) || (url.protocol === "https:" || url.protocol === "wss:" ? 443 : 80),
-        secure: node.secure ?? (url.protocol === "https:" || url.protocol === "wss:"),
-      };
-    } catch (ex) {
-      client.logger.warn(`Invalid Lavalink node host "${node.host}". Using it as configured`);
-      return node;
     }
+
+    return {
+      identifier: node.identifier || node.id || `${host}:${port}`,
+      info: {
+        host,
+        port,
+        auth: node.password,
+        tls,
+      },
+    };
   });
+}
+
+function addLegacyPlayerAliases(lavaclient, client) {
+  lavaclient.getPlayer = (guildId) => wrapLegacyPlayer(lavaclient.players.resolve(guildId));
+  lavaclient.createPlayer = (guildId) => wrapLegacyPlayer(lavaclient.players.create(guildId));
+  lavaclient.destroyPlayer = (guildId) => lavaclient.players.destroy(guildId, true);
+  lavaclient.handleVoiceUpdate = (data) => {
+    const player = lavaclient.players.resolve(data.guild_id);
+    if (player) player.voice.handleVoiceUpdate(data).catch((ex) => client.logger.error("Lavalink voice update", ex));
+  };
+}
+
+function wrapLegacyPlayer(player) {
+  if (!player || player._legacyAliasesAdded) return player;
+
+  player.connect = (channel, options) => player.voice.connect(channel, options);
+  player.disconnect = () => player.voice.disconnect();
+  Object.defineProperty(player, "connected", {
+    get() {
+      return player.voice.connected || Boolean(player.voice.channelId);
+    },
+  });
+  Object.defineProperty(player, "channelId", {
+    get() {
+      return player.voice.channelId;
+    },
+  });
+  player._legacyAliasesAdded = true;
+  return player;
 }
