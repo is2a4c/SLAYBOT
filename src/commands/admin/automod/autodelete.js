@@ -170,7 +170,7 @@ module.exports = {
     else if (sub === "maxlines") response = await maxLines(settings, interaction.options.getInteger("amount"));
     else response = "Invalid command usage!";
 
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

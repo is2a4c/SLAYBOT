@@ -154,7 +154,7 @@ module.exports = {
       );
     } else response = "Invalid command usage!";
 
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

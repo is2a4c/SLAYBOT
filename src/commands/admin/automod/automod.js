@@ -221,7 +221,7 @@ module.exports = {
       response = await whiteListRemove(settings, channelId);
     }
 
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 
