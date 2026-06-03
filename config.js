@@ -32,13 +32,36 @@ module.exports = {
 
   // Music Configuration
   MUSIC: {
-    enabled: false,
+    enabled: true,
     DEFAULT_SOURCE: "YT", // YT, YTM, or SC
     LAVALINK_NODES: [
       {
-        host: "localhost",
-        port: 2333,
+        id: "Serenetia",
+        host: "lavalinkv4.serenetia.com",
+        port: 443,
+        password: "https://seretia.link/discord",
+        secure: true,
+      },
+      {
+        id: "Jirayu",
+        host: "lavalink.jirayu.net",
+        port: 443,
         password: "youshallnotpass",
+        secure: true,
+      },
+      {
+        id: "MilloHost",
+        host: "lava-v4.millohost.my.id",
+        port: 443,
+        password: "https://discord.gg/mjS5J2K3ep",
+        secure: true,
+      },
+      {
+        id: "TriniumHost",
+        host: "lavalink-v4.triniumhost.com",
+        port: 443,
+        password: "free",
+        secure: true,
       },
     ],
     IDLE_TIME: 60, // seconds before destroying player when alone
