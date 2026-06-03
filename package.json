@@ -44,7 +44,7 @@
     "dotenv": "^16.4.7",
     "ejs": "^3.1.10",
     "enhanced-ms": "^2.3.0",
-    "express": "^4.21.2",
+    "express": "^4.22.2",
     "express-session": "^1.18.1",
     "fixedsize-map": "^1.1.0",
     "global-agent": "^4.1.3",
