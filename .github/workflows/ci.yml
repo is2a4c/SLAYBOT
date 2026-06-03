@@ -58,6 +58,8 @@ jobs:
           cache: "npm"
       - name: Install dependencies
         run: npm ci
+      - name: Create test config
+        run: cp example.config.js config.js
       - name: Validate config
         run: |
           node -e "const c=require('./config.js');const r=['OWNER_IDS','CACHE_SIZE','DASHBOARD','MUSIC','EMBED_COLORS','PRESENCE','INTERACTIONS','STATS','SUGGESTIONS','TICKET','ECONOMY','IMAGE','INVITE','AUTOMOD','MODERATION','GIVEAWAYS','MESSAGES','PREFIX_COMMANDS','SUPPORT_SERVER'];const m=r.filter(k=>!(k in c));if(m.length){console.error('Missing:',m.join(', '));process.exit(1)};console.log('✅ Config valid');"
@@ -157,6 +159,8 @@ jobs:
           cache: "npm"
       - name: Install dependencies
         run: npm ci
+      - name: Create test config
+        run: cp example.config.js config.js
       - name: Load all with full stack traces
         timeout-minutes: 3
         run: npm run debug:load

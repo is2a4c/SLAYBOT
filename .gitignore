@@ -1,10 +1,16 @@
 .env
-node_modules
+node_modules/
 logs/*
 config.js
 *.code-workspace
 .vscode
 docker-compose.yml
+.replit
+replit.nix
+
+# Agent/local workspace files
+.claude/
+.ai-context.md
 
 # Dashboard (not maintained yet)
 dashboard/
@@ -15,6 +21,7 @@ build/
 
 # OS files
 .DS_Store
+**/.DS_Store
 Thumbs.db
 
 # IDE
@@ -26,10 +33,9 @@ Thumbs.db
 # PM2
 .pm2/
 
-.ai-context.md
 # Proxy files
 bot-proxy.js
 ss-proxy.js
 
 # Docker
-*.logsetup-deploy.sh
+*.log
