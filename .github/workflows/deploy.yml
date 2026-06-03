@@ -61,11 +61,29 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
+          script_stop: true
           script: |
+            set -e
+
             cd ${{ secrets.DEPLOY_PATH || '/opt/slaybot' }}
 
-            # Pull latest code
-            git pull origin main
+            CONFIG_BACKUP="$(mktemp)"
+            if [ -f config.js ]; then
+              cp config.js "$CONFIG_BACKUP"
+            fi
+
+            # Sync latest code. This overwrites tracked local edits such as config.js,
+            # then restores server-local config.js below.
+            git fetch origin main
+            git reset --hard origin/main
+
+            if [ -s "$CONFIG_BACKUP" ]; then
+              cp "$CONFIG_BACKUP" config.js
+            elif [ ! -f config.js ]; then
+              echo "Missing server config.js. Copy example.config.js to config.js and configure it on the server."
+              exit 1
+            fi
+            rm -f "$CONFIG_BACKUP"
 
             # Install dependencies
             npm ci --omit=dev

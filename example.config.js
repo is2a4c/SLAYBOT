@@ -1,5 +1,8 @@
 /**
- * SLAYBOT Configuration File
+ * SLAYBOT Example Configuration File
+ *
+ * Copy this file to config.js and adjust values for your environment.
+ * config.js is intentionally ignored by git.
  */
 
 module.exports = {
