@@ -10,47 +10,49 @@ jobs:
     environment:
       name: production
     steps:
-      - name: Stop stale instance via SSH
+      # The stale process runs as root, so this step authenticates as root.
+      # Requires the SERVER_ROOT_PASSWORD repository secret to be set.
+      - name: Stop stale instance as root
+        if: ${{ secrets.SERVER_ROOT_PASSWORD != '' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          username: root
+          password: ${{ secrets.SERVER_ROOT_PASSWORD }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
             echo "=== processes before ==="
             ps -eo user:20,pid,etime,args | grep -i slaybot | grep -v grep || true
 
-            # Remove apps whose script lives in the deleted /root/SLAYBOT from every pm2 daemon.
-            # The healthy instance runs /opt/slaybot/bot.js and is never touched.
-            for H in /root/.pm2 /home/*/.pm2; do
-              [ -d "$H" ] || continue
-              echo "=== pm2 daemon: $H ==="
-              NAMES=$(PM2_HOME="$H" pm2 jlist 2>/dev/null | node -e '
-                let d="";
-                process.stdin.on("data",(c)=>d+=c).on("end",()=>{
-                  try {
-                    const apps=JSON.parse(d.slice(d.indexOf("[")));
-                    for (const a of apps) {
-                      const p=(a.pm2_env&&a.pm2_env.pm_exec_path)||"";
-                      console.error(a.name+" -> "+p+" ["+(a.pm2_env?a.pm2_env.status:"?")+"]");
-                      if (p.startsWith("/root/SLAYBOT")) console.log(a.name);
-                    }
-                  } catch(e) { console.error("jlist parse failed"); }
-                });' ) || true
-              for N in $NAMES; do
-                echo "deleting stale pm2 app '$N' from $H"
-                PM2_HOME="$H" pm2 delete "$N" || true
-              done
-              PM2_HOME="$H" pm2 save --force 2>/dev/null || true
+            echo "=== root pm2 apps ==="
+            NAMES=$(pm2 jlist 2>/dev/null | node -e '
+              let d="";
+              process.stdin.on("data",(c)=>d+=c).on("end",()=>{
+                try {
+                  const apps=JSON.parse(d.slice(d.indexOf("[")));
+                  for (const a of apps) {
+                    const p=(a.pm2_env&&a.pm2_env.pm_exec_path)||"";
+                    console.error(a.name+" -> "+p+" ["+(a.pm2_env?a.pm2_env.status:"?")+"]");
+                    if (p.startsWith("/root/SLAYBOT")) console.log(a.name);
+                  }
+                } catch(e) { console.error("jlist parse failed"); }
+              });' ) || true
+            for N in $NAMES; do
+              echo "deleting stale pm2 app '$N' from root pm2"
+              pm2 delete "$N" || true
             done
+            pm2 save --force 2>/dev/null || true
 
-            # Fallback: kill any leftover process started from the deleted directory
-            pkill -f "node /root/SLAYBOT/bot.js" 2>/dev/null || true
+            # Kill any leftover process from the deleted directory.
+            # [n]ode pattern avoids pkill matching this SSH session itself.
+            pkill -f "[n]ode /root/SLAYBOT/bot.js" || true
 
             sleep 2
             echo "=== processes after ==="
-            ps -eo user:20,pid,etime,args | grep -i slaybot | grep -v grep || true
+            ps -eo user:20,pid,etime,args | grep -i slaybot | grep -v grep || echo "no slaybot processes (unexpected!)"
 
-            echo "=== healthy instance ==="
-            pm2 list || true
+      - name: Secret missing notice
+        if: ${{ secrets.SERVER_ROOT_PASSWORD == '' }}
+        run: |
+          echo "::warning::SERVER_ROOT_PASSWORD secret is not set. The stale process runs as root and cannot be stopped by the deploy user."
+          echo "Add the secret in Settings -> Secrets and variables -> Actions, then re-run this workflow."
