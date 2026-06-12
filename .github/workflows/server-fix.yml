@@ -1,0 +1,56 @@
+name: Server Fix Stale Instance
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    name: 🧹 Remove stale /root/SLAYBOT bot instance
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Stop stale instance via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            echo "=== processes before ==="
+            ps -eo user:20,pid,etime,args | grep -i slaybot | grep -v grep || true
+
+            # Remove apps whose script lives in the deleted /root/SLAYBOT from every pm2 daemon.
+            # The healthy instance runs /opt/slaybot/bot.js and is never touched.
+            for H in /root/.pm2 /home/*/.pm2; do
+              [ -d "$H" ] || continue
+              echo "=== pm2 daemon: $H ==="
+              NAMES=$(PM2_HOME="$H" pm2 jlist 2>/dev/null | node -e '
+                let d="";
+                process.stdin.on("data",(c)=>d+=c).on("end",()=>{
+                  try {
+                    const apps=JSON.parse(d.slice(d.indexOf("[")));
+                    for (const a of apps) {
+                      const p=(a.pm2_env&&a.pm2_env.pm_exec_path)||"";
+                      console.error(a.name+" -> "+p+" ["+(a.pm2_env?a.pm2_env.status:"?")+"]");
+                      if (p.startsWith("/root/SLAYBOT")) console.log(a.name);
+                    }
+                  } catch(e) { console.error("jlist parse failed"); }
+                });' ) || true
+              for N in $NAMES; do
+                echo "deleting stale pm2 app '$N' from $H"
+                PM2_HOME="$H" pm2 delete "$N" || true
+              done
+              PM2_HOME="$H" pm2 save --force 2>/dev/null || true
+            done
+
+            # Fallback: kill any leftover process started from the deleted directory
+            pkill -f "node /root/SLAYBOT/bot.js" 2>/dev/null || true
+
+            sleep 2
+            echo "=== processes after ==="
+            ps -eo user:20,pid,etime,args | grep -i slaybot | grep -v grep || true
+
+            echo "=== healthy instance ==="
+            pm2 list || true
