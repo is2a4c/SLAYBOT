@@ -82,7 +82,7 @@ module.exports = {
   },
 
   async interactionRun(interaction) {
-    const sub = interaction.options.getSubcommand("type");
+    const sub = interaction.options.getSubcommand();
 
     if (sub === "coin") {
       const items = ["HEAD", "TAIL"];

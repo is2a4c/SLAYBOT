@@ -299,7 +299,7 @@ async function setStatus(settings, status) {
   const enabled = status.toUpperCase() === "ON" ? true : false;
   settings.farewell.enabled = enabled;
   await settings.save();
-  return `Configuration saved! Farewell message ${status ? "enabled" : "disabled"}`;
+  return `Configuration saved! Farewell message ${enabled ? "enabled" : "disabled"}`;
 }
 
 async function setChannel(settings, channel) {

@@ -98,7 +98,7 @@ module.exports = {
     }
 
     // give
-    if (sub === "give") {
+    else if (sub === "give") {
       const target = interaction.options.getUser("user");
       response = await giveReputation(interaction.user, target);
     }

@@ -7,7 +7,7 @@ const { trackVoiceStats } = require("@handlers/stats");
  */
 module.exports = async (client, oldState, newState) => {
   // Track voice stats
-  trackVoiceStats(oldState, newState);
+  trackVoiceStats(oldState, newState).catch((ex) => client.logger.error("trackVoiceStats", ex));
 
   // Lavalink
   if (client.config.MUSIC.enabled && client.musicManager) {

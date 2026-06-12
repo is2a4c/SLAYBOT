@@ -132,6 +132,11 @@ async function performAutomod(message, settings) {
         fields.push({ name: "AntiSpam Detection", value: "✓", inline: true });
         shouldDelete = true;
         strikesTotal += 1;
+      } else {
+        antispamCache.set(key, {
+          content,
+          timestamp: Date.now(),
+        });
       }
     } else {
       antispamCache.set(key, {
