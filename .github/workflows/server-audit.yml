@@ -1,0 +1,61 @@
+name: Server Audit
+
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: 🔎 Server Audit (read-only)
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Inspect server state via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            echo "=== hostname / uptime ==="
+            hostname; uptime
+
+            echo "=== pm2 list ==="
+            pm2 list || true
+
+            echo "=== node/pm2 processes ==="
+            ps -eo pid,etime,args | grep -E "node|pm2|bot\.js" | grep -v grep || true
+
+            echo "=== /opt/slaybot ==="
+            if [ -d /opt/slaybot ]; then
+              cd /opt/slaybot
+              git log --oneline -3
+              git status --short | head -5
+              ls -la .env config.js 2>/dev/null
+              ls -la *.bak.* 2>/dev/null || echo "no backups yet"
+            else
+              echo "missing"
+            fi
+
+            echo "=== /root/SLAYBOT ==="
+            if [ -d /root/SLAYBOT ]; then
+              cd /root/SLAYBOT
+              git log --oneline -3 2>/dev/null || echo "not a git repo"
+              ls -la .env config.js 2>/dev/null
+            else
+              echo "not present"
+            fi
+
+            echo "=== /opt/slaybot-debug ==="
+            ls -d /opt/slaybot-debug 2>/dev/null || echo "not present"
+
+            echo "=== token comparison (hashes only, no secrets printed) ==="
+            md5sum /opt/slaybot/.env /root/SLAYBOT/.env /opt/slaybot-debug/.env 2>/dev/null || true
+
+            echo "=== disk / memory ==="
+            df -h / | tail -1
+            free -m | head -2
+
+            echo "=== last 30 lines of pm2 error logs ==="
+            tail -n 30 /root/.pm2/logs/slaybot-error.log 2>/dev/null || echo "no slaybot-error.log"

@@ -39,21 +39,6 @@ jobs:
       - name: Install dependencies
         run: npm ci --omit=dev
 
-      - name: Create .env file
-        run: |
-          cat > .env << EOF
-          BOT_TOKEN=${{ secrets.BOT_TOKEN }}
-          MONGO_CONNECTION=${{ secrets.MONGO_CONNECTION }}
-          ERROR_LOGS=${{ secrets.ERROR_LOGS }}
-          JOIN_LEAVE_LOGS=${{ secrets.JOIN_LEAVE_LOGS }}
-          BOT_SECRET=${{ secrets.BOT_SECRET }}
-          SESSION_PASSWORD=${{ secrets.SESSION_PASSWORD }}
-          WEATHERSTACK_KEY=${{ secrets.WEATHERSTACK_KEY }}
-          STRANGE_API_KEY=${{ secrets.STRANGE_API_KEY }}
-          SPOTIFY_CLIENT_ID=${{ secrets.SPOTIFY_CLIENT_ID }}
-          SPOTIFY_CLIENT_SECRET=${{ secrets.SPOTIFY_CLIENT_SECRET }}
-          EOF
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -67,23 +52,48 @@ jobs:
 
             cd ${{ secrets.DEPLOY_PATH || '/opt/slaybot' }}
 
-            CONFIG_BACKUP="$(mktemp)"
-            if [ -f config.js ]; then
-              cp config.js "$CONFIG_BACKUP"
-            fi
+            TS="$(date +%Y%m%d-%H%M%S)"
 
-            # Sync latest code. This overwrites tracked local edits such as config.js,
-            # then restores server-local config.js below.
+            # Backup server-local files before deploy
+            if [ -f config.js ]; then cp config.js "config.js.bak.$TS"; fi
+            if [ -f .env ]; then cp .env ".env.bak.$TS"; fi
+
+            # Sync latest code (config.js and .env are untracked, git does not touch them)
             git fetch origin main
             git reset --hard origin/main
 
-            if [ -s "$CONFIG_BACKUP" ]; then
-              cp "$CONFIG_BACKUP" config.js
-            elif [ ! -f config.js ]; then
+            if [ ! -f config.js ]; then
               echo "Missing server config.js. Copy example.config.js to config.js and configure it on the server."
               exit 1
             fi
-            rm -f "$CONFIG_BACKUP"
+
+            # Update server .env from GitHub secrets.
+            # Skipped when the BOT_TOKEN secret is empty so an existing server .env is never wiped.
+            if [ -n "${{ secrets.BOT_TOKEN }}" ]; then
+              cat > .env << 'ENVEOF'
+            BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+            MONGO_CONNECTION=${{ secrets.MONGO_CONNECTION }}
+            ERROR_LOGS=${{ secrets.ERROR_LOGS }}
+            JOIN_LEAVE_LOGS=${{ secrets.JOIN_LEAVE_LOGS }}
+            BOT_SECRET=${{ secrets.BOT_SECRET }}
+            SESSION_PASSWORD=${{ secrets.SESSION_PASSWORD }}
+            WEATHERSTACK_KEY=${{ secrets.WEATHERSTACK_KEY }}
+            STRANGE_API_KEY=${{ secrets.STRANGE_API_KEY }}
+            SPOTIFY_CLIENT_ID=${{ secrets.SPOTIFY_CLIENT_ID }}
+            SPOTIFY_CLIENT_SECRET=${{ secrets.SPOTIFY_CLIENT_SECRET }}
+            ENVEOF
+            else
+              echo "BOT_TOKEN secret is empty; keeping existing server .env"
+            fi
+
+            if [ ! -f .env ]; then
+              echo "Missing server .env. Set the BOT_TOKEN secret or create .env on the server (see .env.example)."
+              exit 1
+            fi
+
+            # Keep only the 5 most recent backups of each file
+            ls -t config.js.bak.* 2>/dev/null | tail -n +6 | xargs -r rm -f --
+            ls -t .env.bak.* 2>/dev/null | tail -n +6 | xargs -r rm -f --
 
             # Install dependencies
             npm ci --omit=dev
