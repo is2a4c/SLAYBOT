@@ -41,21 +41,6 @@ jobs:
       - name: Install dependencies
         run: npm ci --omit=dev
 
-      - name: Create .env file
-        run: |
-          cat > .env << EOF
-          BOT_TOKEN=${{ secrets.DEBUG_BOT_TOKEN }}
-          MONGO_CONNECTION=${{ secrets.DEBUG_MONGO_CONNECTION }}
-          ERROR_LOGS=${{ secrets.DEBUG_ERROR_LOGS }}
-          JOIN_LEAVE_LOGS=${{ secrets.DEBUG_JOIN_LEAVE_LOGS }}
-          BOT_SECRET=${{ secrets.DEBUG_BOT_SECRET }}
-          SESSION_PASSWORD=${{ secrets.SESSION_PASSWORD }}
-          WEATHERSTACK_KEY=${{ secrets.WEATHERSTACK_KEY }}
-          STRANGE_API_KEY=${{ secrets.STRANGE_API_KEY }}
-          SPOTIFY_CLIENT_ID=${{ secrets.SPOTIFY_CLIENT_ID }}
-          SPOTIFY_CLIENT_SECRET=${{ secrets.SPOTIFY_CLIENT_SECRET }}
-          EOF
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -63,7 +48,10 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
+          script_stop: true
           script: |
+            set -e
+
             DEPLOY_DIR="${{ secrets.DEBUG_DEPLOY_PATH || '/opt/slaybot-debug' }}"
             mkdir -p "$DEPLOY_DIR"
             cd "$DEPLOY_DIR"
@@ -74,15 +62,49 @@ jobs:
               git remote add origin ${{ secrets.REPO_URL }}
             fi
 
-            # Pull develop branch
+            TS="$(date +%Y%m%d-%H%M%S)"
+
+            # Backup server-local files before deploy
+            if [ -f config.js ]; then cp config.js "config.js.bak.$TS"; fi
+            if [ -f .env ]; then cp .env ".env.bak.$TS"; fi
+
+            # Pull develop branch (config.js and .env are untracked, git does not touch them)
             git fetch origin develop
             git reset --hard origin/develop
+
+            # Update server .env from GitHub secrets.
+            # Skipped when the DEBUG_BOT_TOKEN secret is empty so an existing server .env is never wiped.
+            if [ -n "${{ secrets.DEBUG_BOT_TOKEN }}" ]; then
+              cat > .env << 'ENVEOF'
+            BOT_TOKEN=${{ secrets.DEBUG_BOT_TOKEN }}
+            MONGO_CONNECTION=${{ secrets.DEBUG_MONGO_CONNECTION }}
+            ERROR_LOGS=${{ secrets.DEBUG_ERROR_LOGS }}
+            JOIN_LEAVE_LOGS=${{ secrets.DEBUG_JOIN_LEAVE_LOGS }}
+            BOT_SECRET=${{ secrets.DEBUG_BOT_SECRET }}
+            SESSION_PASSWORD=${{ secrets.SESSION_PASSWORD }}
+            WEATHERSTACK_KEY=${{ secrets.WEATHERSTACK_KEY }}
+            STRANGE_API_KEY=${{ secrets.STRANGE_API_KEY }}
+            SPOTIFY_CLIENT_ID=${{ secrets.SPOTIFY_CLIENT_ID }}
+            SPOTIFY_CLIENT_SECRET=${{ secrets.SPOTIFY_CLIENT_SECRET }}
+            ENVEOF
+            else
+              echo "DEBUG_BOT_TOKEN secret is empty; keeping existing server .env"
+            fi
+
+            if [ ! -f .env ]; then
+              echo "Missing server .env. Set the DEBUG_BOT_TOKEN secret or create .env on the server (see .env.example)."
+              exit 1
+            fi
+
+            # Keep only the 5 most recent backups of each file
+            ls -t config.js.bak.* 2>/dev/null | tail -n +6 | xargs -r rm -f --
+            ls -t .env.bak.* 2>/dev/null | tail -n +6 | xargs -r rm -f --
 
             # Install dependencies
             npm ci --omit=dev
 
-            # Restart debug bot
-            pm2 reload slaybot-debug --update-env 2>/dev/null || pm2 start bot.js --name slaybot-debug --no-daemon
+            # Restart debug bot (--no-daemon would block this SSH session forever)
+            pm2 reload slaybot-debug --update-env 2>/dev/null || pm2 start bot.js --name slaybot-debug
             pm2 save
 
             # Show status
