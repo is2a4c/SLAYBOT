@@ -406,7 +406,7 @@ async function removeFromTicket({ channel }, inputId) {
   if (!inputId || isNaN(inputId)) return "Oops! You need to input a valid userId/roleId";
 
   try {
-    channel.permissionOverwrites.create(inputId, {
+    await channel.permissionOverwrites.create(inputId, {
       ViewChannel: false,
       SendMessages: false,
     });

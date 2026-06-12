@@ -269,10 +269,10 @@ module.exports = {
     else if (sub === "edit") {
       const messageId = interaction.options.getString("message_id");
       const addDur = interaction.options.getInteger("add_duration");
-      const addDurationMs = addDur ? ems(addDur) : null;
-      if (!addDurationMs) {
+      if (addDur !== null && addDur <= 0) {
         return interaction.followUp("Not a valid duration");
       }
+      const addDurationMs = addDur ? addDur * 60 * 1000 : null;
       const newPrize = interaction.options.getString("new_prize");
       const newWinnerCount = interaction.options.getInteger("new_winners");
       response = await edit(interaction.member, messageId, addDurationMs, newPrize, newWinnerCount);
