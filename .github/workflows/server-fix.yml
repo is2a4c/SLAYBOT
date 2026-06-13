@@ -10,22 +10,30 @@ jobs:
     environment:
       name: production
     steps:
-      # The stale process runs as root, so this step authenticates as root.
-      # Requires the SERVER_ROOT_PASSWORD repository secret to be set.
-      - name: Stop stale instance as root
-        if: ${{ secrets.SERVER_ROOT_PASSWORD != '' }}
+      # Primary path: connect as the deploy user and escalate with passwordless
+      # sudo. The stale process is owned by root, so root privileges are required;
+      # this avoids needing the root password as a secret. If sudo needs a
+      # password (sudo -n fails), the step falls back to the root-login path below.
+      - name: Stop stale instance via sudo
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
-          username: root
-          password: ${{ secrets.SERVER_ROOT_PASSWORD }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
             echo "=== processes before ==="
             ps -eo user:20,pid,etime,args | grep -i slaybot | grep -v grep || true
 
+            if ! sudo -n true 2>/dev/null; then
+              echo "NO_PASSWORDLESS_SUDO"
+              echo "::warning::Deploy user lacks passwordless sudo; cannot stop the root-owned process. Set SERVER_ROOT_PASSWORD secret or stop it manually."
+              exit 0
+            fi
+            echo "passwordless sudo available; proceeding as root"
+
             echo "=== root pm2 apps ==="
-            NAMES=$(pm2 jlist 2>/dev/null | node -e '
+            NAMES=$(sudo -n env PM2_HOME=/root/.pm2 pm2 jlist 2>/dev/null | node -e '
               let d="";
               process.stdin.on("data",(c)=>d+=c).on("end",()=>{
                 try {
@@ -39,20 +47,58 @@ jobs:
               });' ) || true
             for N in $NAMES; do
               echo "deleting stale pm2 app '$N' from root pm2"
-              pm2 delete "$N" || true
+              sudo -n env PM2_HOME=/root/.pm2 pm2 delete "$N" || true
             done
-            pm2 save --force 2>/dev/null || true
+            sudo -n env PM2_HOME=/root/.pm2 pm2 save --force 2>/dev/null || true
 
             # Kill any leftover process from the deleted directory.
+            # [n]ode pattern avoids pkill matching this SSH session itself.
+            sudo -n pkill -f "[n]ode /root/SLAYBOT/bot.js" || true
+
+            sleep 2
+            echo "=== processes after ==="
+            ps -eo user:20,pid,etime,args | grep -i slaybot | grep -v grep || echo "(no slaybot processes)"
+
+            echo "=== healthy instance ==="
+            pm2 list || true
+
+      # Fallback path: only runs if the SERVER_ROOT_PASSWORD secret is set.
+      # Use this when the deploy user has no passwordless sudo. Harmless no-op
+      # if the sudo step above already removed the stale instance.
+      - name: Stop stale instance via root login
+        if: ${{ secrets.SERVER_ROOT_PASSWORD != '' }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: root
+          password: ${{ secrets.SERVER_ROOT_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            echo "=== processes before ==="
+            ps -eo user:20,pid,etime,args | grep -i slaybot | grep -v grep || true
+
+            echo "=== root pm2 apps ==="
+            NAMES=$(PM2_HOME=/root/.pm2 pm2 jlist 2>/dev/null | node -e '
+              let d="";
+              process.stdin.on("data",(c)=>d+=c).on("end",()=>{
+                try {
+                  const apps=JSON.parse(d.slice(d.indexOf("[")));
+                  for (const a of apps) {
+                    const p=(a.pm2_env&&a.pm2_env.pm_exec_path)||"";
+                    console.error(a.name+" -> "+p+" ["+(a.pm2_env?a.pm2_env.status:"?")+"]");
+                    if (p.startsWith("/root/SLAYBOT")) console.log(a.name);
+                  }
+                } catch(e) { console.error("jlist parse failed"); }
+              });' ) || true
+            for N in $NAMES; do
+              echo "deleting stale pm2 app '$N' from root pm2"
+              PM2_HOME=/root/.pm2 pm2 delete "$N" || true
+            done
+            PM2_HOME=/root/.pm2 pm2 save --force 2>/dev/null || true
+
             # [n]ode pattern avoids pkill matching this SSH session itself.
             pkill -f "[n]ode /root/SLAYBOT/bot.js" || true
 
             sleep 2
             echo "=== processes after ==="
-            ps -eo user:20,pid,etime,args | grep -i slaybot | grep -v grep || echo "no slaybot processes (unexpected!)"
-
-      - name: Secret missing notice
-        if: ${{ secrets.SERVER_ROOT_PASSWORD == '' }}
-        run: |
-          echo "::warning::SERVER_ROOT_PASSWORD secret is not set. The stale process runs as root and cannot be stopped by the deploy user."
-          echo "Add the secret in Settings -> Secrets and variables -> Actions, then re-run this workflow."
+            ps -eo user:20,pid,etime,args | grep -i slaybot | grep -v grep || echo "(no slaybot processes)"
