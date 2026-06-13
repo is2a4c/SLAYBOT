@@ -61,3 +61,44 @@ jobs:
 
             echo "=== healthy instance ==="
             pm2 list || true
+
+      # Fallback path: only runs if the SERVER_ROOT_PASSWORD secret is set.
+      # Use this when the deploy user has no passwordless sudo. Harmless no-op
+      # if the sudo step above already removed the stale instance.
+      - name: Stop stale instance via root login
+        if: ${{ secrets.SERVER_ROOT_PASSWORD != '' }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: root
+          password: ${{ secrets.SERVER_ROOT_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            echo "=== processes before ==="
+            ps -eo user:20,pid,etime,args | grep -i slaybot | grep -v grep || true
+
+            echo "=== root pm2 apps ==="
+            NAMES=$(PM2_HOME=/root/.pm2 pm2 jlist 2>/dev/null | node -e '
+              let d="";
+              process.stdin.on("data",(c)=>d+=c).on("end",()=>{
+                try {
+                  const apps=JSON.parse(d.slice(d.indexOf("[")));
+                  for (const a of apps) {
+                    const p=(a.pm2_env&&a.pm2_env.pm_exec_path)||"";
+                    console.error(a.name+" -> "+p+" ["+(a.pm2_env?a.pm2_env.status:"?")+"]");
+                    if (p.startsWith("/root/SLAYBOT")) console.log(a.name);
+                  }
+                } catch(e) { console.error("jlist parse failed"); }
+              });' ) || true
+            for N in $NAMES; do
+              echo "deleting stale pm2 app '$N' from root pm2"
+              PM2_HOME=/root/.pm2 pm2 delete "$N" || true
+            done
+            PM2_HOME=/root/.pm2 pm2 save --force 2>/dev/null || true
+
+            # [n]ode pattern avoids pkill matching this SSH session itself.
+            pkill -f "[n]ode /root/SLAYBOT/bot.js" || true
+
+            sleep 2
+            echo "=== processes after ==="
+            ps -eo user:20,pid,etime,args | grep -i slaybot | grep -v grep || echo "(no slaybot processes)"
