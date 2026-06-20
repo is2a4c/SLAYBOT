@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
+    env:
+      SERVER_ROOT_PASSWORD: ${{ secrets.SERVER_ROOT_PASSWORD }}
     steps:
       # Primary path: connect as the deploy user and escalate with passwordless
       # sudo. The stale process is owned by root, so root privileges are required;
@@ -66,12 +68,12 @@ jobs:
       # Use this when the deploy user has no passwordless sudo. Harmless no-op
       # if the sudo step above already removed the stale instance.
       - name: Stop stale instance via root login
-        if: ${{ secrets.SERVER_ROOT_PASSWORD != '' }}
+        if: ${{ env.SERVER_ROOT_PASSWORD != '' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: root
-          password: ${{ secrets.SERVER_ROOT_PASSWORD }}
+          password: ${{ env.SERVER_ROOT_PASSWORD }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
             echo "=== processes before ==="
