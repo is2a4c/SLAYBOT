@@ -230,16 +230,8 @@ function getRemainingCooldown(memberId, cmd) {
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 async function respondToInteractionError(interaction) {
-  const response = {
+  await interaction.safeFollowUp({
     content: "Oops! An error occurred while running the command",
     ephemeral: true,
-  };
-
-  try {
-    if (interaction.deferred) return await interaction.editReply(response);
-    if (interaction.replied) return await interaction.followUp(response);
-    return await interaction.reply(response);
-  } catch (ex) {
-    interaction.client.logger.error("Failed to send slash command error response", ex);
-  }
+  });
 }

@@ -27,6 +27,18 @@ jobs:
     if: ${{ always() && (github.event_name == 'workflow_dispatch' || needs.check-ci.result == 'success') }}
     environment:
       name: production
+    env:
+      SERVER_ROOT_PASSWORD: ${{ secrets.SERVER_ROOT_PASSWORD }}
+      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+      MONGO_CONNECTION: ${{ secrets.MONGO_CONNECTION }}
+      ERROR_LOGS: ${{ secrets.ERROR_LOGS }}
+      JOIN_LEAVE_LOGS: ${{ secrets.JOIN_LEAVE_LOGS }}
+      BOT_SECRET: ${{ secrets.BOT_SECRET }}
+      SESSION_PASSWORD: ${{ secrets.SESSION_PASSWORD }}
+      WEATHERSTACK_KEY: ${{ secrets.WEATHERSTACK_KEY }}
+      STRANGE_API_KEY: ${{ secrets.STRANGE_API_KEY }}
+      SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+      SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,18 +51,45 @@ jobs:
       - name: Install dependencies
         run: npm ci --omit=dev
 
+      - name: Stop stale root bot
+        if: ${{ env.SERVER_ROOT_PASSWORD != '' }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: root
+          password: ${{ env.SERVER_ROOT_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script_stop: false
+          script: |
+            pm2 delete SLAYBOT 2>/dev/null || true
+            pkill -f "[n]ode /root/SLAYBOT/bot.js" 2>/dev/null || true
+            pm2 save --force 2>/dev/null || true
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          BOT_TOKEN: ${{ env.BOT_TOKEN }}
+          MONGO_CONNECTION: ${{ env.MONGO_CONNECTION }}
+          ERROR_LOGS: ${{ env.ERROR_LOGS }}
+          JOIN_LEAVE_LOGS: ${{ env.JOIN_LEAVE_LOGS }}
+          BOT_SECRET: ${{ env.BOT_SECRET }}
+          SESSION_PASSWORD: ${{ env.SESSION_PASSWORD }}
+          WEATHERSTACK_KEY: ${{ env.WEATHERSTACK_KEY }}
+          STRANGE_API_KEY: ${{ env.STRANGE_API_KEY }}
+          SPOTIFY_CLIENT_ID: ${{ env.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ env.SPOTIFY_CLIENT_SECRET }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script_stop: true
+          envs: BOT_TOKEN,MONGO_CONNECTION,ERROR_LOGS,JOIN_LEAVE_LOGS,BOT_SECRET,SESSION_PASSWORD,WEATHERSTACK_KEY,STRANGE_API_KEY,SPOTIFY_CLIENT_ID,SPOTIFY_CLIENT_SECRET
           script: |
             set -e
 
-            cd ${{ secrets.DEPLOY_PATH || '/opt/slaybot' }}
+            DEPLOY_DIR="${{ secrets.DEPLOY_PATH || '/opt/slaybot' }}"
+            cd "$DEPLOY_DIR"
 
             TS="$(date +%Y%m%d-%H%M%S)"
 
@@ -69,19 +108,8 @@ jobs:
 
             # Update server .env from GitHub secrets.
             # Skipped when the BOT_TOKEN secret is empty so an existing server .env is never wiped.
-            if [ -n "${{ secrets.BOT_TOKEN }}" ]; then
-              cat > .env << 'ENVEOF'
-            BOT_TOKEN=${{ secrets.BOT_TOKEN }}
-            MONGO_CONNECTION=${{ secrets.MONGO_CONNECTION }}
-            ERROR_LOGS=${{ secrets.ERROR_LOGS }}
-            JOIN_LEAVE_LOGS=${{ secrets.JOIN_LEAVE_LOGS }}
-            BOT_SECRET=${{ secrets.BOT_SECRET }}
-            SESSION_PASSWORD=${{ secrets.SESSION_PASSWORD }}
-            WEATHERSTACK_KEY=${{ secrets.WEATHERSTACK_KEY }}
-            STRANGE_API_KEY=${{ secrets.STRANGE_API_KEY }}
-            SPOTIFY_CLIENT_ID=${{ secrets.SPOTIFY_CLIENT_ID }}
-            SPOTIFY_CLIENT_SECRET=${{ secrets.SPOTIFY_CLIENT_SECRET }}
-            ENVEOF
+            if [ -n "$BOT_TOKEN" ]; then
+              node -e 'const fs=require("fs"); const keys=["BOT_TOKEN","MONGO_CONNECTION","ERROR_LOGS","JOIN_LEAVE_LOGS","BOT_SECRET","SESSION_PASSWORD","WEATHERSTACK_KEY","STRANGE_API_KEY","SPOTIFY_CLIENT_ID","SPOTIFY_CLIENT_SECRET"]; fs.writeFileSync(".env", keys.map((key)=>`${key}=${process.env[key]||""}`).join("\n")+"\n", {mode:0o600});'
             else
               echo "BOT_TOKEN secret is empty; keeping existing server .env"
             fi
@@ -98,8 +126,16 @@ jobs:
             # Install dependencies
             npm ci --omit=dev
 
+            if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+              sudo -n env PM2_HOME=/root/.pm2 pm2 delete SLAYBOT 2>/dev/null || true
+              sudo -n pkill -f "[n]ode /root/SLAYBOT/bot.js" 2>/dev/null || true
+              sudo -n env PM2_HOME=/root/.pm2 pm2 save --force 2>/dev/null || true
+            fi
+
             # Restart bot
             pm2 reload slaybot --update-env 2>/dev/null || pm2 start bot.js --name slaybot
+
+            pm2 describe slaybot | grep -F "$DEPLOY_DIR/bot.js"
 
             # Show status
             pm2 status
