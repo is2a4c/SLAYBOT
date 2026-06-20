@@ -8,15 +8,20 @@ const VALID_STATUSES = new Set(["online", "idle", "dnd", "invisible"]);
  */
 function updatePresence(client) {
   const presence = client.config.PRESENCE;
-  const messages = Array.isArray(presence.MESSAGE) && presence.MESSAGE.length > 0 ? presence.MESSAGE : ["SLAYBOT"];
-  let message = Array.isArray(messages) ? messages[messageIndex] : messages;
-  if (typeof message !== "string") message = String(message || "SLAYBOT");
+  const messages = Array.isArray(presence.MESSAGE)
+    ? presence.MESSAGE.filter((item) => item !== null && item !== undefined && String(item).trim() !== "")
+    : presence.MESSAGE
+      ? [presence.MESSAGE]
+      : [];
 
-  if (message.includes("{servers}")) {
+  let message = messages.length > 0 ? messages[messageIndex] : null;
+  if (message !== null && typeof message !== "string") message = String(message);
+
+  if (message?.includes("{servers}")) {
     message = message.replaceAll("{servers}", client.guilds.cache.size);
   }
 
-  if (message.includes("{members}")) {
+  if (message?.includes("{members}")) {
     const members = client.guilds.cache.map((g) => g.memberCount).reduce((partial_sum, a) => partial_sum + a, 0);
     message = message.replaceAll("{members}", members);
   }
@@ -44,31 +49,19 @@ function updatePresence(client) {
   };
 
   const status = VALID_STATUSES.has(presence.STATUS) ? presence.STATUS : "idle";
-
-  if (presence.TYPE === "CUSTOM") {
-    client.user.setPresence({
-      status,
-      activities: [
+  const activities = message
+    ? [
         {
           name: message,
-          state: message,
+          ...(presence.TYPE === "CUSTOM" ? { state: message } : {}),
           type: getType(presence.TYPE),
         },
-      ],
-    });
-  } else {
-    client.user.setPresence({
-      status,
-      activities: [
-        {
-          name: message,
-          type: getType(presence.TYPE),
-        },
-      ],
-    });
-  }
+      ]
+    : [];
 
-  if (Array.isArray(messages)) {
+  client.user.setPresence({ status, activities });
+
+  if (messages.length > 0) {
     messageIndex = (messageIndex + 1) % messages.length;
   }
 }
