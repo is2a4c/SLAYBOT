@@ -73,6 +73,9 @@
     "utf-8-validate": "^6.0.5",
     "zlib-sync": "^0.1.9"
   },
+  "overrides": {
+    "undici": "6.27.0"
+  },
   "devDependencies": {
     "eslint": "^8.57.1",
     "eslint-plugin-jsdoc": "^46.10.1",
