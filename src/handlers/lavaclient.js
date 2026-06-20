@@ -2,14 +2,30 @@ const { EmbedBuilder } = require("discord.js");
 const { Cluster } = require("lavaclient");
 const prettyMs = require("pretty-ms");
 const { load: loadSpotify, SpotifyItemType } = require("@lavaclient/spotify");
-const { Queue, load: loadQueue } = require("@lavaclient/queue");
+const { Queue, LoopType, load: loadQueue } = require("@lavaclient/queue");
+
+const LAVALINK_V4_MAY_START_NEXT = {
+  finished: true,
+  loadFailed: true,
+  stopped: false,
+  replaced: false,
+  cleanup: false,
+};
 
 loadQueue((player) => {
-  return new Queue(player, {
+  const queue = new Queue(player, {
     play: async (_queue, song) => {
       await player.play(song.track);
     },
   });
+
+  player.on("trackEnd", async (_track, reason) => {
+    if (!Object.prototype.hasOwnProperty.call(LAVALINK_V4_MAY_START_NEXT, reason)) return;
+    if (!LAVALINK_V4_MAY_START_NEXT[reason]) return;
+    await startNextTrack(queue);
+  });
+
+  return queue;
 });
 
 /**
@@ -161,4 +177,32 @@ function wrapLegacyPlayer(player) {
   });
   player._legacyAliasesAdded = true;
   return player;
+}
+
+async function startNextTrack(queue) {
+  queue.last = queue.current;
+
+  if (queue.current) {
+    switch (queue.loop.type) {
+      case LoopType.Song:
+        await queue.options.play(queue, queue.current);
+        return;
+
+      case LoopType.Queue:
+        queue.previous.push(queue.current);
+        break;
+
+      case LoopType.None:
+        break;
+    }
+
+    queue.emit("trackEnd", queue.current);
+  }
+
+  if (!queue.tracks.length) {
+    queue.tracks = queue.previous;
+    queue.previous = [];
+  }
+
+  await queue.next();
 }

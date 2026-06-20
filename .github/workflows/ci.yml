@@ -65,6 +65,8 @@ jobs:
           node -e "const c=require('./config.js');const r=['OWNER_IDS','CACHE_SIZE','DASHBOARD','MUSIC','EMBED_COLORS','PRESENCE','INTERACTIONS','STATS','SUGGESTIONS','TICKET','ECONOMY','IMAGE','INVITE','AUTOMOD','MODERATION','GIVEAWAYS','MESSAGES','PREFIX_COMMANDS','SUPPORT_SERVER'];const m=r.filter(k=>!(k in c));if(m.length){console.error('Missing:',m.join(', '));process.exit(1)};console.log('✅ Config valid');"
       - name: Runtime config check
         run: npm run runtime:check
+      - name: Music queue check
+        run: npm run music:check
       - name: Check module aliases
         run: node -e "require('module-alias/register');console.log('✅ Module aliases resolved');"
       - name: Load schemas

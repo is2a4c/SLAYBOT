@@ -19,7 +19,8 @@
     "docker:run": "docker compose up -d",
     "docker:stop": "docker compose down",
     "debug:load": "node --trace-warnings scripts/debug-load.js",
-    "runtime:check": "node scripts/check-runtime-config.js"
+    "runtime:check": "node scripts/check-runtime-config.js",
+    "music:check": "node scripts/check-music-queue.js"
   },
   "homepage": "https://github.com/PashaBritva/SLAYBOT#readme",
   "repository": {
