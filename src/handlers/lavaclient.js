@@ -1,14 +1,22 @@
 const { EmbedBuilder } = require("discord.js");
 const { Cluster } = require("lavaclient");
 const prettyMs = require("pretty-ms");
-const { load, SpotifyItemType } = require("@lavaclient/spotify");
-require("@lavaclient/queue/register");
+const { load: loadSpotify, SpotifyItemType } = require("@lavaclient/spotify");
+const { Queue, load: loadQueue } = require("@lavaclient/queue");
+
+loadQueue((player) => {
+  return new Queue(player, {
+    play: async (_queue, song) => {
+      await player.play(song.track);
+    },
+  });
+});
 
 /**
  * @param {import("@structures/BotClient")} client
  */
 module.exports = (client) => {
-  load({
+  loadSpotify({
     client: {
       id: process.env.SPOTIFY_CLIENT_ID,
       secret: process.env.SPOTIFY_CLIENT_SECRET,
