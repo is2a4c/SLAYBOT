@@ -1,13 +1,16 @@
 const { ActivityType } = require("discord.js");
 
 let messageIndex = 0;
+const VALID_STATUSES = new Set(["online", "idle", "dnd", "invisible"]);
 
 /**
  * @param {import('@src/structures').BotClient} client
  */
 function updatePresence(client) {
-  let messages = client.config.PRESENCE.MESSAGE;
+  const presence = client.config.PRESENCE;
+  const messages = Array.isArray(presence.MESSAGE) && presence.MESSAGE.length > 0 ? presence.MESSAGE : ["SLAYBOT"];
   let message = Array.isArray(messages) ? messages[messageIndex] : messages;
+  if (typeof message !== "string") message = String(message || "SLAYBOT");
 
   if (message.includes("{servers}")) {
     message = message.replaceAll("{servers}", client.guilds.cache.size);
@@ -34,27 +37,32 @@ function updatePresence(client) {
 
       case "CUSTOM":
         return ActivityType.Custom;
+
+      default:
+        return ActivityType.Playing;
     }
   };
 
-  if (client.config.PRESENCE.TYPE === "CUSTOM") {
+  const status = VALID_STATUSES.has(presence.STATUS) ? presence.STATUS : "idle";
+
+  if (presence.TYPE === "CUSTOM") {
     client.user.setPresence({
-      status: client.config.PRESENCE.STATUS,
+      status,
       activities: [
         {
           name: message,
           state: message,
-          type: getType(client.config.PRESENCE.TYPE),
+          type: getType(presence.TYPE),
         },
       ],
     });
   } else {
     client.user.setPresence({
-      status: client.config.PRESENCE.STATUS,
+      status,
       activities: [
         {
           name: message,
-          type: getType(client.config.PRESENCE.TYPE),
+          type: getType(presence.TYPE),
         },
       ],
     });

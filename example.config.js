@@ -93,6 +93,7 @@ module.exports = {
       UP_VOTE: "⬆️",
       DOWN_VOTE: "⬇️",
     },
+    DEFAULT_EMBED: "#3498DB",
     APPROVED_EMBED: "#57F287",
     DENIED_EMBED: "#ED4245",
   },
@@ -102,6 +103,8 @@ module.exports = {
     enabled: true,
     log_channel: "",
     limit: 10,
+    CREATE_EMBED: "#57F287",
+    CLOSE_EMBED: "#ED4245",
   },
 
   // Invite Configuration
@@ -189,10 +192,13 @@ module.exports = {
     WARNING: "#FEE75C",
     INFO: "#3498DB",
     SUCCESS: "#57F287",
+    GIVEAWAYS: "#FFDF00",
+    TRANSPARENT: null,
   },
 
   // Messages
   MESSAGES: {
+    API_ERROR: "The API is currently unavailable. Please try again later.",
     ERRORS: {
       INTERNAL: "An internal error occurred while executing this command",
     },

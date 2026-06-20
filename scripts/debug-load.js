@@ -7,6 +7,7 @@
  */
 
 require("module-alias/register");
+require("@helpers/ConfigDefaults").applyConfigDefaults();
 
 const { recursiveReadDirSync } = require("@helpers/Utils");
 

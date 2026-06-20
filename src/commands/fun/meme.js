@@ -115,7 +115,7 @@ module.exports = {
 
 async function getRandomEmbed(choice) {
   const subReddits = ["meme", "Memes_Of_The_Dank", "memes", "dankmemes"];
-  let rand = choice ? choice : subReddits[getRandomInt(subReddits.length - 1)];
+  let rand = choice ? choice : subReddits[getRandomInt(subReddits.length)];
 
   const response = await getJson(`https://meme-api.com/gimme/${rand}`);
   if (!response.success || !response.data) {
