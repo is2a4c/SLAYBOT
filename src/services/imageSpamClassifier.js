@@ -126,7 +126,7 @@ async function runLocalVision(buffer, caption) {
     });
     const image = await runtime.RawImage.fromBlob(new Blob([buffer], { type: "image/jpeg" }));
     const inputs = await runtime.processor(formatted, image, { do_image_splitting: false });
-    const output = await runtime.model.generate({ ...inputs, max_new_tokens: 160, do_sample: false });
+    const output = await runtime.model.generate({ ...inputs, max_new_tokens: 32, do_sample: false });
     return runtime.processor.tokenizer.batch_decode(output, { skip_special_tokens: true })[0] || "";
   });
   visionQueue = job.catch(() => {});
