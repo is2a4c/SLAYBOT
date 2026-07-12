@@ -22,6 +22,7 @@
     "runtime:check": "node scripts/check-runtime-config.js",
     "image-spam:check": "node scripts/check-image-spam.js",
     "image-spam:model:download": "node scripts/download-image-spam-model.js",
+    "image-spam:e2e": "node scripts/check-image-spam-e2e.js",
     "test": "node --test test/*.test.js",
     "music:check": "node scripts/check-music-queue.js"
   },
