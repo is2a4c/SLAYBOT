@@ -241,6 +241,7 @@ async function getStatus(settings, guild) {
     ❯ **Anti-Links**: ${automod.anti_links ? "✓" : "✕"}
     ❯ **Anti-Invites**: ${automod.anti_invites ? "✓" : "✕"}
     ❯ **Anti-Spam**: ${automod.anti_spam ? "✓" : "✕"}
+    ❯ **Anti Image-Spam**: ${automod.anti_image_spam ? `✓ (${automod.image_spam_threshold || 70}/100)` : "✕"}
     ❯ **Anti-Ghostping**: ${automod.anti_ghostping ? "✓" : "✕"}
   `;
 

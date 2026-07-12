@@ -20,6 +20,9 @@
     "docker:stop": "docker compose down",
     "debug:load": "node --trace-warnings scripts/debug-load.js",
     "runtime:check": "node scripts/check-runtime-config.js",
+    "image-spam:check": "node scripts/check-image-spam.js",
+    "image-spam:model:download": "node scripts/download-image-spam-model.js",
+    "test": "node --test test/*.test.js",
     "music:check": "node scripts/check-music-queue.js"
   },
   "homepage": "https://github.com/PashaBritva/SLAYBOT#readme",
@@ -31,9 +34,11 @@
     "url": "https://github.com/PashaBritva/SLAYBOT/issues"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@lavaclient/queue": "^2.1.1",
     "@lavaclient/spotify": "^3.1.0",
     "@lavaclient/types": "^2.1.1",
+    "@tesseract.js-data/eng": "^1.0.0",
     "@vitalets/google-translate-api": "^9.2.1",
     "ascii-table": "0.0.9",
     "btoa": "^1.2.1",
@@ -61,11 +66,13 @@
     "pino-pretty": "^10.3.1",
     "pretty-ms": "^7.0.1",
     "shadowsocks": "^1.5.3",
+    "sharp": "^0.34.3",
     "snakecord": "^1.0.9",
     "socks-proxy-agent": "^10.0.0",
     "sourcebin_js": "^0.0.3-ignore",
     "string-progressbar": "^1.0.4",
     "table": "^6.9.0",
+    "tesseract.js": "^7.0.0",
     "timestamp-to-date": "^1.1.0",
     "twemoji-parser": "^14.0.0"
   },

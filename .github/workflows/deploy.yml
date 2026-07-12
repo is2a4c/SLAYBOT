@@ -45,8 +45,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci --omit=dev
@@ -125,6 +125,9 @@ jobs:
 
             # Install dependencies
             npm ci --omit=dev
+
+            # Download the local image-spam model into the persistent server cache.
+            npm run image-spam:model:download
 
             if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
               sudo -n env PM2_HOME=/root/.pm2 pm2 delete SLAYBOT 2>/dev/null || true

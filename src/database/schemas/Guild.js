@@ -52,6 +52,8 @@ const Schema = new mongoose.Schema({
     anti_invites: Boolean,
     anti_links: Boolean,
     anti_spam: Boolean,
+    anti_image_spam: { type: Boolean, default: false },
+    image_spam_threshold: { type: Number, default: 70, min: 50, max: 100 },
     anti_ghostping: Boolean,
     anti_massmention: Number,
     max_lines: Number,

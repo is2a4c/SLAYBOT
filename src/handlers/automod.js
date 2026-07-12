@@ -4,6 +4,7 @@ const { getMember } = require("@schemas/Member");
 const { addModAction } = require("@helpers/ModUtils");
 const { AUTOMOD } = require("@root/config");
 const { addAutoModLogToDb } = require("@schemas/AutomodLogs");
+const { classifyImage, isImageAttachment, DEFAULT_THRESHOLD } = require("@src/services/imageSpamClassifier");
 
 const antispamCache = new Map();
 const MESSAGE_SPAM_THRESHOLD = 3000;
@@ -18,7 +19,7 @@ setInterval(
     });
   },
   10 * 60 * 1000
-);
+).unref();
 
 /**
  * Check if the message needs to be moderated and has required permissions
@@ -38,6 +39,38 @@ const shouldModerate = (message) => {
   return true;
 };
 
+async function inspectImageSpam(message, automod, classifier = classifyImage) {
+  const fields = [];
+  const image = [...message.attachments.values()].find(isImageAttachment);
+  if (!image) return { shouldDelete: false, strikes: 0, fields };
+
+  const threshold = Math.min(100, Math.max(50, automod.image_spam_threshold || DEFAULT_THRESHOLD));
+  try {
+    const result = await classifier({ url: image.url, caption: message.content, threshold });
+    if (!result.risky) return { shouldDelete: false, strikes: 0, fields };
+
+    fields.push({
+      name: `Image-Spam Risk: ${result.score}/100`,
+      value:
+        [`Model: ${result.model}`, ...result.reasons].join("\n").slice(0, 1024) || "multiple suspicious image signals",
+      inline: false,
+    });
+    if (result.ocrText) {
+      fields.push({
+        name: `OCR (${result.confidence}% confidence)`,
+        value: result.ocrText.slice(0, 1024),
+        inline: false,
+      });
+    }
+    return { shouldDelete: true, strikes: 1, fields };
+  } catch (error) {
+    message.client.logger.warn(
+      `Image-spam analysis failed; message ${message.id} was left untouched: ${error.message}`
+    );
+    return { shouldDelete: false, strikes: 0, fields };
+  }
+}
+
 /**
  * Perform moderation on the message
  * @param {import('discord.js').Message} message
@@ -45,11 +78,12 @@ const shouldModerate = (message) => {
  */
 async function performAutomod(message, settings) {
   const { automod } = settings;
+  const ordinaryMember = shouldModerate(message);
 
   if (automod.wh_channels.includes(message.channelId)) {
     return { triggered: false, deleted: false, strikes: 0 };
   }
-  if (!automod.debug && !shouldModerate(message)) {
+  if (!automod.debug && !ordinaryMember) {
     return { triggered: false, deleted: false, strikes: 0 };
   }
 
@@ -60,6 +94,15 @@ async function performAutomod(message, settings) {
   let strikesTotal = 0;
 
   const fields = [];
+
+  // Image spam is intentionally limited to ordinary members even when automod
+  // debug mode is enabled. A classifier outage must never block a message.
+  if (automod.anti_image_spam && ordinaryMember) {
+    const result = await inspectImageSpam(message, automod);
+    fields.push(...result.fields);
+    shouldDelete ||= result.shouldDelete;
+    strikesTotal += result.strikes;
+  }
 
   // Max mentions
   if (mentions.members.size > automod.max_mentions) {
@@ -231,4 +274,5 @@ async function performAutomod(message, settings) {
 
 module.exports = {
   performAutomod,
+  inspectImageSpam,
 };

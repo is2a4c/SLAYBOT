@@ -66,6 +66,8 @@ const DEFAULT_CONFIG = {
     anti_invites: false,
     anti_links: false,
     anti_spam: false,
+    anti_image_spam: false,
+    image_spam_threshold: 70,
     anti_ghostping: false,
     anti_massmention: 0,
     max_lines: 0,

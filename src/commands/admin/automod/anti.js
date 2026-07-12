@@ -21,6 +21,10 @@ module.exports = {
         description: "enable or disable antispam detection",
       },
       {
+        trigger: "imagespam <on|off> [threshold]",
+        description: "detect image spam with local OCR (safe threshold: 70)",
+      },
+      {
         trigger: "massmention <on|off> [threshold]",
         description: "enable or disable massmention detection [default threshold is 3 mentions]",
       },
@@ -77,6 +81,31 @@ module.exports = {
         ],
       },
       {
+        name: "imagespam",
+        description: "detect image spam with local OCR",
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: "status",
+            description: "configuration status",
+            required: true,
+            type: ApplicationCommandOptionType.String,
+            choices: [
+              { name: "ON", value: "ON" },
+              { name: "OFF", value: "OFF" },
+            ],
+          },
+          {
+            name: "threshold",
+            description: "risk score required to delete (50-100, recommended 70)",
+            required: false,
+            type: ApplicationCommandOptionType.Integer,
+            minValue: 50,
+            maxValue: 100,
+          },
+        ],
+      },
+      {
         name: "massmention",
         description: "enable or disable massmention detection",
         type: ApplicationCommandOptionType.Subcommand,
@@ -127,6 +156,13 @@ module.exports = {
     }
 
     //
+    else if (sub == "imagespam") {
+      const status = args[1]?.toLowerCase();
+      if (!["on", "off"].includes(status)) return message.safeReply("Invalid status. Value must be `on/off`");
+      response = await antiImageSpam(settings, status, args[2]);
+    }
+
+    //
     else if (sub === "massmention") {
       const status = args[1].toLowerCase();
       const threshold = args[2] || 3;
@@ -146,7 +182,13 @@ module.exports = {
     let response;
     if (sub == "ghostping") response = await antiGhostPing(settings, interaction.options.getString("status"));
     else if (sub == "spam") response = await antiSpam(settings, interaction.options.getString("status"));
-    else if (sub === "massmention") {
+    else if (sub == "imagespam") {
+      response = await antiImageSpam(
+        settings,
+        interaction.options.getString("status"),
+        interaction.options.getInteger("threshold")
+      );
+    } else if (sub === "massmention") {
       response = await antiMassMention(
         settings,
         interaction.options.getString("status"),
@@ -172,11 +214,27 @@ async function antiSpam(settings, input) {
   return `Antispam detection is now ${status ? "enabled" : "disabled"}`;
 }
 
+async function antiImageSpam(settings, input, requestedThreshold) {
+  const status = input.toUpperCase() === "ON";
+  const threshold =
+    requestedThreshold == null ? settings.automod.image_spam_threshold || 70 : Number(requestedThreshold);
+  if (!Number.isInteger(threshold) || threshold < 50 || threshold > 100) {
+    return "Threshold must be a whole number from 50 to 100";
+  }
+
+  settings.automod.anti_image_spam = status;
+  settings.automod.image_spam_threshold = threshold;
+  await settings.save();
+  return `Image-spam detection is now ${status ? `enabled at ${threshold}/100` : "disabled"}`;
+}
+
 async function antiMassMention(settings, input, threshold) {
   const status = input.toUpperCase() === "ON" ? true : false;
   if (!status) {
     settings.automod.anti_massmention = 0;
   } else {
+    threshold = Number.parseInt(threshold, 10);
+    if (!Number.isInteger(threshold) || threshold < 1) return "Threshold must be a valid number greater than 0";
     settings.automod.anti_massmention = threshold;
   }
   await settings.save();

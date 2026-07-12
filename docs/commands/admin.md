@@ -36,11 +36,17 @@ By default, Auto moderation events are ignored for members who have the followin
 
 **Settings**
 
-| Name                                          | Description                                                                 |
-| --------------------------------------------- | --------------------------------------------------------------------------- |
-| **!anti ghostping \<on\|off>**                | logs ghost mentions in your server (Requires `/modlog` channel to be setup) |
-| **!anti spam \<on\|off>**                     | enable or disable antispam detection                                        |
-| **!anti massmention \<on\|off> \[threshold]** | enable or disable massmention detection (default threshold is 3 mentions]   |
+| Name                                       | Description                                                                 |
+| ------------------------------------------ | --------------------------------------------------------------------------- |
+| **!anti ghostping \<on\|off>**             | logs ghost mentions in your server (Requires `/modlog` channel to be setup) |
+| **!anti spam \<on\|off>**                  | enable or disable antispam detection                                        |
+| **!anti imagespam \<on\|off> [threshold]** | detect suspicious images locally with OCR (recommended threshold: 70)       |
+
+`anti imagespam` runs a quantized SmolVLM model and OCR directly inside the bot
+process. The deployment downloads the model into the server cache; no API key
+or paid service is required. Enable it with `!anti imagespam on 70`. If model
+loading or OCR fails, the message is left untouched.
+| **!anti massmention \<on\|off> \[threshold]** | enable or disable massmention detection (default threshold is 3 mentions] |
 
 **Autodelete**
 
