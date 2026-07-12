@@ -35,18 +35,40 @@ const pinoLogger = pino.default(
   ])
 );
 
+function stringify(value, fallback) {
+  if (typeof value === "string") return value || fallback;
+  if (value == null) return fallback;
+  try {
+    return JSON.stringify(value, null, 2) || fallback;
+  } catch {
+    return String(value) || fallback;
+  }
+}
+
+function truncate(value, maxLength) {
+  const text = String(value);
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 14)}\n… truncated`;
+}
+
 function sendWebhook(content, err) {
   if (!content && !err) return;
 
-  const embed = new EmbedBuilder()
-    .setColor(config.EMBED_COLORS.ERROR)
-    .setAuthor({ name: err?.name || "Error" })
-    .addFields(
-      { name: "Description", value: content || "NA" },
-      { name: "Details", value: "```js\n" + (err?.stack?.slice(0, 4000) || "No details") + "\n```" }
-    );
+  try {
+    const description = truncate(stringify(content, "NA"), 1024);
+    const details = truncate(stringify(err?.stack || err?.message, "No details"), 1014);
+    const embed = new EmbedBuilder()
+      .setColor(config.EMBED_COLORS.ERROR)
+      .setAuthor({ name: truncate(stringify(err?.name, "Error"), 256) })
+      .addFields(
+        { name: "Description", value: description },
+        { name: "Details", value: `\`\`\`js\n${details}\n\`\`\`` }
+      );
 
-  webhookLogger.send({ username: "Logs", embeds: [embed] }).catch(() => {});
+    webhookLogger.send({ username: "Logs", embeds: [embed] }).catch(() => {});
+  } catch (webhookError) {
+    pinoLogger.error({ details: webhookError?.stack || String(webhookError) }, "Failed to format webhook log");
+  }
 }
 
 module.exports = class Logger {
