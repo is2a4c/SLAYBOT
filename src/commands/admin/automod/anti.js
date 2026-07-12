@@ -22,10 +22,6 @@ module.exports = {
         description: "enable or disable antispam detection",
       },
       {
-        trigger: "imagespam <on|off> [threshold]",
-        description: "detect image spam with local OCR (safe threshold: 70)",
-      },
-      {
         trigger: "imagespam test [caption]",
         description: "owner-only image analysis without deleting the message",
       },
@@ -162,10 +158,8 @@ module.exports = {
 
     //
     else if (sub == "imagespam") {
-      const status = args[1]?.toLowerCase();
-      if (status === "test") return testImageSpam(message, settings, args.slice(2).join(" "));
-      if (!["on", "off"].includes(status)) return message.safeReply("Invalid status. Value must be `on/off`");
-      response = await antiImageSpam(settings, status, args[2]);
+      if (args[1]?.toLowerCase() !== "test") return message.safeReply("Use `/anti imagespam` to change settings");
+      return testImageSpam(message, settings, args.slice(2).join(" "));
     }
 
     //
@@ -252,7 +246,7 @@ async function testImageSpam(message, settings, suppliedCaption) {
   await message.channel.sendTyping().catch(() => {});
   const threshold = settings.automod.image_spam_threshold || 70;
   const caption = suppliedCaption || (source.id === message.id ? "" : source.content);
-  const result = await classifyImage({ url: attachment.url, caption, threshold });
+  const result = await classifyImage({ url: attachment.url, caption, threshold, guildId: message.guildId });
   const reasons = result.reasons.length ? result.reasons.map((reason) => `- ${reason}`).join("\n") : "- none";
   const ocr = (result.ocrText || "none").replace(/```/g, "''' ").slice(0, 700);
   const output = [
