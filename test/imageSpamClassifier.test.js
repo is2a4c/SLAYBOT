@@ -2,7 +2,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 require("module-alias/register");
-const { scoreImageSpam, isImageAttachment, analyzeWithVision } = require("../src/services/imageSpamClassifier");
+const {
+  scoreImageSpam,
+  isImageAttachment,
+  analyzeWithVision,
+  selectVisionCandidate,
+} = require("../src/services/imageSpamClassifier");
 const { inspectImageSpam } = require("../src/handlers/automod");
 
 test("scores a fake withdrawal collage above the safe threshold", () => {
@@ -49,6 +54,48 @@ test("low-confidence OCR alone cannot cross the default threshold", () => {
   });
 
   assert.equal(result.score, 69);
+});
+
+test("low-confidence OCR with a bait caption still cannot delete a message", () => {
+  const result = scoreImageSpam({
+    caption: "bro",
+    ocrText: "$9000 withdrawal successful crypto wallet claim reward",
+    confidence: 12,
+    visual: { width: 1000, height: 600, entropy: 6 },
+  });
+
+  assert.equal(result.score, 69);
+});
+
+test("recognizes cryptocurrency wallet addresses as a strong signal", () => {
+  const result = scoreImageSpam({
+    ocrText: "claim reward 0x0123456789abcdef0123456789abcdef01234567",
+    confidence: 80,
+    visual: { width: 800, height: 800, entropy: 5 },
+  });
+
+  assert.ok(result.reasons.some((reason) => reason.includes("wallet address")));
+});
+
+test("selects the image region with the strongest OCR risk for vision", () => {
+  const visionImages = [Buffer.from("full"), Buffer.from("safe"), Buffer.from("payout")];
+  const selected = selectVisionCandidate(
+    {
+      candidates: [
+        { text: "release notes", confidence: 90 },
+        { text: "ordinary screenshot", confidence: 85 },
+        { text: "$4600 reward withdrawal successful", confidence: 72 },
+      ],
+    },
+    visionImages,
+    "bro",
+    { width: 900, height: 600, entropy: 6 }
+  );
+
+  assert.equal(selected.index, 2);
+  assert.equal(selected.buffer.toString(), "payout");
+  assert.match(selected.ocrHint, /4600/);
+  assert.equal(selected.confidence, 72);
 });
 
 test("recognizes image MIME types and common image extensions", () => {

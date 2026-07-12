@@ -61,6 +61,7 @@ async function recognizeAll(buffers) {
       .filter(Boolean)
       .join("\n"),
     confidence: Math.max(0, ...results.map((result) => result.confidence)),
+    candidates: results,
   };
 }
 
@@ -84,43 +85,54 @@ async function downloadImage(url) {
 
 async function prepareImage(buffer) {
   const image = sharp(buffer, { animated: false, limitInputPixels: 30_000_000 });
-  const [metadata, stats, prepared] = await Promise.all([
+  const [metadata, stats, visionBase] = await Promise.all([
     image.metadata(),
     image.stats(),
     image
       .clone()
       .rotate()
       .resize({ width: 1800, height: 1800, fit: "inside", withoutEnlargement: false })
-      .grayscale()
-      .normalize()
-      .sharpen()
       .png()
       .toBuffer(),
   ]);
 
+  const prepared = await sharp(visionBase).grayscale().normalize().sharpen().png().toBuffer();
   const preparedMetadata = await sharp(prepared).metadata();
   const width = preparedMetadata.width;
   const height = preparedMetadata.height;
   const tileWidth = Math.ceil(width * 0.55);
   const tileHeight = Math.ceil(height * 0.55);
-  const tiles = await Promise.all(
-    [
-      [0, 0],
-      [width - tileWidth, 0],
-      [0, height - tileHeight],
-      [width - tileWidth, height - tileHeight],
-    ].map(([left, top]) =>
-      sharp(prepared)
-        .extract({ left, top, width: tileWidth, height: tileHeight })
-        .resize({ width: 1800, withoutEnlargement: false })
-        .threshold(180)
-        .png()
-        .toBuffer()
-    )
-  );
+  const regions = [
+    [0, 0],
+    [width - tileWidth, 0],
+    [0, height - tileHeight],
+    [width - tileWidth, height - tileHeight],
+  ];
+  const [ocrTiles, visionTiles] = await Promise.all([
+    Promise.all(
+      regions.map(([left, top]) =>
+        sharp(prepared)
+          .extract({ left, top, width: tileWidth, height: tileHeight })
+          .resize({ width: 1800, withoutEnlargement: false })
+          .threshold(180)
+          .png()
+          .toBuffer()
+      )
+    ),
+    Promise.all(
+      regions.map(([left, top]) =>
+        sharp(visionBase)
+          .extract({ left, top, width: tileWidth, height: tileHeight })
+          .resize({ width: 1200, withoutEnlargement: false })
+          .png()
+          .toBuffer()
+      )
+    ),
+  ]);
 
   return {
-    ocrImages: [prepared, ...tiles],
+    ocrImages: [prepared, ...ocrTiles],
+    visionImages: [visionBase, ...visionTiles],
     visual: {
       width: metadata.width || 0,
       height: metadata.height || 0,
@@ -148,7 +160,7 @@ async function getLocalVision() {
   return localVisionPromise;
 }
 
-async function runLocalVision(buffer, caption) {
+async function runLocalVision(buffer, caption, ocrHint = "") {
   const runtime = await getLocalVision();
   const job = visionQueue.then(async () => {
     const prompt =
@@ -156,7 +168,8 @@ async function runLocalVision(buffer, caption) {
       "Look for fake withdrawals, payment confirmations, wallets, large rewards, claim prompts, and success screens. " +
       "Normal memes, games, receipts, and legitimate finance screenshots are not spam. Be conservative. " +
       "Reply with exactly one label: IMAGE_SPAM or IMAGE_SAFE. " +
-      `Caption: ${JSON.stringify(caption || "")}`;
+      `Caption: ${JSON.stringify(caption || "")}. ` +
+      `OCR from this image region: ${JSON.stringify(ocrHint.slice(0, 600))}`;
     const messages = [{ role: "user", content: [{ type: "image" }, { type: "text", text: prompt }] }];
     const formatted = runtime.processor.tokenizer.apply_chat_template(messages, {
       add_generation_prompt: true,
@@ -180,8 +193,8 @@ function parseVisionResponse(text) {
   return { score: 10, reasons: ["local vision found no convincing spam pattern"], detectedText: "" };
 }
 
-async function analyzeWithVision(buffer, caption, engine = runLocalVision) {
-  const result = parseVisionResponse(await engine(buffer, caption));
+async function analyzeWithVision(buffer, caption, engine = runLocalVision, ocrHint = "") {
+  const result = parseVisionResponse(await engine(buffer, caption, ocrHint));
   return { ...result, model: process.env.IMAGE_SPAM_VISION_MODEL || "SmolVLM-256M-Instruct (q4)" };
 }
 
@@ -217,6 +230,9 @@ function scoreImageSpam({ caption = "", ocrText = "", confidence = 0, visual = {
     add(20, "crypto/wallet language");
   }
 
+  const hasWalletAddress = /\b(?:bc1|[13])[a-z0-9]{25,62}\b/i.test(combined) || /\b0x[a-f0-9]{40}\b/i.test(combined);
+  if (hasWalletAddress) add(25, "cryptocurrency wallet address");
+
   if (/\b(click|tap|visit|dm me|check this|check it|limited time)\b/.test(combined)) add(8, "call to action");
   if (/\b(bro|guys?|mate|friend)\b/.test(caption.toLowerCase()) && caption.trim().length < 40) {
     add(5, "short bait caption");
@@ -231,11 +247,37 @@ function scoreImageSpam({ caption = "", ocrText = "", confidence = 0, visual = {
     add(25, "large payout screenshot paired with a bait caption");
   }
 
-  // Low-confidence OCR may contain hallucinated fragments. It can contribute to
-  // a log entry, but must not be sufficient to delete a message by itself.
-  if (confidence < 25 && caption.trim().length === 0) score = Math.min(score, DEFAULT_THRESHOLD - 1);
+  // Low-confidence OCR may contain hallucinated fragments. A caption can add
+  // context, but must not turn unreliable OCR into an automatic deletion.
+  if (confidence < 25) score = Math.min(score, DEFAULT_THRESHOLD - 1);
 
   return { score: Math.min(100, score), reasons };
+}
+
+function selectVisionCandidate({ candidates = [] }, visionImages, caption, visual) {
+  let selectedIndex = 0;
+  let selectedScore = -1;
+  for (let index = 0; index < candidates.length && index < visionImages.length; index += 1) {
+    const candidate = candidates[index];
+    const score = scoreImageSpam({
+      caption,
+      ocrText: candidate.text,
+      confidence: candidate.confidence,
+      visual,
+    }).score;
+    if (score > selectedScore) {
+      selectedIndex = index;
+      selectedScore = score;
+    }
+  }
+  const selected = candidates[selectedIndex] || { text: "", confidence: 0 };
+  return {
+    buffer: visionImages[selectedIndex] || visionImages[0],
+    index: selectedIndex,
+    ocrHint: selected.confidence >= 25 ? selected.text : "",
+    ocrRisk: Math.max(0, selectedScore),
+    confidence: selected.confidence,
+  };
 }
 
 async function classifyImage({ url, caption = "", threshold = DEFAULT_THRESHOLD }) {
@@ -247,13 +289,18 @@ async function classifyImageBuffer({ buffer, caption = "", threshold = DEFAULT_T
   if (pendingAnalyses >= MAX_PENDING_ANALYSES) throw new Error("image classifier is busy");
   pendingAnalyses += 1;
   try {
-    const [{ ocrImages, visual }, vision] = await Promise.all([
-      prepareImage(buffer),
-      analyzeWithVision(buffer, caption),
-    ]);
+    const { ocrImages, visionImages, visual } = await prepareImage(buffer);
     const ocr = await recognizeAll(ocrImages);
-    const result = scoreImageSpam({ caption, ocrText: ocr.text, confidence: ocr.confidence, visual });
+    const selected = selectVisionCandidate(ocr, visionImages, caption, visual);
+    const vision = await analyzeWithVision(selected.buffer, caption, runLocalVision, selected.ocrHint);
+    const result = scoreImageSpam({
+      caption,
+      ocrText: ocr.text,
+      confidence: selected.confidence,
+      visual,
+    });
     const combinedReasons = [
+      `region: ${selected.index === 0 ? "full image" : `tile ${selected.index}`} selected (${selected.ocrRisk}/100 OCR risk)`,
       ...vision.reasons.map((reason) => `vision: ${reason}`),
       ...result.reasons.map((reason) => `OCR/caption: ${reason}`),
     ];
@@ -269,7 +316,7 @@ async function classifyImageBuffer({ buffer, caption = "", threshold = DEFAULT_T
       risky: combinedScore >= threshold,
       threshold,
       ocrText: combinedText.trim().slice(0, 500),
-      confidence: Math.round(ocr.confidence),
+      confidence: Math.round(selected.confidence),
       model: vision.model,
     };
   } finally {
@@ -286,4 +333,5 @@ module.exports = {
   analyzeWithVision,
   parseVisionResponse,
   preloadVisionModel,
+  selectVisionCandidate,
 };
