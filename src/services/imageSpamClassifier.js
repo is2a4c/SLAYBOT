@@ -146,7 +146,7 @@ async function getLocalVision() {
     localVisionPromise = (async () => {
       const { env, AutoProcessor, AutoModelForImageTextToText, RawImage } = await import("@huggingface/transformers");
       env.cacheDir = process.env.IMAGE_SPAM_MODEL_CACHE || path.join(process.cwd(), ".cache", "image-spam");
-      const modelId = process.env.IMAGE_SPAM_VISION_MODEL || "HuggingFaceTB/SmolVLM-256M-Instruct";
+      const modelId = process.env.IMAGE_SPAM_VISION_MODEL || "HuggingFaceTB/SmolVLM-500M-Instruct";
       const [processor, model] = await Promise.all([
         AutoProcessor.from_pretrained(modelId),
         AutoModelForImageTextToText.from_pretrained(modelId, { dtype: "q4", device: "cpu" }),
@@ -195,7 +195,7 @@ function parseVisionResponse(text) {
 
 async function analyzeWithVision(buffer, caption, engine = runLocalVision, ocrHint = "") {
   const result = parseVisionResponse(await engine(buffer, caption, ocrHint));
-  return { ...result, model: process.env.IMAGE_SPAM_VISION_MODEL || "SmolVLM-256M-Instruct (q4)" };
+  return { ...result, model: process.env.IMAGE_SPAM_VISION_MODEL || "SmolVLM-500M-Instruct (q4)" };
 }
 
 async function preloadVisionModel() {
@@ -234,8 +234,9 @@ function scoreImageSpam({ caption = "", ocrText = "", confidence = 0, visual = {
   if (hasWalletAddress) add(25, "cryptocurrency wallet address");
 
   if (/\b(click|tap|visit|dm me|check this|check it|limited time)\b/.test(combined)) add(8, "call to action");
-  if (/\b(bro|guys?|mate|friend)\b/.test(caption.toLowerCase()) && caption.trim().length < 40) {
-    add(5, "short bait caption");
+  const hasBaitLanguage = /\b(bro|guys?|mate|friend)\b/.test(combined);
+  if (hasBaitLanguage && (caption.trim().length < 40 || ocrText.length > 0)) {
+    add(5, "short conversational bait");
   }
 
   const ocrLines = ocrText.split(/\n+/).filter((line) => line.trim().length >= 3).length;
@@ -243,8 +244,8 @@ function scoreImageSpam({ caption = "", ocrText = "", confidence = 0, visual = {
   const screenshotLike = visual.entropy >= 4.5 && ocrLines >= 4;
   if (score >= 25 && screenshotLike) add(8, "text-heavy screenshot");
   if (score >= 35 && screenshotLike && landscape) add(7, "collage-like landscape layout");
-  if (amounts.length && screenshotLike && landscape && /\b(bro|guys?|mate|friend)\b/.test(caption.toLowerCase())) {
-    add(25, "large payout screenshot paired with a bait caption");
+  if (amounts.length && screenshotLike && landscape && hasBaitLanguage) {
+    add(25, "large payout screenshot paired with conversational bait");
   }
 
   // Low-confidence OCR may contain hallucinated fragments. A caption can add

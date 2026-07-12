@@ -43,7 +43,17 @@ test("flags a large payout panel with a bait caption even when tiny OCR misses o
   });
 
   assert.equal(result.score, 70);
-  assert.ok(result.reasons.some((reason) => reason.includes("bait caption")));
+  assert.ok(result.reasons.some((reason) => reason.includes("conversational bait")));
+});
+
+test("detects conversational bait rendered inside a payout screenshot", () => {
+  const result = scoreImageSpam({
+    ocrText: "bro\n$7200.00\naccount overview\ntransaction details\nrecent activity",
+    confidence: 40,
+    visual: { width: 650, height: 442, entropy: 6 },
+  });
+
+  assert.equal(result.score, 70);
 });
 
 test("low-confidence OCR alone cannot cross the default threshold", () => {
