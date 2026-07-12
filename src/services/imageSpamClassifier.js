@@ -116,8 +116,8 @@ async function runLocalVision(buffer, caption) {
     const prompt =
       "Classify this Discord image for financial or crypto reward spam. A single fraudulent panel in a collage is enough. " +
       "Look for fake withdrawals, payment confirmations, wallets, large rewards, claim prompts, and success screens. " +
-      "Normal memes, games, receipts, and legitimate finance screenshots must score low. " +
-      "Reply exactly: SCORE=<0-100>; REASONS=<short comma list>; MARKERS=<visible suspicious text>. " +
+      "Normal memes, games, receipts, and legitimate finance screenshots are not spam. Be conservative. " +
+      "Reply with exactly one label: IMAGE_SPAM or IMAGE_SAFE. " +
       `Caption: ${JSON.stringify(caption || "")}`;
     const messages = [{ role: "user", content: [{ type: "image" }, { type: "text", text: prompt }] }];
     const formatted = runtime.processor.tokenizer.apply_chat_template(messages, {
@@ -126,7 +126,7 @@ async function runLocalVision(buffer, caption) {
     });
     const image = await runtime.RawImage.fromBlob(new Blob([buffer], { type: "image/jpeg" }));
     const inputs = await runtime.processor(formatted, image, { do_image_splitting: false });
-    const output = await runtime.model.generate({ ...inputs, max_new_tokens: 32, do_sample: false });
+    const output = await runtime.model.generate({ ...inputs, max_new_tokens: 8, do_sample: false });
     return runtime.processor.tokenizer.batch_decode(output, { skip_special_tokens: true })[0] || "";
   });
   visionQueue = job.catch(() => {});
@@ -134,19 +134,12 @@ async function runLocalVision(buffer, caption) {
 }
 
 function parseVisionResponse(text) {
-  const score = Number([...text.matchAll(/SCORE\s*=\s*(\d{1,3})/gi)].at(-1)?.[1]);
-  if (!Number.isFinite(score) || score < 0 || score > 100) throw new Error("local vision returned an invalid score");
-  const reasons = [...text.matchAll(/REASONS\s*=\s*([^;\n]+)/gi)].at(-1)?.[1] || "local vision signals";
-  const markers = [...text.matchAll(/MARKERS\s*=\s*([^;\n]+)/gi)].at(-1)?.[1] || "";
-  return {
-    score: Math.round(score),
-    reasons: reasons
-      .split(",")
-      .map((reason) => reason.trim().slice(0, 200))
-      .filter(Boolean)
-      .slice(0, 4),
-    detectedText: markers.slice(0, 500),
-  };
+  const label = [...text.matchAll(/\bIMAGE_(SPAM|SAFE)\b/gi)].at(-1)?.[1]?.toUpperCase();
+  if (!label) throw new Error(`local vision returned no classification: ${text.slice(-500)}`);
+  if (label === "SPAM") {
+    return { score: 85, reasons: ["local vision detected financial reward spam"], detectedText: "" };
+  }
+  return { score: 10, reasons: ["local vision found no convincing spam pattern"], detectedText: "" };
 }
 
 async function analyzeWithVision(buffer, caption, engine = runLocalVision) {

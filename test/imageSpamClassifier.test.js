@@ -47,13 +47,21 @@ test("recognizes image MIME types and common image extensions", () => {
 
 test("local vision adapter parses the model response", async () => {
   const result = await analyzeWithVision(Buffer.from("image"), "bro", async () => {
-    return "SCORE=88; REASONS=fake withdrawal, crypto reward; MARKERS=$4600, withdrawal successful";
+    return "Assistant: IMAGE_SPAM";
   });
 
-  assert.equal(result.score, 88);
-  assert.deepEqual(result.reasons, ["fake withdrawal", "crypto reward"]);
-  assert.equal(result.detectedText, "$4600, withdrawal successful");
+  assert.equal(result.score, 85);
+  assert.deepEqual(result.reasons, ["local vision detected financial reward spam"]);
+  assert.equal(result.detectedText, "");
   assert.match(result.model, /SmolVLM/);
+});
+
+test("local vision adapter uses the final label after the echoed prompt", async () => {
+  const result = await analyzeWithVision(Buffer.from("image"), "release notes", async () => {
+    return "Reply with IMAGE_SPAM or IMAGE_SAFE. Assistant: IMAGE_SAFE";
+  });
+
+  assert.equal(result.score, 10);
 });
 
 test("image moderation returns deletion fields for a risky classifier result", async () => {
