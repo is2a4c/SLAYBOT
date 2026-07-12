@@ -1,6 +1,6 @@
 const sharp = require("sharp");
 const path = require("path");
-const { createWorker } = require("tesseract.js");
+const { createWorker, PSM } = require("tesseract.js");
 
 const DEFAULT_THRESHOLD = 70;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -26,10 +26,15 @@ async function getWorker() {
       gzip: language.gzip,
       cacheMethod: "none",
       logger: () => {},
-    }).catch((error) => {
-      workerPromise = undefined;
-      throw error;
-    });
+    })
+      .then(async (worker) => {
+        await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
+        return worker;
+      })
+      .catch((error) => {
+        workerPromise = undefined;
+        throw error;
+      });
   }
   return workerPromise;
 }
@@ -45,6 +50,18 @@ async function recognize(buffer) {
   });
   ocrQueue = job.catch(() => {});
   return job;
+}
+
+async function recognizeAll(buffers) {
+  const results = [];
+  for (const buffer of buffers) results.push(await recognize(buffer));
+  return {
+    text: results
+      .map((result) => result.text.trim())
+      .filter(Boolean)
+      .join("\n"),
+    confidence: Math.max(0, ...results.map((result) => result.confidence)),
+  };
 }
 
 async function downloadImage(url) {
@@ -81,8 +98,29 @@ async function prepareImage(buffer) {
       .toBuffer(),
   ]);
 
+  const preparedMetadata = await sharp(prepared).metadata();
+  const width = preparedMetadata.width;
+  const height = preparedMetadata.height;
+  const tileWidth = Math.ceil(width * 0.55);
+  const tileHeight = Math.ceil(height * 0.55);
+  const tiles = await Promise.all(
+    [
+      [0, 0],
+      [width - tileWidth, 0],
+      [0, height - tileHeight],
+      [width - tileWidth, height - tileHeight],
+    ].map(([left, top]) =>
+      sharp(prepared)
+        .extract({ left, top, width: tileWidth, height: tileHeight })
+        .resize({ width: 1800, withoutEnlargement: false })
+        .threshold(180)
+        .png()
+        .toBuffer()
+    )
+  );
+
   return {
-    prepared,
+    ocrImages: [prepared, ...tiles],
     visual: {
       width: metadata.width || 0,
       height: metadata.height || 0,
@@ -189,6 +227,9 @@ function scoreImageSpam({ caption = "", ocrText = "", confidence = 0, visual = {
   const screenshotLike = visual.entropy >= 4.5 && ocrLines >= 4;
   if (score >= 25 && screenshotLike) add(8, "text-heavy screenshot");
   if (score >= 35 && screenshotLike && landscape) add(7, "collage-like landscape layout");
+  if (amounts.length && screenshotLike && landscape && /\b(bro|guys?|mate|friend)\b/.test(caption.toLowerCase())) {
+    add(25, "large payout screenshot paired with a bait caption");
+  }
 
   // Low-confidence OCR may contain hallucinated fragments. It can contribute to
   // a log entry, but must not be sufficient to delete a message by itself.
@@ -206,18 +247,21 @@ async function classifyImageBuffer({ buffer, caption = "", threshold = DEFAULT_T
   if (pendingAnalyses >= MAX_PENDING_ANALYSES) throw new Error("image classifier is busy");
   pendingAnalyses += 1;
   try {
-    const [{ prepared, visual }, vision] = await Promise.all([
+    const [{ ocrImages, visual }, vision] = await Promise.all([
       prepareImage(buffer),
       analyzeWithVision(buffer, caption),
     ]);
-    const ocr = await recognize(prepared);
+    const ocr = await recognizeAll(ocrImages);
     const result = scoreImageSpam({ caption, ocrText: ocr.text, confidence: ocr.confidence, visual });
     const combinedReasons = [
       ...vision.reasons.map((reason) => `vision: ${reason}`),
       ...result.reasons.map((reason) => `OCR/caption: ${reason}`),
     ];
     const combinedText = [vision.detectedText, ocr.text].filter(Boolean).join("\n");
-    const combinedScore = Math.min(100, vision.score + Math.min(10, Math.floor(result.score / 10)));
+    const combinedScore = Math.min(
+      100,
+      Math.max(vision.score, result.score) + (vision.score >= 50 && result.score >= 50 ? 10 : 0)
+    );
 
     return {
       score: combinedScore,

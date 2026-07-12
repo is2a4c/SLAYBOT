@@ -29,6 +29,18 @@ test("does not flag an ordinary text-heavy screenshot", () => {
   assert.equal(result.score, 0);
 });
 
+test("flags a large payout panel with a bait caption even when tiny OCR misses other words", () => {
+  const result = scoreImageSpam({
+    caption: "bro",
+    ocrText: "$4600.00\naccount overview\ntransaction details\nrecent activity",
+    confidence: 40,
+    visual: { width: 650, height: 442, entropy: 6 },
+  });
+
+  assert.equal(result.score, 70);
+  assert.ok(result.reasons.some((reason) => reason.includes("bait caption")));
+});
+
 test("low-confidence OCR alone cannot cross the default threshold", () => {
   const result = scoreImageSpam({
     ocrText: "$9000 withdrawal successful crypto wallet claim reward",
