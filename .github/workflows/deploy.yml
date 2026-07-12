@@ -125,8 +125,22 @@ jobs:
             ls -t config.js.bak.* 2>/dev/null | tail -n +6 | xargs -r rm -f --
             ls -t .env.bak.* 2>/dev/null | tail -n +6 | xargs -r rm -f --
 
-            # Install dependencies
-            npm ci --omit=dev
+            # ONNX Runtime downloads its native binary from a separate CDN,
+            # which occasionally times out. Retry the clean install without
+            # allowing a partial node_modules tree to reach the running bot.
+            installed=false
+            for attempt in 1 2 3 4; do
+              if npm ci --omit=dev; then
+                installed=true
+                break
+              fi
+              echo "Dependency install attempt $attempt failed"
+              sleep 10
+            done
+            if [ "$installed" != true ]; then
+              echo "Dependency installation failed after 4 attempts"
+              exit 1
+            fi
 
             # Download the local image-spam model into the persistent server cache.
             npm run image-spam:model:download
