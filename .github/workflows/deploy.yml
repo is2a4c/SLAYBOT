@@ -142,8 +142,11 @@ jobs:
               exit 1
             fi
 
-            # Download the local image-spam model into the persistent server cache.
-            npm run image-spam:model:download
+            # Warm the local image-spam model cache without blocking a deploy. The
+            # classifier also loads it lazily when image spam detection is used.
+            if ! npm run image-spam:model:download; then
+              echo "::warning::Image-spam model warm-up failed; it will retry when image spam detection is first used."
+            fi
 
             # Optional end-to-end check using an ephemeral encrypted Actions secret.
             if [ -n "$IMAGE_SPAM_E2E_IMAGE" ]; then npm run image-spam:e2e; fi
