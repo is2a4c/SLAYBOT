@@ -24,7 +24,10 @@
     "image-spam:model:download": "node scripts/download-image-spam-model.js",
     "image-spam:e2e": "node scripts/check-image-spam-e2e.js",
     "test": "node --test test/*.test.js",
-    "music:check": "node scripts/check-music-queue.js"
+    "music:check": "node scripts/check-music-queue.js",
+    "slaynode:worker": "node slaynode/worker.js",
+    "slaynode:enroll": "node slaynode/enroll.js",
+    "slaynode:e2e": "node scripts/check-slaynode-e2e.js"
   },
   "homepage": "https://github.com/PashaBritva/SLAYBOT#readme",
   "repository": {
@@ -40,6 +43,7 @@
     "@lavaclient/spotify": "^3.1.0",
     "@lavaclient/types": "^2.1.1",
     "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/rus": "^1.0.0",
     "@vitalets/google-translate-api": "^9.2.1",
     "ascii-table": "0.0.9",
     "btoa": "^1.2.1",
@@ -89,6 +93,7 @@
   "devDependencies": {
     "eslint": "^8.57.1",
     "eslint-plugin-jsdoc": "^46.10.1",
+    "mongodb-memory-server": "^10.1.4",
     "node": "^18.20.6",
     "nodemon": "^3.1.9",
     "prettier": "3.4.2"
