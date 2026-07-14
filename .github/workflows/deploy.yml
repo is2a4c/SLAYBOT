@@ -178,18 +178,6 @@ jobs:
             set -e
             DEPLOY_DIR="${{ secrets.DEPLOY_PATH || '/opt/slaybot' }}"
             sleep 10
-            pm2 jlist | node -e '
-              let output = "";
-              process.stdin.on("data", (chunk) => (output += chunk));
-              process.stdin.on("end", () => {
-                const apps = JSON.parse(output);
-                const app = apps.find((item) => item.name === "slaybot");
-                const status = app?.pm2_env?.status;
-                const script = app?.pm2_env?.pm_exec_path || "";
-                if (status !== "online" || script !== `${process.argv[1]}/bot.js`) {
-                  console.error(`slaybot health check failed: status=${status || "missing"}, script=${script || "missing"}`);
-                  process.exit(1);
-                }
-                console.log(`slaybot is online: pid=${app.pid}, script=${script}`);
-              });
-            ' "$DEPLOY_DIR"
+            pm2 describe slaybot | grep -F "$DEPLOY_DIR/bot.js"
+            pm2 describe slaybot | grep -E "status.*online"
+            echo "slaybot is online from $DEPLOY_DIR/bot.js"
