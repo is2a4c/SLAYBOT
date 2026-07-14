@@ -117,42 +117,13 @@ async function prepareImage(buffer) {
   ]);
 
   const prepared = await sharp(visionBase).grayscale().normalize().sharpen().png().toBuffer();
-  const preparedMetadata = await sharp(prepared).metadata();
-  const width = preparedMetadata.width;
-  const height = preparedMetadata.height;
-  const tileWidth = Math.ceil(width * 0.55);
-  const tileHeight = Math.ceil(height * 0.55);
-  const regions = [
-    [0, 0],
-    [width - tileWidth, 0],
-    [0, height - tileHeight],
-    [width - tileWidth, height - tileHeight],
-  ];
-  const [ocrTiles, visionTiles] = await Promise.all([
-    Promise.all(
-      regions.map(([left, top]) =>
-        sharp(prepared)
-          .extract({ left, top, width: tileWidth, height: tileHeight })
-          .resize({ width: 1800, withoutEnlargement: false })
-          .threshold(180)
-          .png()
-          .toBuffer()
-      )
-    ),
-    Promise.all(
-      regions.map(([left, top]) =>
-        sharp(visionBase)
-          .extract({ left, top, width: tileWidth, height: tileHeight })
-          .resize({ width: 1200, withoutEnlargement: false })
-          .png()
-          .toBuffer()
-      )
-    ),
-  ]);
 
   return {
-    ocrImages: [prepared, ...ocrTiles],
-    visionImages: [visionBase, ...visionTiles],
+    // The vision processor already splits a full collage into panels. Processing
+    // four extra OCR/vision tiles made a single attachment run five expensive
+    // CPU jobs while their results were no longer used for classification.
+    ocrImages: [prepared],
+    visionImages: [visionBase],
     visual: {
       width: metadata.width || 0,
       height: metadata.height || 0,
@@ -166,9 +137,9 @@ async function getLocalVision() {
     localVisionPromise = (async () => {
       const { env, AutoProcessor, AutoModelForImageTextToText, RawImage } = await import("@huggingface/transformers");
       env.cacheDir = process.env.IMAGE_SPAM_MODEL_CACHE || path.join(process.cwd(), ".cache", "image-spam");
-      // Defaults to the 2.2B SmolVLM: it reads image intent far better than the 500M
-      // and, with no GPU on the host, still finishes within the ~1 min automod budget.
-      const modelId = process.env.IMAGE_SPAM_VISION_MODEL || "HuggingFaceTB/SmolVLM-Instruct";
+      // The 500M model keeps moderation responsive on CPU-only hosts. Operators
+      // with sufficient capacity can explicitly select the larger 2.2B model.
+      const modelId = process.env.IMAGE_SPAM_VISION_MODEL || "HuggingFaceTB/SmolVLM-500M-Instruct";
       // dtype and model are configurable: a larger model or higher precision reads
       // image intent far better, at the cost of RAM and CPU latency.
       const dtype = process.env.IMAGE_SPAM_VISION_DTYPE || "q4";
@@ -224,7 +195,7 @@ function parseVisionResponse(text) {
 
 async function analyzeWithVision(buffer, caption, engine = runLocalVision, ocrHint = "") {
   const result = parseVisionResponse(await engine(buffer, caption, ocrHint));
-  const modelName = (process.env.IMAGE_SPAM_VISION_MODEL || "SmolVLM-Instruct").split("/").pop();
+  const modelName = (process.env.IMAGE_SPAM_VISION_MODEL || "SmolVLM-500M-Instruct").split("/").pop();
   return { ...result, model: `${modelName} (${process.env.IMAGE_SPAM_VISION_DTYPE || "q4"})` };
 }
 

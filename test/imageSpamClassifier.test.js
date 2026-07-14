@@ -6,6 +6,7 @@ const {
   scoreImageSpam,
   isImageAttachment,
   analyzeWithVision,
+  prepareImage,
   selectVisionCandidate,
 } = require("../src/services/imageSpamClassifier");
 const { inspectImageSpam } = require("../src/handlers/automod");
@@ -146,6 +147,19 @@ test("recognizes image MIME types and common image extensions", () => {
   assert.equal(isImageAttachment({ contentType: "image/jpeg", name: "upload" }), true);
   assert.equal(isImageAttachment({ contentType: null, name: "photo.WEBP" }), true);
   assert.equal(isImageAttachment({ contentType: "application/pdf", name: "invoice.pdf" }), false);
+});
+
+test("prepares one full OCR and vision image for a classification", async () => {
+  const image = await require("sharp")({
+    create: { width: 64, height: 64, channels: 3, background: "white" },
+  })
+    .png()
+    .toBuffer();
+
+  const prepared = await prepareImage(image);
+
+  assert.equal(prepared.ocrImages.length, 1);
+  assert.equal(prepared.visionImages.length, 1);
 });
 
 test("local vision adapter parses the model response", async () => {

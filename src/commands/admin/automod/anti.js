@@ -246,7 +246,12 @@ async function testImageSpam(message, settings, suppliedCaption) {
   await message.channel.sendTyping().catch(() => {});
   const threshold = settings.automod.image_spam_threshold || 70;
   const caption = suppliedCaption || (source.id === message.id ? "" : source.content);
-  const result = await classifyImage({ url: attachment.url, caption, threshold, guildId: message.guildId });
+  let result;
+  try {
+    result = await classifyImage({ url: attachment.url, caption, threshold, guildId: message.guildId });
+  } catch (error) {
+    return message.safeReply(`Image-spam test could not finish: ${error.message}`);
+  }
   const reasons = result.reasons.length ? result.reasons.map((reason) => `- ${reason}`).join("\n") : "- none";
   const ocr = (result.ocrText || "none").replace(/```/g, "''' ").slice(0, 700);
   const output = [

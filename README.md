@@ -133,8 +133,8 @@ Attachment → image safety limits → OCR (RU + EN) → visual preparation
 !anti imagespam on 70
 ```
 
-- Модель **SmolVLM 2.2B** используется по умолчанию в quantized-режиме <code>q4</code>.
-- Для более лёгкого запуска укажите <code>IMAGE_SPAM_VISION_MODEL=HuggingFaceTB/SmolVLM-500M-Instruct</code>.
+- Модель **SmolVLM 500M** используется по умолчанию в quantized-режиме <code>q4</code>, чтобы AutoMod оставался отзывчивым на CPU.
+- Для более точного, но требовательного анализа укажите <code>IMAGE_SPAM_VISION_MODEL=HuggingFaceTB/SmolVLM-Instruct</code>.
 - Cache по умолчанию: <code>.cache/image-spam</code>. Его можно перенести через <code>IMAGE_SPAM_MODEL_CACHE</code>.
 - Модель можно прогреть вручную, но это **не требуется** для старта: загрузка ленивая, а deploy не блокируется из-за временной ошибки сети.
 
