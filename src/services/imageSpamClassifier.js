@@ -1,6 +1,9 @@
 const sharp = require("sharp");
+const fs = require("fs");
 const path = require("path");
 const { createWorker, PSM } = require("tesseract.js");
+
+const OCR_LANGS = ["eng", "rus"];
 
 const DEFAULT_THRESHOLD = 70;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -18,12 +21,29 @@ function isImageAttachment(attachment) {
   return attachment.contentType?.toLowerCase().startsWith("image/") || IMAGE_EXTENSIONS.test(attachment.name || "");
 }
 
+// Tesseract needs every requested language's traineddata in a single langPath
+// directory, so gather them from their per-package folders into one cache dir.
+function prepareLangPath() {
+  const cacheRoot = process.env.IMAGE_SPAM_MODEL_CACHE || path.join(process.cwd(), ".cache", "image-spam");
+  const langPath = path.join(cacheRoot, "tessdata");
+  fs.mkdirSync(langPath, { recursive: true });
+  for (const code of OCR_LANGS) {
+    const pkg = require(`@tesseract.js-data/${code}`);
+    const file = `${code}.traineddata.gz`;
+    const dest = path.join(langPath, file);
+    if (!fs.existsSync(dest)) fs.copyFileSync(path.join(pkg.langPath, file), dest);
+  }
+  return langPath;
+}
+
 async function getWorker() {
   if (!workerPromise) {
-    const language = require("@tesseract.js-data/eng");
-    workerPromise = createWorker(language.code, 1, {
-      langPath: language.langPath,
-      gzip: language.gzip,
+    const langPath = prepareLangPath();
+    // Russian is bundled alongside English: the bot's audience is Russian-speaking,
+    // and English-only OCR turned Cyrillic scam text into unusable noise.
+    workerPromise = createWorker(OCR_LANGS, 1, {
+      langPath,
+      gzip: true,
       cacheMethod: "none",
       logger: () => {},
     })
@@ -146,10 +166,15 @@ async function getLocalVision() {
     localVisionPromise = (async () => {
       const { env, AutoProcessor, AutoModelForImageTextToText, RawImage } = await import("@huggingface/transformers");
       env.cacheDir = process.env.IMAGE_SPAM_MODEL_CACHE || path.join(process.cwd(), ".cache", "image-spam");
-      const modelId = process.env.IMAGE_SPAM_VISION_MODEL || "HuggingFaceTB/SmolVLM-500M-Instruct";
+      // Defaults to the 2.2B SmolVLM: it reads image intent far better than the 500M
+      // and, with no GPU on the host, still finishes within the ~1 min automod budget.
+      const modelId = process.env.IMAGE_SPAM_VISION_MODEL || "HuggingFaceTB/SmolVLM-Instruct";
+      // dtype and model are configurable: a larger model or higher precision reads
+      // image intent far better, at the cost of RAM and CPU latency.
+      const dtype = process.env.IMAGE_SPAM_VISION_DTYPE || "q4";
       const [processor, model] = await Promise.all([
         AutoProcessor.from_pretrained(modelId),
-        AutoModelForImageTextToText.from_pretrained(modelId, { dtype: "q4", device: "cpu" }),
+        AutoModelForImageTextToText.from_pretrained(modelId, { dtype, device: "cpu" }),
       ]);
       return { processor, model, RawImage, modelId };
     })().catch((error) => {
@@ -160,23 +185,27 @@ async function getLocalVision() {
   return localVisionPromise;
 }
 
-async function runLocalVision(buffer, caption, ocrHint = "") {
+const VISION_SPLIT = process.env.IMAGE_SPAM_VISION_SPLIT !== "false";
+
+async function runLocalVision(buffer, caption, ocrHint = "", split = VISION_SPLIT) {
   const runtime = await getLocalVision();
   const job = visionQueue.then(async () => {
     const prompt =
-      "Classify this Discord image for financial or crypto reward spam. A single fraudulent panel in a collage is enough. " +
-      "Look for fake withdrawals, payment confirmations, wallets, large rewards, claim prompts, and success screens. " +
-      "Normal memes, games, receipts, and legitimate finance screenshots are not spam. Be conservative. " +
-      "Reply with exactly one label: IMAGE_SPAM or IMAGE_SAFE. " +
+      "You are a Discord anti-spam reviewer. Decide if this image is a get-rich-quick / reward scam. " +
+      "Scam traits: fake bank transfers or payment confirmations (e.g. Ozon, Sber, Tinkoff, a big +amount in ₽/$), " +
+      "in-game or app currency balances and coin/token giveaways (e.g. 'Coins', 'Balance'), casino or betting balances, " +
+      "'claim your reward / free money for new users / register to withdraw' promos, crypto wallets, and success screens. " +
+      "A single fraudulent panel inside a collage is enough. Ordinary memes, games, chats and real personal screenshots are safe. " +
+      "Judge the picture itself, not only the text. Reply with exactly one label: IMAGE_SPAM or IMAGE_SAFE. " +
       `Caption: ${JSON.stringify(caption || "")}. ` +
-      `OCR from this image region: ${JSON.stringify(ocrHint.slice(0, 600))}`;
+      `OCR text found in the image: ${JSON.stringify(ocrHint.slice(0, 600))}`;
     const messages = [{ role: "user", content: [{ type: "image" }, { type: "text", text: prompt }] }];
     const formatted = runtime.processor.tokenizer.apply_chat_template(messages, {
       add_generation_prompt: true,
       tokenize: false,
     });
     const image = await runtime.RawImage.fromBlob(new Blob([buffer], { type: "image/jpeg" }));
-    const inputs = await runtime.processor(formatted, image, { do_image_splitting: false });
+    const inputs = await runtime.processor(formatted, image, { do_image_splitting: split });
     const output = await runtime.model.generate({ ...inputs, max_new_tokens: 8, do_sample: false });
     return runtime.processor.tokenizer.batch_decode(output, { skip_special_tokens: true })[0] || "";
   });
@@ -195,7 +224,8 @@ function parseVisionResponse(text) {
 
 async function analyzeWithVision(buffer, caption, engine = runLocalVision, ocrHint = "") {
   const result = parseVisionResponse(await engine(buffer, caption, ocrHint));
-  return { ...result, model: process.env.IMAGE_SPAM_VISION_MODEL || "SmolVLM-500M-Instruct (q4)" };
+  const modelName = (process.env.IMAGE_SPAM_VISION_MODEL || "SmolVLM-Instruct").split("/").pop();
+  return { ...result, model: `${modelName} (${process.env.IMAGE_SPAM_VISION_DTYPE || "q4"})` };
 }
 
 async function preloadVisionModel() {
@@ -239,6 +269,41 @@ function scoreImageSpam({ caption = "", ocrText = "", confidence = 0, visual = {
     add(5, "short conversational bait");
   }
 
+  // Multilingual (RU) gambling / giveaway scam signals. SLAYBOT's audience is
+  // Russian-speaking, and these phrasings dominate Discord casino-referral scams.
+  const gambling =
+    combined.match(
+      /(казино|казик|ставк|рулетк|слот[аовы]|джекпот|casino|roulette|jackpot|gambling|1xbet|mostbet|melbet|pin.?up|vavada)/gi
+    ) || [];
+  if (gambling.length) add(30, "gambling/casino reference");
+
+  // Deliberately excludes banking-ambiguous words (пополнить, вывод, баланс) so a
+  // genuine balance screenshot is not flagged on its own.
+  const giveawayRu =
+    combined.match(
+      /(разда[ёе]т|раздач|бонус|промокод|подар[оки]|беспл|каждому|нов(?:ым|ому)\s+(?:игрок|пользовател)|регистрац|выигр|заработ)/gi
+    ) || [];
+  if (giveawayRu.length) {
+    add(
+      Math.min(30, 12 + (new Set(giveawayRu.map((match) => match.toLowerCase())).size - 1) * 6),
+      "reward/giveaway bait"
+    );
+  }
+
+  const knownScamBrand = /(мелл?стро[йи]|mellstro|mellget|1xbet|mostbet|melbet|vavada)/i.test(combined);
+  const promoDomain = combined.match(
+    /\b([a-z0-9-]{3,}\.(?:com|net|ru|cc|xyz|org|io|vip|bet|casino|club|online|site))\b/i
+  );
+  if (knownScamBrand) add(30, "known scam brand");
+  else if (promoDomain && (gambling.length || giveawayRu.length)) add(18, `promo domain (${promoDomain[1]})`);
+
+  // Fake bank-transfer / payment-proof screenshots only count as a signal alongside
+  // scam context — a real balance screenshot must never be flagged on its own.
+  const banking =
+    /(банк|баланс|перевод|сч[её]т|пополн|\bozon\b|сбер|тинькофф|tinkoff|qiwi|kaspi|перевести|₽|\bруб)/i.test(combined);
+  const scamContext = gambling.length || giveawayRu.length || knownScamBrand;
+  if (banking && amounts.length && scamContext) add(20, "banking payment proof with scam context");
+
   const ocrLines = ocrText.split(/\n+/).filter((line) => line.trim().length >= 3).length;
   const landscape = visual.width > visual.height * 1.15;
   const screenshotLike = visual.entropy >= 4.5 && ocrLines >= 4;
@@ -281,19 +346,37 @@ function selectVisionCandidate({ candidates = [] }, visionImages, caption, visua
   };
 }
 
-async function classifyImage({ url, caption = "", threshold = DEFAULT_THRESHOLD }) {
+async function classifyImage({ url, caption = "", threshold = DEFAULT_THRESHOLD, guildId }) {
   const buffer = await downloadImage(url);
-  return classifyImageBuffer({ buffer, caption, threshold });
+  return classifyImageBuffer({ buffer, caption, threshold, guildId });
 }
 
-async function classifyImageBuffer({ buffer, caption = "", threshold = DEFAULT_THRESHOLD }) {
+async function classifyImageBuffer({
+  buffer,
+  caption = "",
+  threshold = DEFAULT_THRESHOLD,
+  guildId,
+  localOnly = false,
+}) {
   if (pendingAnalyses >= MAX_PENDING_ANALYSES) throw new Error("image classifier is busy");
   pendingAnalyses += 1;
   try {
+    if (!localOnly && guildId) {
+      const distributed = await require("../slaynode/control/runtime").dispatchImageSpam({
+        buffer,
+        caption,
+        threshold,
+        guildId,
+      });
+      if (distributed) return distributed;
+    }
     const { ocrImages, visionImages, visual } = await prepareImage(buffer);
     const ocr = await recognizeAll(ocrImages);
     const selected = selectVisionCandidate(ocr, visionImages, caption, visual);
-    const vision = await analyzeWithVision(selected.buffer, caption, runLocalVision, selected.ocrHint);
+    // Show the vision model the whole image (with panel splitting) plus the OCR it
+    // read, so it can judge multi-panel collages instead of one cropped tile.
+    const visionHint = selected.confidence >= 25 ? ocr.text : selected.ocrHint;
+    const vision = await analyzeWithVision(visionImages[0], caption, runLocalVision, visionHint);
     const result = scoreImageSpam({
       caption,
       ocrText: ocr.text,
@@ -334,5 +417,7 @@ module.exports = {
   analyzeWithVision,
   parseVisionResponse,
   preloadVisionModel,
+  prepareImage,
+  recognizeAll,
   selectVisionCandidate,
 };

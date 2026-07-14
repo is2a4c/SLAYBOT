@@ -87,6 +87,40 @@ test("recognizes cryptocurrency wallet addresses as a strong signal", () => {
   assert.ok(result.reasons.some((reason) => reason.includes("wallet address")));
 });
 
+test("flags a Russian casino-referral scam collage", () => {
+  const result = scoreImageSpam({
+    ocrText:
+      "Меллстрой открыл своё казино и раздаёт 10000 рублей каждому новому пользователю. " +
+      "Бонус можно получить на mellget.com. После регистрации деньги поступают на баланс.",
+    confidence: 60,
+    visual: { width: 1200, height: 800, entropy: 6 },
+  });
+
+  assert.ok(result.score >= 70, `expected >= 70, got ${result.score}`);
+  assert.ok(result.reasons.some((reason) => reason.includes("gambling/casino")));
+  assert.ok(result.reasons.some((reason) => reason.includes("scam brand")));
+});
+
+test("flags a fake Russian bank-transfer proof paired with a casino promo", () => {
+  const result = scoreImageSpam({
+    ocrText: "Ozon банк\nПереводы +10 823 ₽\nБаланс 10 822 руб\nказино бонус mellget.com",
+    confidence: 55,
+    visual: { width: 1400, height: 900, entropy: 6 },
+  });
+
+  assert.ok(result.score >= 70, `expected >= 70, got ${result.score}`);
+});
+
+test("does not flag a plain Russian bank balance screenshot", () => {
+  const result = scoreImageSpam({
+    ocrText: "Баланс\nОсновной счёт\nРоссийский рубль\n10 822 рубля\nПополнить\nПодробнее",
+    confidence: 85,
+    visual: { width: 800, height: 1000, entropy: 5 },
+  });
+
+  assert.ok(result.score < 50, `expected < 50, got ${result.score}`);
+});
+
 test("selects the image region with the strongest OCR risk for vision", () => {
   const visionImages = [Buffer.from("full"), Buffer.from("safe"), Buffer.from("payout")];
   const selected = selectVisionCandidate(
