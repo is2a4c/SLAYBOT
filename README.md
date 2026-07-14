@@ -1,184 +1,297 @@
-<h1 align="center">
-  <br>
-  <a href="https://discord.gg/6D5ZpJy4Eg"><img src="./docs/.gitbook/assets/logo.png" height="200" alt="SLAYBOT Support Server"></a>
-  <br>
-  SLAYBOT v2
-  <br>
-</h1>
+<div align="center">
+  <a href="https://discord.gg/6D5ZpJy4Eg">
+    <img src="./docs/.gitbook/assets/logo.png" width="180" alt="SLAYBOT logo">
+  </a>
 
-<p align="center">Admin, AutoMod, Anime, Economy, Fun, Giveaway, Image, Invite, Information, Moderation, Music, Owner, Social, Statistics, Suggestion, Ticket, Utility and More...</p>
+  <h1>SLAYBOT v3</h1>
+  <p><strong>Умный Discord-бот для порядка, комьюнити и тяжёлых задач без компромиссов по безопасности.</strong></p>
 
-<br>
+  <p>
+    <a href="https://github.com/is2a4c/SLAYBOT/actions/workflows/ci.yml">
+      <img src="https://github.com/is2a4c/SLAYBOT/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status">
+    </a>
+    <a href="https://nodejs.org/">
+      <img src="https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white" alt="Node.js 18 or newer">
+    </a>
+    <a href="https://discord.js.org/">
+      <img src="https://img.shields.io/badge/discord.js-v14-5865F2?logo=discord&logoColor=white" alt="discord.js v14">
+    </a>
+    <a href="LICENSE">
+      <img src="https://img.shields.io/badge/license-educational%20use-A855F7" alt="License terms">
+    </a>
+  </p>
 
-<p align="center">
-  <a href="#-resource-links">Resource Links</a>
-  •
-  <a href="#-prerequisites">Prerequisites</a>
-  •
-  <a href="#-getting-started">Getting Started</a>
-  •
-  <a href="#-features">Features</a>
-  •
-  <a href="#-slaynode-partner-new-in-v3">SlayNode Partner</a>
-</p>
+  <p>
+    <a href="https://discord.com/api/oauth2/authorize?client_id=1228720060219129856&scope=bot+applications.commands&permissions=1374891928950"><strong>Пригласить бота</strong></a>
+    &nbsp;·&nbsp;
+    <a href="https://discord.gg/6D5ZpJy4Eg"><strong>Сервер поддержки</strong></a>
+    &nbsp;·&nbsp;
+    <a href="docs/SUMMARY.md"><strong>Документация</strong></a>
+  </p>
+</div>
 
-<br>
+> **v3 — это единая платформа для сервера:** обычные и slash-команды, глубокая AutoMod-защита, локальный анализ изображений с OCR и SlayNode для безопасного распределённого вычисления.
 
-## 🔗 Resource Links
+<div align="center">
+  <a href="#quick-start">Быстрый старт</a>
+  &nbsp;•&nbsp;
+  <a href="#what-is-new">Что даёт v3</a>
+  &nbsp;•&nbsp;
+  <a href="#image-spam">Защита от image spam</a>
+  &nbsp;•&nbsp;
+  <a href="#slaynode">SlayNode Partner</a>
+  &nbsp;•&nbsp;
+  <a href="#commands">Команды</a>
+  &nbsp;•&nbsp;
+  <a href="#operations">Эксплуатация</a>
+</div>
 
-- 🌐 Bot Website: [Visit Here](https://pashabritva.github.io/SLAYBOT/)
-- 🤖 Invite Bot: [Invite Here](https://discord.com/api/oauth2/authorize?client_id=1228720060219129856&scope=bot+applications.commands&permissions=1374891928950)
-- 🤝 Support Server: [Join Here](https://discord.gg/6D5ZpJy4Eg)
-- 🐳 Docker Image: [Hub](https://hub.docker.com/r/is2a4/slaybot)
+---
 
-## 📦 Prerequisites
+## <a id="what-is-new"></a>✨ Что даёт v3
 
-- [Node.js](https://nodejs.org/en/) v18 or higher
-- [Git](https://git-scm.com/downloads)
-- [MongoDB](https://www.mongodb.com)
+| 🛡️ Безопасность по умолчанию                                                                   | 🧠 Локальный интеллект                                                                                       | 🛰️ Вычисления без доверия                                                                                        |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Автомодерация, журналирование, предупреждения, гибкие пороги и безопасное fail-open поведение. | OCR на русском и английском + SmolVLM для распознавания финансового image spam прямо в вашей инфраструктуре. | SlayNode разгружает тяжёлые OCR/AI-задачи на подключённые машины, не отдавая им токен бота или доступ к MongoDB. |
 
-## 🚀 Getting Started
+| ⚡ Вся жизнь сервера                                                                         | 🎵 Медиа и развлечения                                                                  | 🎛️ Управление без рутины                                                                  |
+| -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Модерация, тикеты, роли, приветствия, инвайты, статистика, репутация, экономика и розыгрыши. | Lavalink-музыка, поиск, очередь, фильтры, image-команды, игры, аниме-реакции и утилиты. | Prefix, slash и context-команды; серверные настройки хранятся отдельно для каждого guild. |
 
-- Open the terminal and run the following commands
+### Почему это важно
 
+- **Центральный бот остаётся источником истины.** Решение о модерации, Discord gateway, секреты и база данных никогда не покидают основной сервис.
+- **Тяжёлые функции не требуют платного AI API.** Модель image spam загружается в локальный cache и запускается только когда нужна.
+- **Сервер не становится хрупким.** Если OCR, vision-модель или удалённый worker недоступны, сообщение остаётся нетронутым, а бот продолжает работу.
+- **v3 рассчитан на рост.** SlayNode даёт путь от одного процесса к управляемой сети worker-ов с очередью, лимитами и центральным fallback.
+
+---
+
+## <a id="quick-start"></a>⚡ Быстрый старт
+
+### Что понадобится
+
+- **Node.js 18+** — для production рекомендуется Node.js 22.
+- **MongoDB** — хранилище конфигурации серверов, статистики, тикетов, инвайтов и очереди SlayNode.
+- **Discord application** с bot token и нужными intents.
+
+### Запуск локально
+
+```bash
+git clone https://github.com/is2a4c/SLAYBOT.git
+cd SLAYBOT
+cp example.config.js config.js
+cp .env.example .env
+npm ci
 ```
-git clone https://github.com/PashaBritva/SLAYBOT.git
-cd slaybot
-npm install
+
+1. Заполните <code>.env</code>: минимум <code>BOT_TOKEN</code> и <code>MONGO_CONNECTION</code>.
+2. Проверьте <code>config.js</code>: owner IDs, prefix, нужные модули и параметры interactions.
+3. Выполните проверку конфигурации и запустите бота:
+
+```bash
+npm run runtime:check
+npm start
 ```
 
-- Wait for all the dependencies to be installed
-- Rename `.env.example` to `.env` and fill the values
-- Optionally edit `config.js`
-- Type `npm run start` to start the bot
+> [!IMPORTANT]
+> Не коммитьте <code>.env</code>, <code>config.js</code>, ключи SlayNode или cache моделей. Репозиторий уже исключает локальный <code>config.js</code> из Git.
 
-If you need any additional help, make sure to read our guides [here](docs/additional/installation.md)
+<details>
+  <summary><strong>Полезные переменные окружения</strong></summary>
+  <br>
 
-<br>
+| Переменная                                                         | Для чего нужна                     | Обязательность |
+| ------------------------------------------------------------------ | ---------------------------------- | -------------- |
+| <code>BOT_TOKEN</code>                                             | Подключение к Discord              | Да             |
+| <code>MONGO_CONNECTION</code>                                      | MongoDB для данных бота и SlayNode | Да             |
+| <code>ERROR_LOGS</code>, <code>JOIN_LEAVE_LOGS</code>              | Webhooks для журналов              | Нет            |
+| <code>SPOTIFY_CLIENT_ID</code>, <code>SPOTIFY_CLIENT_SECRET</code> | Spotify-поиск для музыки           | Нет            |
+| <code>STRANGE_API_KEY</code>                                       | Внешние image-команды              | Нет            |
+| <code>WEATHERSTACK_KEY</code>                                      | Команда погоды                     | Нет            |
 
-<h1 align="center"> ✨ Features ✨ </h1>
+</details>
 
-### 📡 **Advanced Dashboard**
+---
 
-- Manage your servers and make your server-specific settings!
-- Make custom adjustments easy!
+## <a id="image-spam"></a>🧠 Image Spam Guard
 
-### 🛑 **Powerful Moderation:**
+v3 умеет анализировать вложенные изображения на мошеннические выплаты, казино/ставки, фальшивые банковские переводы, криптокошельки и схемы с «бесплатными» наградами.
 
-- **Moderation Commands.** <br /> _Commands:_ `ban`, `unban`, `timeout`, `voice moderation`, `deafen`, `move`, `warn`, `setnick`, ...
-- **Multi-Function Purge Commands.** <br /> _Commands:_ `purge`, `purge attach`, `purge bots`, `purge links`, `purge token`, `purge user`, ...
+```text
+Attachment → image safety limits → OCR (RU + EN) → visual preparation
+           → SmolVLM classification → score fusion → AutoMod action
+```
 
-### 🤖 **Auto Moderation:**
+### Включение в сервере
 
-- **Anti system** <br /> _Commands:_ `anti ghostping`, `anti spam`, `anti massmention`, ...
-- **Auto Delete system** <br /> _Commands:_ `autodelete attachments`, `autodelete invites`, `autodelete links`, `autodelete maxlines`, ...
-- **AutoMod system** <br /> _Commands:_ `automod status`, `automod strikes`, `automod action`, `automod debug`, `automod whitelist`, ...
+```text
+!anti imagespam on 70
+```
 
-### ⚙️ **Admin Configuration:**
+- Модель **SmolVLM 2.2B** используется по умолчанию в quantized-режиме <code>q4</code>.
+- Для более лёгкого запуска укажите <code>IMAGE_SPAM_VISION_MODEL=HuggingFaceTB/SmolVLM-500M-Instruct</code>.
+- Cache по умолчанию: <code>.cache/image-spam</code>. Его можно перенести через <code>IMAGE_SPAM_MODEL_CACHE</code>.
+- Модель можно прогреть вручную, но это **не требуется** для старта: загрузка ленивая, а deploy не блокируется из-за временной ошибки сети.
 
-- **Let a bot be the server's assistant!** <br /> _Commands:_ `autorole`, `farewell`, `welcome`, `counters`, `flag translation`, `reaction roles`, ...
-- **Make custom settings for your own server.** <br /> _Commands:_ `setprefix`, `maxwarns`, `modlog`...
+```bash
+npm run image-spam:model:download
+npm run image-spam:check
+```
 
-### 💁 **Information Gathering:**
+> [!NOTE]
+> Image Spam Guard сознательно работает в режиме **fail-open**: сомнительное или неуспешно обработанное изображение не удаляется автоматически. Настройте порог под правила конкретного сервера.
 
-- **User Context Interactions**
-- **Advanced Information** Get deep information about a user, channel, role, etc.
+---
 
-### 🎵 **Music:**
+## <a id="slaynode"></a>🛰️ SlayNode Partner
 
-- **LossLess Music!** Enjoy high quality lossless music
-- **Multi-Platform** Play music from YouTube, SoundCloud, Spotify, and more
-- **Filters** Apply filters to your music and spice it up
+**SlayNode Partner** — распределённый слой вычислений для OCR, image и AI-задач. Это не «копия бота» на чужой машине: worker получает только строго разрешённый job envelope и не видит токен Discord, строку MongoDB или центральные ключи.
 
-### 🎉 **Giveaways:**
+```mermaid
+flowchart LR
+  A["Discord guild"] --> B["SLAYBOT control plane"]
+  B --> C{"Privacy policy"}
+  C -->|"central-only"| D["Local OCR + vision"]
+  C -->|"opted-in guild"| E["SlayNode queue"]
+  E --> F["Sandboxed worker"]
+  F --> B
+  B --> G["Moderation decision"]
+```
 
-- **Easy to use** Create giveaways with ease
-- **Role specific** giveaways
-- **Customizable** Customize the giveaway to your liking
-- **Limitless** Create unlimited giveaways
+### Что получает сервер
 
-### 🫂 **Social Content:**
+| Возможность          | Как работает                                                                                                                                                                 |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Guild affinity**   | Работа конкретного сервера в первую очередь уходит на его собственные nodes.                                                                                                 |
+| **Privacy classes**  | <code>PUBLIC</code> и <code>ANONYMIZED</code> безопасны по умолчанию; <code>GUILD_PRIVATE</code> требует явного opt-in; <code>CENTRAL_ONLY</code> не отправляется worker-ам. |
+| **Надёжная очередь** | Состояния <code>QUEUED → LEASED → SUCCEEDED</code>, leases, idempotency, exponential backoff и central fallback.                                                             |
+| **Изоляция**         | Non-root контейнеры, read-only FS, ограничения CPU/RAM/PID, child process с timeout и без удалённого shell.                                                                  |
+| **Slay Credits**     | Проверенные jobs записываются в защищённый ledger и формируют Partner tier: Bronze, Silver, Gold, Platinum.                                                                  |
 
-- **You Have A CV In Each Server-Specific Bot!** <br /> _Commands:_ `rep`, `rep view`...
-- **Do You Love Someone?** <br /> _Commands:_ `rep give`...
+### Подключение worker-а
 
-### 🎟 **Ticket System:**
+1. Включите <code>SLAYNODE.enabled</code> в <code>config.js</code> и задайте <code>SLAYNODE_MASTER_KEY</code> длиной не менее 32 символов.
+2. Разместите control plane за HTTPS reverse proxy.
+3. Создайте enrollment через <code>/slaynode enroll</code> с правом Manage Server.
+4. Запустите CLI enrollment с полученным токеном:
 
-- **Make Supporting Members A Breeze With Tickets!** <br/> Highly customizable ticket system with staff roles
-- **Multiple Categories** <br/> Don't Want The Tickets To Be Everywhere? Categorize them using select menus
+```bash
+SLAYNODE_ENROLLMENT_TOKEN=... \
+SLAYNODE_CONTROL_URL=https://your-control.example \
+npm run slaynode:enroll
+```
 
-### 📉 **Stats Tracking:**
+5. Сохраните возвращённые <code>SLAYNODE_ID</code> и <code>SLAYNODE_SECRET</code> только на worker-е и поднимите контейнер.
 
-- **Levelling** Track your server's activity with a level system
-- **Leaderboards** See who is the most active user in your server
-- **Customizable System** Configure the levelup message, rank cards to your liking
+Полное описание протокола, границ доверия, monitoring и переменных окружения — в [архитектуре SlayNode](docs/slaynode/architecture.md).
 
-### 🙋‍♂️ **Suggestions:**
+---
 
-- **Get Suggestions From Server Members To Help Your Server Become The Best!** <br /> _Commands:_ `suggest`, `suggestion`...
-- **Accept Or Decline The Suggestions And Customize Them To The Max!** <br /> _Commands:_ `suggestion status`, `suggestion channel`, `suggestion appch`, `suggestion rejch`, `suggestion approve`, `suggestion staffadd`, `suggestion staffremove`...
+## <a id="commands"></a>🎮 Карта команд
 
-### ⚒️ **Utility Commands:**
+В репозитории **133 command modules** в 16 категориях. Полный список и актуальные параметры — в документации; ниже — удобная карта возможностей v3.
 
-- **Need Some Help With Something? Use The Utility Commands To Find Out The Answer To It** <br /> _Commands:_ `bigemoji`, `covid`, `pokedex`, `urban`, `weather`, ...
-- **Need Help With Some More Stuff?** <br /> _Commands:_ `help`, `proxies`, `translate`, `paste`, ...
+| Пространство           | Что внутри                                                                                                        | Документация                                                                      |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 🛡️ **Admin & AutoMod** | anti spam, image spam, ghost ping, mass mention, whitelist, actions, modlog, auto-delete, roles, welcome/farewell | [Admin](docs/commands/admin.md)                                                   |
+| 🔨 **Moderation**      | warn, timeout, kick, ban, purge по фильтрам, voice moderation, nicknames                                          | [Moderation](docs/commands/moderation.md)                                         |
+| 🛰️ **SlayNode**        | enrollment, privacy policy, node health, limits, credits, tiers, rotation и audit log                             | [Architecture](docs/slaynode/architecture.md)                                     |
+| 🎫 **Server workflow** | тикеты, предложения, reaction roles, счётчики, giveaways, invite tracking                                         | [Giveaways](docs/commands/giveaways.md) · [Invites](docs/commands/invites.md)     |
+| 📈 **Community**       | XP, rank, leaderboard, reputation, экономика, daily и gamble                                                      | [Stats](docs/commands/stats.md) · [Economy](docs/commands/economy.md)             |
+| 🎵 **Media**           | play, queue, search, seek, filters, Spotify support и Lavalink                                                    | [Music](docs/commands/music.md)                                                   |
+| 🖼️ **Creative**        | filters, overlays и генераторы изображений                                                                        | [Image](docs/commands/image.md)                                                   |
+| 🧰 **Everyday tools**  | help, translation, weather, GitHub profile, bigemoji, paste, info                                                 | [Utility](docs/commands/utility.md) · [Information](docs/commands/information.md) |
+| 🎲 **Fun**             | games, memes, animals, facts, Discord Activities и anime reactions                                                | [Fun](docs/commands/fun.md) · [Anime](docs/commands/anime.md)                     |
 
-### ⭐ **Anime Content:**
+### Три быстрых сценария
 
-- **Love Anime? Express Your Love To Someone Using The React Commands** <br /> _Commands:_ `react`, `hug`, `kiss`, `cuddle`, `pat`, `poke`, `slap`, `smug`, ...
+<details>
+  <summary><strong>🛡️ Настроить безопасный сервер за 10 минут</strong></summary>
+  <br>
 
-### 🪙 **Economy System:**
+1. Задайте лог-канал: <code>!modlog #moderation-log</code>.
+2. Настройте action и strikes через <code>!automodconfig</code>.
+3. Включите нужные защиты: anti spam, anti invites, anti ghostping, anti massmention.
+4. Добавьте whitelist для служебных каналов.
+5. Включите <code>!anti imagespam on 70</code> после проверки модели.
 
-- **Want To Become Richest? Use The Economy Commands!** <br /> _Commands:_ `bank`, `daily`, `beg`, `gamble`...
-- **Give People Money, Check Your Balance, Or Just Flex!** <br /> _Commands:_ `bank balance`, `bank deposit`, `bank withdraw`, `bank transfer`, ...
+</details>
 
-### 😁 **Fun Commands:**
+<details>
+  <summary><strong>🎟️ Собрать self-service для комьюнити</strong></summary>
+  <br>
 
-- **Have Some Fun In Your Server!** <br /> _Commands:_ `animal`, `facts`, `meme`, `flip`, ...
-- **Play Games And Enjoy Yourself** <br /> _Commands:_ `snake`, `together`, `flip coin`, `flip text`, ...
+Объедините welcome/farewell, autorole, reaction roles, ticket categories, suggestions, invite ranks, giveaways и XP leaderboard. Все настройки изолированы на уровне конкретного Discord-сервера.
 
-### 📨 **Invite Tracking:**
+</details>
 
-- **Track who has been inviting people to your server!**
-- **Invite Ranks!** Inviter can get awesome rewards and be recognised
-- **Configure these settings and customize them to your liking!** <br /> _Commands:_ `resetinvites`, `addinvites`, `invitesimport`, `inviterank`...
+<details>
+  <summary><strong>🎵 Включить музыкальный режим</strong></summary>
+  <br>
 
-### 📷 **Image Manipulation:**
+Оставьте <code>MUSIC.enabled</code> включённым, настройте доступный Lavalink node в <code>config.js</code> и при необходимости добавьте Spotify credentials в <code>.env</code>.
 
-- **Customize other peoples avatars** <br /> _Commands:_ `blur`, `greyscale`, `invert`, `pixelate`, `blur`, `sepia`, `sharpen`, `ad`, `affect`, `beautiful`, `color`...
-- **Make some images by yourself or make some art** <br /> _Commands:_ `bobross`, `confusedstonk`, `delete`, `facepalm`, ` hitler`, `jail`, `jokeoverhead`, `karaba`, `mms`, `notstonk`, `poutine`, `rainbow`, `rip`, ` shit`, `stonk`, `tatoo`, `thomas`, `trash`, `wanted`, `wasted`, ...
+</details>
 
-<br>
+---
 
-## 🛰️ SlayNode Partner (New in v3)
+## <a id="operations"></a>🧰 Эксплуатация и качество
 
-**SlayNode Partner** is a distributed compute layer that lets server owners contribute their own machines as secure worker nodes for heavy image, OCR and AI jobs — **without** ever handing those nodes the keys to the bot.
+### Команды разработчика
 
-Workers are untrusted compute, **not** copies of the Discord bot. The bot token, MongoDB connection, OAuth secrets, internal keys and all moderation decisions stay on the central SLAYBOT server. Nodes only receive a versioned, allowlisted job envelope — never a raw Discord message or central credentials.
+| Команда                               | Назначение                                                    |
+| ------------------------------------- | ------------------------------------------------------------- |
+| <code>npm test</code>                 | Запустить unit-тесты.                                         |
+| <code>npm run lint</code>             | Проверить JavaScript через ESLint.                            |
+| <code>npm run format:check</code>     | Проверить форматирование Prettier.                            |
+| <code>npm run runtime:check</code>    | Убедиться, что runtime-конфигурация корректна.                |
+| <code>npm run image-spam:check</code> | Проверить локальный pipeline image spam.                      |
+| <code>npm run image-spam:e2e</code>   | Запустить E2E-проверку image spam при настроенном test image. |
+| <code>npm run slaynode:worker</code>  | Запустить worker напрямую.                                    |
+| <code>npm run slaynode:e2e</code>     | Проверить SlayNode end-to-end.                                |
 
-### How it works
+### Production checklist
 
-- **Distributed processing** for image and AI tasks (Sharp, Tesseract OCR, SmolVLM) on connected nodes.
-- **Guild affinity** — your server's jobs are preferred on your own nodes, with automatic **central fallback** when a node is unavailable.
-- **Privacy classes** — `PUBLIC` and `ANONYMIZED` are safe defaults; `GUILD_PRIVATE` image bytes are dispatched only after the guild opts in, and only to a node bound to that guild. `CENTRAL_ONLY` is never dispatched.
-- **Safe enrollment** — one-time enrollment token, unique per-node credentials, HMAC-authenticated requests with timestamp + nonce replay protection over HTTPS.
-- **Sandboxed workers** — non-root, read-only, capability-free containers with CPU/RAM/PID limits; every executor runs in a child process with a memory ceiling and timeout. No shell command is ever accepted from a job.
-- **Reliability** — jobs move through `QUEUED → LEASED → SUCCEEDED` with idempotent leases, exponential backoff retries, canary health checks, and a circuit breaker that falls back centrally after repeated distributed timeouts.
-- **Slay Credits** — verified jobs earn integer micro-credit units on an immutable, authoritative ledger with replay and double-reward protection. Credits persist after a node disconnects and unlock resource-heavy image/AI/media features. Regular free commands are never blocked.
-- **Partner tiers** — Bronze, Silver, Gold and Platinum, based not just on hardware but on real contribution, uptime, reliability, speed and passing verification.
+- [ ] Секреты доступны только в environment или vault, а не в репозитории.
+- [ ] MongoDB защищён сетевой политикой и резервным копированием.
+- [ ] Для SlayNode control plane настроен HTTPS reverse proxy.
+- [ ] У worker-ов есть CPU/RAM limits и отдельные credentials.
+- [ ] Перед релизом проходят <code>npm test</code>, <code>npm run lint</code> и <code>npm run runtime:check</code>.
+- [ ] Порог image spam и automod action протестированы на правилах вашего сообщества.
 
-### Management
+---
 
-Use the `/slaynode` command (Manage Server permission) to enroll and rename nodes, configure limits and schedule, manage privacy policy, view state / load / reliability, check earned credits and Partner tier, revoke or safely rotate credentials, and browse the event log.
+## 🗂️ Структура проекта
 
-See [`docs/slaynode/architecture.md`](docs/slaynode/architecture.md) for the full architecture, data-flow and operation guide.
+```text
+src/
+├── commands/        16 категорий команд
+├── handlers/        Discord-события и бизнес-логика
+├── services/        image spam classifier и сервисы
+├── slaynode/        control plane, protocol и executors
+├── database/        Mongoose schemas и persistence
+└── helpers/         конфигурация, validation, logging и utilities
 
-<br>
+slaynode/             worker runtime и enrollment CLI
+scripts/              проверки runtime, image spam и E2E
+test/                 unit и protocol-тесты
+docs/                 команды, guides и архитектура
+```
 
-## 📝 License
+## 🤝 Вклад в проект
 
-This project is licensed under the [License](LICENSE).
+1. Создайте ветку с понятным названием.
+2. Добавьте или обновите тесты для изменения поведения.
+3. Запустите checks из раздела выше.
+4. Опишите, как проверить изменение, в pull request.
 
-## 🔒 Security
+Если нашли уязвимость, не публикуйте детали в issue — используйте [Security Policy](SECURITY.md).
 
-SLAYBOT v2 follows strict security practices. For detailed guidelines and best practices, please refer to our [Security Policy](SECURITY.md).
+## 📄 Лицензия
+
+Проект распространяется на условиях, указанных в [LICENSE](LICENSE).
+
+<div align="center">
+  <sub>SLAYBOT v3 · moderation, community and secure compute for Discord</sub>
+</div>
