@@ -27,6 +27,10 @@
     <a href="https://discord.gg/6D5ZpJy4Eg"><strong>Сервер поддержки</strong></a>
     &nbsp;·&nbsp;
     <a href="docs/SUMMARY.md"><strong>Документация</strong></a>
+    &nbsp;·&nbsp;
+    <a href="PRIVACY.md"><strong>Privacy</strong></a>
+    &nbsp;·&nbsp;
+    <a href="TERMS.md"><strong>Terms</strong></a>
   </p>
 </div>
 
@@ -291,6 +295,11 @@ docs/                 команды, guides и архитектура
 ## 📄 Лицензия
 
 Проект распространяется на условиях, указанных в [LICENSE](LICENSE).
+
+## ⚖️ Правовые документы
+
+- [Политика конфиденциальности](PRIVACY.md)
+- [Условия использования](TERMS.md)
 
 <div align="center">
   <sub>SLAYBOT v3 · moderation, community and secure compute for Discord</sub>

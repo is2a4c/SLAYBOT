@@ -22,3 +22,8 @@
 
 - [✍ Guides](additional/installation.md)
 - [❓ FAQ](additional/faq.md)
+
+## Legal
+
+- [🔒 Privacy Policy](../PRIVACY.md)
+- [⚖️ Terms of Use](../TERMS.md)
