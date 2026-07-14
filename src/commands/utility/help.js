@@ -114,16 +114,23 @@ async function getHelpMenu({ client, guild }) {
 
   let buttonsRow = new ActionRowBuilder().addComponents(components);
 
+  const categoryCount = options.length;
+  const commandCount = client.slashCommands.size || client.commands.size;
+
   const embed = new EmbedBuilder()
     .setColor(EMBED_COLORS.BOT_EMBED)
+    .setAuthor({ name: `${client.user.username} • Command Center`, iconURL: client.user.displayAvatarURL() })
     .setThumbnail(client.user.displayAvatarURL())
     .setDescription(
-      "**About Me:**\n" +
-        `Hello I am ${guild.members.me.displayName}!\n` +
-        "A cool multipurpose discord bot which can serve all your needs\n\n" +
-        `**Invite Me:** [Here](${client.getInvite()})\n` +
-        `**Support Server:** [Join](${SUPPORT_SERVER})`
-    );
+      `Hey, I'm **${guild.members.me.displayName}** — your all-in-one server companion. ✨\n` +
+        "Pick a category below to browse commands, or use `help <command>` for details.\n\n" +
+        `🔗 **[Invite](${client.getInvite()})**  •  💬 **[Support](${SUPPORT_SERVER})**`
+    )
+    .addFields(
+      { name: "📦 Categories", value: `\`${categoryCount}\``, inline: true },
+      { name: "⚡ Commands", value: `\`${commandCount}\``, inline: true }
+    )
+    .setFooter({ text: `${client.user.username} • menu closes after ${IDLE_TIMEOUT}s idle` });
 
   return {
     embeds: [embed],

@@ -1,5 +1,12 @@
 const { resolveColor } = require("discord.js");
 
+// SLAYBOT brand accent. The logo is monochrome, so the neutral embed colour is the
+// place the brand lives. Legacy configs shipped Discord's dead grey (#2F3136); those
+// are auto-upgraded to the accent at startup so every BOT_EMBED embed is themed
+// without touching individual commands.
+const BRAND_ACCENT = "#A855F7";
+const LEGACY_NEUTRALS = ["#2f3136", "#36393f", "#202225", "#000000"];
+
 const DEFAULT_CONFIG = {
   OWNER_IDS: [],
   SUPPORT_SERVER: "",
@@ -119,7 +126,7 @@ const DEFAULT_CONFIG = {
     TEST_GUILD_ID: "",
   },
   EMBED_COLORS: {
-    BOT_EMBED: "#2F3136",
+    BOT_EMBED: BRAND_ACCENT,
     OK: "#57F287",
     ERROR: "#ED4245",
     WARNING: "#FEE75C",
@@ -133,6 +140,22 @@ const DEFAULT_CONFIG = {
     ERRORS: {
       INTERNAL: "An internal error occurred while executing this command",
     },
+  },
+  SLAYNODE: {
+    enabled: false,
+    host: "127.0.0.1",
+    port: 8090,
+    leaseMs: 60000,
+    maxPayloadBytes: 8388608,
+    verificationRate: 0.05,
+    canaryIntervalMs: 3600000,
+    allowedWorkerDigests: [],
+    tiers: [
+      { name: "Platinum", score: 90 },
+      { name: "Gold", score: 75 },
+      { name: "Silver", score: 55 },
+      { name: "Bronze", score: 0 },
+    ],
   },
 };
 
@@ -220,13 +243,24 @@ function normalizeColors(config) {
   });
 }
 
+// Retheme installs that still carry a legacy neutral BOT_EMBED. A config that has
+// deliberately set some other colour is left untouched.
+function applyBrandTheme(config) {
+  const current = getPath(config, "EMBED_COLORS.BOT_EMBED");
+  if (!current || LEGACY_NEUTRALS.includes(String(current).toLowerCase())) {
+    setPath(config, "EMBED_COLORS.BOT_EMBED", BRAND_ACCENT);
+  }
+}
+
 function applyConfigDefaults(config = require("@root/config")) {
   mergeMissing(config, DEFAULT_CONFIG);
   normalizeColors(config);
+  applyBrandTheme(config);
   return config;
 }
 
 module.exports = {
   DEFAULT_CONFIG,
+  BRAND_ACCENT,
   applyConfigDefaults,
 };

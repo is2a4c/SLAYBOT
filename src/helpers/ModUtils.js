@@ -1,5 +1,5 @@
 const { Collection, EmbedBuilder, GuildMember } = require("discord.js");
-const { MODERATION } = require("@root/config");
+const { MODERATION, EMBED_COLORS } = require("@root/config");
 
 // Utils
 const { containsLink } = require("@helpers/Utils");
@@ -35,7 +35,7 @@ const logModeration = async (issuer, target, reason, type, data = {}) => {
   let logChannel;
   if (settings.modlog_channel) logChannel = guild.channels.cache.get(settings.modlog_channel);
 
-  const embed = new EmbedBuilder().setFooter({
+  const embed = new EmbedBuilder().setColor(EMBED_COLORS.BOT_EMBED).setFooter({
     text: `By ${issuer.displayName} • ${issuer.id}`,
     iconURL: issuer.displayAvatarURL(),
   });
@@ -199,6 +199,10 @@ module.exports = class ModUtils {
    * @param {any} argument
    */
   static async purgeMessages(issuer, channel, type, amount, argument) {
+    amount = Number.parseInt(amount, 10);
+    if (!Number.isInteger(amount) || amount < 1) return "NO_MESSAGES";
+    amount = Math.min(amount, 100);
+
     if (!channel.permissionsFor(issuer).has(["ManageMessages", "ReadMessageHistory"])) {
       return "MEMBER_PERM";
     }
