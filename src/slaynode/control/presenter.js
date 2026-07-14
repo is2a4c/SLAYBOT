@@ -77,10 +77,7 @@ function relativeTime(date, now = Date.now()) {
 
 function fleetSummary(nodes) {
   const online = nodes.filter((node) => node.status === "ONLINE").length;
-  const capacity = nodes.reduce(
-    (sum, node) => sum + (node.limits?.parallelism || node.resources?.parallelism || 1),
-    0
-  );
+  const capacity = nodes.reduce((sum, node) => sum + (node.limits?.parallelism || node.resources?.parallelism || 1), 0);
   const gpu = nodes.filter((node) => node.resources?.gpu).length;
   return { total: nodes.length, online, capacity, gpu };
 }

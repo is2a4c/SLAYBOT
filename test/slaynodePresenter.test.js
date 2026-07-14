@@ -63,7 +63,15 @@ test("fleetSummary counts online, capacity and gpu", () => {
 test("nodeLine is compact and includes credits", () => {
   const now = Date.now();
   const line = presenter.nodeLine(
-    { name: "Alpha", status: "ONLINE", reliability: 0.987, load: { running: 1 }, limits: { parallelism: 4 }, latencyMs: 42, lastHeartbeatAt: new Date(now - 5_000) },
+    {
+      name: "Alpha",
+      status: "ONLINE",
+      reliability: 0.987,
+      load: { running: 1 },
+      limits: { parallelism: 4 },
+      latencyMs: 42,
+      lastHeartbeatAt: new Date(now - 5_000),
+    },
     1500,
     now
   );

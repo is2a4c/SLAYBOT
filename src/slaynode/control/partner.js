@@ -95,4 +95,12 @@ async function recalculateAllTiers(tiers) {
   return Promise.all(guilds.map((guildId) => calculateGuildTier(guildId, tiers)));
 }
 
-module.exports = { DEFAULT_TIERS, WEIGHTS, tierForScore, scoreGuild, calculateGuildTier, enqueueCanaries, recalculateAllTiers };
+module.exports = {
+  DEFAULT_TIERS,
+  WEIGHTS,
+  tierForScore,
+  scoreGuild,
+  calculateGuildTier,
+  enqueueCanaries,
+  recalculateAllTiers,
+};

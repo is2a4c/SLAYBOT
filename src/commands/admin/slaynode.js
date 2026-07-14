@@ -6,7 +6,12 @@ const { JOB_TYPES } = require("@src/slaynode/protocol");
 const presenter = require("@src/slaynode/control/presenter");
 const { EMBED_COLORS } = require("@root/config");
 
-const NODE_ID_OPTION = { name: "node_id", description: "Node ID", type: ApplicationCommandOptionType.String, required: true };
+const NODE_ID_OPTION = {
+  name: "node_id",
+  description: "Node ID",
+  type: ApplicationCommandOptionType.String,
+  required: true,
+};
 const CREDIT_WINDOW_DAYS = 30;
 
 module.exports = {
@@ -25,7 +30,13 @@ module.exports = {
         description: "Create a one-time enrollment token",
         type: ApplicationCommandOptionType.Subcommand,
         options: [
-          { name: "name", description: "Node name", type: ApplicationCommandOptionType.String, required: true, maxLength: 64 },
+          {
+            name: "name",
+            description: "Node name",
+            type: ApplicationCommandOptionType.String,
+            required: true,
+            maxLength: 64,
+          },
         ],
       },
       {
@@ -69,7 +80,13 @@ module.exports = {
         type: ApplicationCommandOptionType.Subcommand,
         options: [
           NODE_ID_OPTION,
-          { name: "name", description: "New name", type: ApplicationCommandOptionType.String, required: true, maxLength: 64 },
+          {
+            name: "name",
+            description: "New name",
+            type: ApplicationCommandOptionType.String,
+            required: true,
+            maxLength: 64,
+          },
         ],
       },
       {
@@ -119,7 +136,9 @@ module.exports = {
   },
   async interactionRun(interaction) {
     if (!interaction.client.config.SLAYNODE?.enabled)
-      return interaction.followUp({ embeds: [note(EMBED_COLORS.WARNING, "🛰️ SlayNode Partner is disabled by the operator.")] });
+      return interaction.followUp({
+        embeds: [note(EMBED_COLORS.WARNING, "🛰️ SlayNode Partner is disabled by the operator.")],
+      });
 
     const sub = interaction.options.getSubcommand();
     const guildId = interaction.guildId;
@@ -298,7 +317,10 @@ async function handleAudit(interaction, guildId) {
   embed.setDescription(
     events.length
       ? events
-          .map((event) => `\`${event.createdAt.toISOString().replace("T", " ").slice(0, 19)}\` — **${event.action}** · ${event.outcome || "OK"}`)
+          .map(
+            (event) =>
+              `\`${event.createdAt.toISOString().replace("T", " ").slice(0, 19)}\` — **${event.action}** · ${event.outcome || "OK"}`
+          )
           .join("\n")
       : "No audit events recorded yet."
   );
@@ -316,7 +338,10 @@ async function handleRevoke(interaction, node) {
 }
 
 async function handleRename(interaction, node) {
-  node.name = interaction.options.getString("name").replace(/[^\w .-]/g, "").slice(0, 64);
+  node.name = interaction.options
+    .getString("name")
+    .replace(/[^\w .-]/g, "")
+    .slice(0, 64);
   await node.save();
   return interaction.followUp({ embeds: [note(EMBED_COLORS.SUCCESS, `✏️ Node renamed to **${node.name}**.`)] });
 }
@@ -325,7 +350,9 @@ async function handleConfigure(interaction, node) {
   const start = interaction.options.getInteger("start_utc");
   const end = interaction.options.getInteger("end_utc");
   if ((start === null) !== (end === null))
-    return interaction.followUp({ embeds: [note(EMBED_COLORS.WARNING, "⚠️ Provide both start_utc and end_utc, or neither.")] });
+    return interaction.followUp({
+      embeds: [note(EMBED_COLORS.WARNING, "⚠️ Provide both start_utc and end_utc, or neither.")],
+    });
   node.limits = { ...node.limits, parallelism: interaction.options.getInteger("parallelism") };
   node.schedule = { enabled: start !== null, startHourUtc: start, endHourUtc: end };
   await node.save();
