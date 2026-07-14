@@ -161,12 +161,35 @@ jobs:
             pm2 reload slaybot --update-env 2>/dev/null || pm2 start bot.js --name slaybot
 
             pm2 describe slaybot | grep -F "$DEPLOY_DIR/bot.js"
+            pm2 save --force
 
             # Show status
             pm2 status
 
       - name: Health Check
-        run: |
-          echo "Waiting for bot to start..."
-          sleep 10
-          echo "✅ Deployment complete!"
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+            DEPLOY_DIR="${{ secrets.DEPLOY_PATH || '/opt/slaybot' }}"
+            sleep 10
+            pm2 jlist | node -e '
+              let output = "";
+              process.stdin.on("data", (chunk) => (output += chunk));
+              process.stdin.on("end", () => {
+                const apps = JSON.parse(output);
+                const app = apps.find((item) => item.name === "slaybot");
+                const status = app?.pm2_env?.status;
+                const script = app?.pm2_env?.pm_exec_path || "";
+                if (status !== "online" || script !== `${process.argv[1]}/bot.js`) {
+                  console.error(`slaybot health check failed: status=${status || "missing"}, script=${script || "missing"}`);
+                  process.exit(1);
+                }
+                console.log(`slaybot is online: pid=${app.pid}, script=${script}`);
+              });
+            ' "$DEPLOY_DIR"
