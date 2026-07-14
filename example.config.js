@@ -27,6 +27,24 @@ module.exports = {
     port: 8080,
   },
 
+  // SlayNode Partner Control Plane. Expose only behind TLS in production.
+  SLAYNODE: {
+    enabled: false,
+    host: "127.0.0.1",
+    port: 8090,
+    leaseMs: 60000,
+    maxPayloadBytes: 8388608,
+    verificationRate: 0.05,
+    canaryIntervalMs: 3600000,
+    allowedWorkerDigests: [],
+    tiers: [
+      { name: "Platinum", score: 90 },
+      { name: "Gold", score: 75 },
+      { name: "Silver", score: 55 },
+      { name: "Bronze", score: 0 },
+    ],
+  },
+
   // Prefix Commands Configuration
   PREFIX_COMMANDS: {
     enabled: true,
@@ -188,7 +206,7 @@ module.exports = {
 
   // Embed Colors
   EMBED_COLORS: {
-    BOT_EMBED: "#2F3136",
+    BOT_EMBED: "#A855F7", // SLAYBOT brand accent (was Discord grey #2F3136)
     OK: "#57F287",
     ERROR: "#ED4245",
     WARNING: "#FEE75C",
