@@ -18,6 +18,8 @@
   <a href="#-getting-started">Getting Started</a>
   •
   <a href="#-features">Features</a>
+  •
+  <a href="#-slaynode-partner-new-in-v3">SlayNode Partner</a>
 </p>
 
 <br>
@@ -145,6 +147,31 @@ If you need any additional help, make sure to read our guides [here](docs/additi
 
 - **Customize other peoples avatars** <br /> _Commands:_ `blur`, `greyscale`, `invert`, `pixelate`, `blur`, `sepia`, `sharpen`, `ad`, `affect`, `beautiful`, `color`...
 - **Make some images by yourself or make some art** <br /> _Commands:_ `bobross`, `confusedstonk`, `delete`, `facepalm`, ` hitler`, `jail`, `jokeoverhead`, `karaba`, `mms`, `notstonk`, `poutine`, `rainbow`, `rip`, ` shit`, `stonk`, `tatoo`, `thomas`, `trash`, `wanted`, `wasted`, ...
+
+<br>
+
+## 🛰️ SlayNode Partner (New in v3)
+
+**SlayNode Partner** is a distributed compute layer that lets server owners contribute their own machines as secure worker nodes for heavy image, OCR and AI jobs — **without** ever handing those nodes the keys to the bot.
+
+Workers are untrusted compute, **not** copies of the Discord bot. The bot token, MongoDB connection, OAuth secrets, internal keys and all moderation decisions stay on the central SLAYBOT server. Nodes only receive a versioned, allowlisted job envelope — never a raw Discord message or central credentials.
+
+### How it works
+
+- **Distributed processing** for image and AI tasks (Sharp, Tesseract OCR, SmolVLM) on connected nodes.
+- **Guild affinity** — your server's jobs are preferred on your own nodes, with automatic **central fallback** when a node is unavailable.
+- **Privacy classes** — `PUBLIC` and `ANONYMIZED` are safe defaults; `GUILD_PRIVATE` image bytes are dispatched only after the guild opts in, and only to a node bound to that guild. `CENTRAL_ONLY` is never dispatched.
+- **Safe enrollment** — one-time enrollment token, unique per-node credentials, HMAC-authenticated requests with timestamp + nonce replay protection over HTTPS.
+- **Sandboxed workers** — non-root, read-only, capability-free containers with CPU/RAM/PID limits; every executor runs in a child process with a memory ceiling and timeout. No shell command is ever accepted from a job.
+- **Reliability** — jobs move through `QUEUED → LEASED → SUCCEEDED` with idempotent leases, exponential backoff retries, canary health checks, and a circuit breaker that falls back centrally after repeated distributed timeouts.
+- **Slay Credits** — verified jobs earn integer micro-credit units on an immutable, authoritative ledger with replay and double-reward protection. Credits persist after a node disconnects and unlock resource-heavy image/AI/media features. Regular free commands are never blocked.
+- **Partner tiers** — Bronze, Silver, Gold and Platinum, based not just on hardware but on real contribution, uptime, reliability, speed and passing verification.
+
+### Management
+
+Use the `/slaynode` command (Manage Server permission) to enroll and rename nodes, configure limits and schedule, manage privacy policy, view state / load / reliability, check earned credits and Partner tier, revoke or safely rotate credentials, and browse the event log.
+
+See [`docs/slaynode/architecture.md`](docs/slaynode/architecture.md) for the full architecture, data-flow and operation guide.
 
 <br>
 
