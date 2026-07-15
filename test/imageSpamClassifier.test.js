@@ -206,6 +206,31 @@ test("image moderation returns deletion fields for a risky classifier result", a
   assert.match(result.fields[0].value, /fake payout/);
 });
 
+test("image moderation flags a spammy attachment that is not the first image", async () => {
+  const message = {
+    id: "message-multi",
+    content: "",
+    attachments: new Map([
+      ["a", { name: "cat.png", contentType: "image/png", url: "https://cdn.test/cat.png" }],
+      ["b", { name: "scam.png", contentType: "image/png", url: "https://cdn.test/scam.png" }],
+    ]),
+    client: { logger: { warn: () => assert.fail("unexpected warning") } },
+  };
+  const seen = [];
+  const classifier = async ({ url }) => {
+    seen.push(url);
+    return url.endsWith("scam.png")
+      ? { risky: true, score: 88, model: "test-vision", reasons: ["fake payout"], ocrText: "", confidence: 70 }
+      : { risky: false, score: 5, model: "test-vision", reasons: [], ocrText: "", confidence: 70 };
+  };
+
+  const result = await inspectImageSpam(message, { image_spam_threshold: 70 }, classifier);
+  assert.equal(result.shouldDelete, true);
+  assert.equal(result.strikes, 1);
+  assert.deepEqual(seen, ["https://cdn.test/cat.png", "https://cdn.test/scam.png"]);
+  assert.match(result.fields[0].name, /image 2\/2/);
+});
+
 test("image moderation fails open when the vision service errors", async () => {
   let warning = "";
   const message = {

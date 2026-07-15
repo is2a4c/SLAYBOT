@@ -41,34 +41,46 @@ const shouldModerate = (message) => {
 
 async function inspectImageSpam(message, automod, classifier = classifyImage) {
   const fields = [];
-  const image = [...message.attachments.values()].find(isImageAttachment);
-  if (!image) return { shouldDelete: false, strikes: 0, fields };
+  const images = [...message.attachments.values()].filter(isImageAttachment);
+  if (!images.length) return { shouldDelete: false, strikes: 0, fields };
 
   const threshold = Math.min(100, Math.max(50, automod.image_spam_threshold || DEFAULT_THRESHOLD));
-  try {
-    const result = await classifier({ url: image.url, caption: message.content, threshold });
-    if (!result.risky) return { shouldDelete: false, strikes: 0, fields };
+  // Any single spammy attachment is enough to act; stop at the first hit and fail
+  // open per-image so one classifier error never spares the rest of the message.
+  for (let index = 0; index < images.length; index += 1) {
+    const image = images[index];
+    try {
+      const result = await classifier({
+        url: image.url,
+        caption: message.content,
+        threshold,
+        guildId: message.guildId,
+      });
+      if (!result.risky) continue;
 
-    fields.push({
-      name: `Image-Spam Risk: ${result.score}/100`,
-      value:
-        [`Model: ${result.model}`, ...result.reasons].join("\n").slice(0, 1024) || "multiple suspicious image signals",
-      inline: false,
-    });
-    if (result.ocrText) {
+      const label = images.length > 1 ? ` (image ${index + 1}/${images.length})` : "";
       fields.push({
-        name: `OCR (${result.confidence}% confidence)`,
-        value: result.ocrText.slice(0, 1024),
+        name: `Image-Spam Risk: ${result.score}/100${label}`,
+        value:
+          [`Model: ${result.model}`, ...result.reasons].join("\n").slice(0, 1024) ||
+          "multiple suspicious image signals",
         inline: false,
       });
+      if (result.ocrText) {
+        fields.push({
+          name: `OCR (${result.confidence}% confidence)`,
+          value: result.ocrText.slice(0, 1024),
+          inline: false,
+        });
+      }
+      return { shouldDelete: true, strikes: 1, fields };
+    } catch (error) {
+      message.client.logger.warn(
+        `Image-spam analysis failed for an attachment on message ${message.id}; it was left untouched: ${error.message}`
+      );
     }
-    return { shouldDelete: true, strikes: 1, fields };
-  } catch (error) {
-    message.client.logger.warn(
-      `Image-spam analysis failed; message ${message.id} was left untouched: ${error.message}`
-    );
-    return { shouldDelete: false, strikes: 0, fields };
   }
+  return { shouldDelete: false, strikes: 0, fields };
 }
 
 /**
