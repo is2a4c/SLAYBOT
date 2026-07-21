@@ -88,7 +88,10 @@
     "zlib-sync": "^0.1.9"
   },
   "overrides": {
-    "undici": "6.27.0"
+    "undici": "6.27.0",
+    "onnxruntime-node": {
+      "adm-zip": "0.6.0"
+    }
   },
   "devDependencies": {
     "eslint": "^8.57.1",
