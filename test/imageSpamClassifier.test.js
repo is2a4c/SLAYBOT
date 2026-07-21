@@ -6,6 +6,7 @@ const {
   scoreImageSpam,
   isImageAttachment,
   analyzeWithVision,
+  analyzeVisionImages,
   prepareImage,
   selectVisionCandidate,
 } = require("../src/services/imageSpamClassifier");
@@ -149,7 +150,7 @@ test("recognizes image MIME types and common image extensions", () => {
   assert.equal(isImageAttachment({ contentType: "application/pdf", name: "invoice.pdf" }), false);
 });
 
-test("prepares one full OCR and vision image for a classification", async () => {
+test("prepares the full image and four overlapping collage regions", async () => {
   const image = await require("sharp")({
     create: { width: 64, height: 64, channels: 3, background: "white" },
   })
@@ -158,8 +159,31 @@ test("prepares one full OCR and vision image for a classification", async () => 
 
   const prepared = await prepareImage(image);
 
-  assert.equal(prepared.ocrImages.length, 1);
-  assert.equal(prepared.visionImages.length, 1);
+  assert.equal(prepared.ocrImages.length, 5);
+  assert.equal(prepared.visionImages.length, 5);
+});
+
+test("local vision analyzes every prepared collage region", async () => {
+  const images = [Buffer.from("full"), Buffer.from("top-left"), Buffer.from("bottom-right")];
+  const candidates = [
+    { text: "ordinary screenshot", confidence: 80 },
+    { text: "release notes", confidence: 80 },
+    { text: "$4600 reward withdrawal", confidence: 80 },
+  ];
+  const seen = [];
+  const result = await analyzeVisionImages(images, candidates, "bro", async (buffer, caption, hint, split) => {
+    seen.push({ image: buffer.toString(), caption, hint, split });
+    return buffer.toString() === "bottom-right" ? "IMAGE_SPAM" : "IMAGE_SAFE";
+  });
+
+  assert.deepEqual(
+    seen.map(({ image }) => image),
+    ["full", "top-left", "bottom-right"]
+  );
+  assert.equal(seen[1].split, false);
+  assert.match(seen[2].hint, /4600/);
+  assert.equal(result.index, 2);
+  assert.equal(result.score, 85);
 });
 
 test("local vision adapter parses the model response", async () => {

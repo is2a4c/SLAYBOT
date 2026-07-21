@@ -117,13 +117,44 @@ async function prepareImage(buffer) {
   ]);
 
   const prepared = await sharp(visionBase).grayscale().normalize().sharpen().png().toBuffer();
+  const preparedMetadata = await sharp(prepared).metadata();
+  const width = preparedMetadata.width;
+  const height = preparedMetadata.height;
+  const tileWidth = Math.ceil(width * 0.55);
+  const tileHeight = Math.ceil(height * 0.55);
+  const regions = [
+    [0, 0],
+    [width - tileWidth, 0],
+    [0, height - tileHeight],
+    [width - tileWidth, height - tileHeight],
+  ];
+  const [ocrTiles, visionTiles] = await Promise.all([
+    Promise.all(
+      regions.map(([left, top]) =>
+        sharp(prepared)
+          .extract({ left, top, width: tileWidth, height: tileHeight })
+          .resize({ width: 1800, withoutEnlargement: false })
+          .threshold(180)
+          .png()
+          .toBuffer()
+      )
+    ),
+    Promise.all(
+      regions.map(([left, top]) =>
+        sharp(visionBase)
+          .extract({ left, top, width: tileWidth, height: tileHeight })
+          .resize({ width: 1200, withoutEnlargement: false })
+          .png()
+          .toBuffer()
+      )
+    ),
+  ]);
 
   return {
-    // The vision processor already splits a full collage into panels. Processing
-    // four extra OCR/vision tiles made a single attachment run five expensive
-    // CPU jobs while their results were no longer used for classification.
-    ocrImages: [prepared],
-    visionImages: [visionBase],
+    // Keep the full frame for context and inspect four overlapping regions so
+    // small panels in a collage are not lost when the full image is downscaled.
+    ocrImages: [prepared, ...ocrTiles],
+    visionImages: [visionBase, ...visionTiles],
     visual: {
       width: metadata.width || 0,
       height: metadata.height || 0,
@@ -193,10 +224,27 @@ function parseVisionResponse(text) {
   return { score: 10, reasons: ["local vision found no convincing spam pattern"], detectedText: "" };
 }
 
-async function analyzeWithVision(buffer, caption, engine = runLocalVision, ocrHint = "") {
-  const result = parseVisionResponse(await engine(buffer, caption, ocrHint));
+async function analyzeWithVision(buffer, caption, engine = runLocalVision, ocrHint = "", split = VISION_SPLIT) {
+  const result = parseVisionResponse(await engine(buffer, caption, ocrHint, split));
   const modelName = (process.env.IMAGE_SPAM_VISION_MODEL || "SmolVLM-500M-Instruct").split("/").pop();
   return { ...result, model: `${modelName} (${process.env.IMAGE_SPAM_VISION_DTYPE || "q4"})` };
+}
+
+async function analyzeVisionImages(visionImages, candidates, caption, engine = runLocalVision) {
+  const results = [];
+  for (let index = 0; index < visionImages.length; index += 1) {
+    const candidate = candidates[index] || { text: "", confidence: 0 };
+    const ocrHint = candidate.confidence >= 25 ? candidate.text : "";
+    const result = await analyzeWithVision(
+      visionImages[index],
+      caption,
+      engine,
+      ocrHint,
+      index === 0 ? VISION_SPLIT : false
+    );
+    results.push({ ...result, index });
+  }
+  return results.reduce((best, result) => (result.score > best.score ? result : best));
 }
 
 async function preloadVisionModel() {
@@ -344,10 +392,9 @@ async function classifyImageBuffer({
     const { ocrImages, visionImages, visual } = await prepareImage(buffer);
     const ocr = await recognizeAll(ocrImages);
     const selected = selectVisionCandidate(ocr, visionImages, caption, visual);
-    // Show the vision model the whole image (with panel splitting) plus the OCR it
-    // read, so it can judge multi-panel collages instead of one cropped tile.
-    const visionHint = selected.confidence >= 25 ? ocr.text : selected.ocrHint;
-    const vision = await analyzeWithVision(visionImages[0], caption, runLocalVision, visionHint);
+    // Analyze every prepared region. The full image keeps overall context, while
+    // the enlarged regions make each small collage panel readable to the model.
+    const vision = await analyzeVisionImages(visionImages, ocr.candidates, caption);
     const result = scoreImageSpam({
       caption,
       ocrText: ocr.text,
@@ -356,6 +403,9 @@ async function classifyImageBuffer({
     });
     const combinedReasons = [
       `region: ${selected.index === 0 ? "full image" : `tile ${selected.index}`} selected (${selected.ocrRisk}/100 OCR risk)`,
+      `vision: ${visionImages.length} regions analyzed; strongest was ${
+        vision.index === 0 ? "full image" : `tile ${vision.index}`
+      }`,
       ...vision.reasons.map((reason) => `vision: ${reason}`),
       ...result.reasons.map((reason) => `OCR/caption: ${reason}`),
     ];
@@ -386,6 +436,7 @@ module.exports = {
   isImageAttachment,
   scoreImageSpam,
   analyzeWithVision,
+  analyzeVisionImages,
   parseVisionResponse,
   preloadVisionModel,
   prepareImage,
