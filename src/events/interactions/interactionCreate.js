@@ -1,5 +1,12 @@
 const { getSettings } = require("@schemas/Guild");
-const { commandHandler, contextHandler, statsHandler, suggestionHandler, ticketHandler } = require("@src/handlers");
+const {
+  commandHandler,
+  contextHandler,
+  formHandler,
+  statsHandler,
+  suggestionHandler,
+  ticketHandler,
+} = require("@src/handlers");
 const { InteractionType } = require("discord.js");
 
 /**
@@ -27,6 +34,11 @@ module.exports = async (client, interaction) => {
 
   // Buttons
   else if (interaction.isButton()) {
+    // form buttons carry the form id: FORM_FILL:<formId>
+    if (interaction.customId.startsWith(`${formHandler.BUTTON_PREFIX}:`)) {
+      return formHandler.handleFormButton(interaction);
+    }
+
     switch (interaction.customId) {
       case "TICKET_CREATE":
         return ticketHandler.handleTicketOpen(interaction);
@@ -47,6 +59,11 @@ module.exports = async (client, interaction) => {
 
   // Modals
   else if (interaction.type === InteractionType.ModalSubmit) {
+    // form modals carry the form id: FORM_MODAL:<formId>
+    if (interaction.customId.startsWith(`${formHandler.MODAL_PREFIX}:`)) {
+      return formHandler.handleFormModal(interaction);
+    }
+
     switch (interaction.customId) {
       case "SUGGEST_APPROVE_MODAL":
         return suggestionHandler.handleApproveModal(interaction);
