@@ -8,10 +8,6 @@ docker-compose.yml
 .replit
 replit.nix
 
-# Agent/local workspace files
-.claude/
-.ai-context.md
-
 # Dashboard (not maintained yet)
 dashboard/
 
