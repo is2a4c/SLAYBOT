@@ -15,6 +15,7 @@ const { getSettings } = require("@schemas/Guild");
 // helpers
 const { postToBin } = require("@helpers/HttpUtils");
 const { error } = require("@helpers/Logger");
+const { canCloseTicket } = require("@helpers/TicketPermissions");
 
 const OPEN_PERMS = ["ManageChannels"];
 const CLOSE_PERMS = ["ManageChannels", "ReadMessageHistory"];
@@ -222,8 +223,9 @@ async function handleTicketOpen(interaction) {
       },
     ];
 
-    if (catPerms?.length > 0) {
-      catPerms?.forEach((roleId) => {
+    const staffRoleIds = [...new Set([...(settings.ticket.staff_roles || []), ...(catPerms || [])])];
+    if (staffRoleIds.length > 0) {
+      staffRoleIds.forEach((roleId) => {
         const role = guild.roles.cache.get(roleId);
         if (!role) return;
         permissionOverwrites.push({
@@ -288,6 +290,11 @@ async function handleTicketOpen(interaction) {
  */
 async function handleTicketClose(interaction) {
   await interaction.deferReply({ ephemeral: true });
+  const settings = await getSettings(interaction.guild);
+  if (!canCloseTicket(interaction.member, interaction.user.id, settings, interaction.channel)) {
+    return interaction.followUp("Only the ticket owner or configured support staff can close this ticket.");
+  }
+
   const status = await closeTicket(interaction.channel, interaction.user);
   if (status === "MISSING_PERMISSIONS") {
     return interaction.followUp("Cannot close the ticket, missing permissions. Contact server manager for help!");

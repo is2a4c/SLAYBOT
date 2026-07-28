@@ -11,7 +11,17 @@ const {
   ComponentType,
 } = require("discord.js");
 const { EMBED_COLORS } = require("@root/config.js");
-const { isTicketChannel, closeTicket, closeAllTickets } = require("@handlers/ticket");
+const { isTicketChannel, getTicketChannels, closeTicket, closeAllTickets } = require("@handlers/ticket");
+const {
+  canCloseTicket,
+  isTicketStaff,
+  memberHasPermission,
+  syncStaffRoleAccess,
+} = require("@helpers/TicketPermissions");
+
+const ADMIN_SUBCOMMANDS = new Set(["setup", "log", "limit", "closeall", "staff-add", "staff-remove", "staff-list"]);
+const STAFF_SUBCOMMANDS = new Set(["add", "remove"]);
+const MAX_STAFF_ROLES = 25;
 
 /**
  * @type {import("@structures/Command")}
@@ -20,7 +30,6 @@ module.exports = {
   name: "ticket",
   description: "various ticketing commands",
   category: "TICKET",
-  userPermissions: ["ManageGuild"],
   command: {
     enabled: true,
     minArgsCount: 1,
@@ -52,6 +61,18 @@ module.exports = {
       {
         trigger: "remove <userId|roleId>",
         description: "remove user/role from the ticket",
+      },
+      {
+        trigger: "staff-add <@role>",
+        description: "allow a role to work with all tickets",
+      },
+      {
+        trigger: "staff-remove <@role>",
+        description: "remove a role from global ticket support",
+      },
+      {
+        trigger: "staff-list",
+        description: "list roles allowed to work with tickets",
       },
     ],
   },
@@ -135,12 +156,51 @@ module.exports = {
           },
         ],
       },
+      {
+        name: "staff-add",
+        description: "allow a role to work with all tickets",
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: "role",
+            description: "the support role",
+            type: ApplicationCommandOptionType.Role,
+            required: true,
+          },
+        ],
+      },
+      {
+        name: "staff-remove",
+        description: "remove a role from global ticket support",
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: "role",
+            description: "the support role",
+            type: ApplicationCommandOptionType.Role,
+            required: true,
+          },
+        ],
+      },
+      {
+        name: "staff-list",
+        description: "list roles allowed to work with tickets",
+        type: ApplicationCommandOptionType.Subcommand,
+      },
     ],
   },
 
   async messageRun(message, args, data) {
     const input = args[0].toLowerCase();
     let response;
+
+    if (ADMIN_SUBCOMMANDS.has(input) && !memberHasPermission(message.member, "ManageGuild")) {
+      return message.safeReply("You need the `Manage Server` permission to configure tickets.");
+    }
+
+    if (STAFF_SUBCOMMANDS.has(input) && !isTicketStaff(message.member, data.settings, message.channel)) {
+      return message.safeReply("Only configured support staff can manage ticket participants.");
+    }
 
     // Setup
     if (input === "setup") {
@@ -172,7 +232,7 @@ module.exports = {
 
     // Close ticket
     else if (input === "close") {
-      response = await close(message, message.author);
+      response = await close(message, message.author, data.settings);
       if (!response) return;
     }
 
@@ -203,6 +263,23 @@ module.exports = {
       response = await removeFromTicket(message, inputId);
     }
 
+    // Add global support role
+    else if (input === "staff-add") {
+      const role = message.mentions.roles.first() || message.guild.roles.cache.get(args[1]);
+      response = await addStaffRole(message.guild, data.settings, role);
+    }
+
+    // Remove global support role
+    else if (input === "staff-remove") {
+      const role = message.mentions.roles.first() || message.guild.roles.cache.get(args[1]);
+      response = await removeStaffRole(message.guild, data.settings, role);
+    }
+
+    // List global support roles
+    else if (input === "staff-list") {
+      response = listStaffRoles(data.settings);
+    }
+
     // Invalid input
     else {
       return message.safeReply("Incorrect command usage");
@@ -214,6 +291,14 @@ module.exports = {
   async interactionRun(interaction, data) {
     const sub = interaction.options.getSubcommand();
     let response;
+
+    if (ADMIN_SUBCOMMANDS.has(sub) && !memberHasPermission(interaction.member, "ManageGuild")) {
+      return interaction.followUp("You need the `Manage Server` permission to configure tickets.");
+    }
+
+    if (STAFF_SUBCOMMANDS.has(sub) && !isTicketStaff(interaction.member, data.settings, interaction.channel)) {
+      return interaction.followUp("Only configured support staff can manage ticket participants.");
+    }
 
     // setup
     if (sub === "setup") {
@@ -241,7 +326,7 @@ module.exports = {
 
     // Close
     else if (sub === "close") {
-      response = await close(interaction, interaction.user);
+      response = await close(interaction, interaction.user, data.settings);
     }
 
     // Close all
@@ -259,6 +344,23 @@ module.exports = {
     else if (sub === "remove") {
       const user = interaction.options.getUser("user");
       response = await removeFromTicket(interaction, user.id);
+    }
+
+    // Add global support role
+    else if (sub === "staff-add") {
+      const role = interaction.options.getRole("role");
+      response = await addStaffRole(interaction.guild, data.settings, role);
+    }
+
+    // Remove global support role
+    else if (sub === "staff-remove") {
+      const role = interaction.options.getRole("role");
+      response = await removeStaffRole(interaction.guild, data.settings, role);
+    }
+
+    // List global support roles
+    else if (sub === "staff-list") {
+      response = listStaffRoles(data.settings);
     }
 
     if (response) await interaction.followUp(response);
@@ -372,8 +474,12 @@ async function setupLimit(limit, settings) {
   return `Configuration saved. You can now have a maximum of \`${limit}\` open tickets`;
 }
 
-async function close({ channel }, author) {
+async function close({ channel, member }, author, settings) {
   if (!isTicketChannel(channel)) return "This command can only be used in ticket channels";
+  if (!canCloseTicket(member, author.id, settings, channel)) {
+    return "Only the ticket owner or configured support staff can close this ticket.";
+  }
+
   const status = await closeTicket(channel, author, "Closed by a moderator");
   if (status === "MISSING_PERMISSIONS") return "I do not have permission to close tickets";
   if (status === "ERROR") return "An error occurred while closing the ticket";
@@ -414,4 +520,43 @@ async function removeFromTicket({ channel }, inputId) {
   } catch (ex) {
     return "Failed to remove user/role. Did you provide a valid ID?";
   }
+}
+
+function listStaffRoles(settings) {
+  const roleIds = settings.ticket.staff_roles || [];
+  if (roleIds.length === 0) return "No global ticket support roles configured.";
+  return `Global ticket support roles:\n${roleIds.map((roleId) => `• <@&${roleId}>`).join("\n")}`;
+}
+
+async function addStaffRole(guild, settings, role) {
+  if (!role || role.id === guild.id) return "Please provide a valid support role.";
+
+  const roleIds = settings.ticket.staff_roles || [];
+  if (roleIds.includes(role.id)) return `${role.toString()} is already a ticket support role.`;
+  if (roleIds.length >= MAX_STAFF_ROLES) return `You can configure a maximum of ${MAX_STAFF_ROLES} support roles.`;
+
+  settings.ticket.staff_roles = [...roleIds, role.id];
+  await settings.save();
+
+  const result = await syncStaffRoleAccess(getTicketChannels(guild), settings, role, true);
+  return (
+    `${role.toString()} can now work with all tickets. Updated ${result.updated} open ticket(s)` +
+    (result.failed > 0 ? `; failed to update ${result.failed}.` : ".")
+  );
+}
+
+async function removeStaffRole(guild, settings, role) {
+  if (!role) return "Please provide a valid support role.";
+
+  const roleIds = settings.ticket.staff_roles || [];
+  if (!roleIds.includes(role.id)) return `${role.toString()} is not a global ticket support role.`;
+
+  settings.ticket.staff_roles = roleIds.filter((roleId) => roleId !== role.id);
+  await settings.save();
+
+  const result = await syncStaffRoleAccess(getTicketChannels(guild), settings, role, false);
+  return (
+    `${role.toString()} was removed from global ticket support. Updated ${result.updated} open ticket(s)` +
+    (result.failed > 0 ? `; failed to update ${result.failed}.` : ".")
+  );
 }

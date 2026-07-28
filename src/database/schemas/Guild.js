@@ -35,6 +35,7 @@ const Schema = new mongoose.Schema({
   ticket: {
     log_channel: String,
     limit: { type: Number, default: 10 },
+    staff_roles: { type: [String], default: [] },
     categories: [
       {
         _id: false,
