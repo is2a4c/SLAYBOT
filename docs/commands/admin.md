@@ -208,6 +208,14 @@ _Enabling this feature will allow members to simply react to any message with a 
 - **!ticket log \<#channel>**: setup log channel for tickets
 - **!ticket limit \<amount>**: set maximum number of concurrent open tickets
 - **!ticket closeall**: close all open tickets
+- **!ticket staff-add \<@role>**: allow a role to view, reply to, and manage all tickets
+- **!ticket staff-remove \<@role>**: remove a role from global ticket support
+- **!ticket staff-list**: list global ticket support roles
+
+The same controls are available as `/ticket staff-add`, `/ticket staff-remove`, and `/ticket staff-list`.
+Adding a support role updates existing open tickets as well as new tickets. Support roles can reply in ticket channels,
+close tickets, and use the participant add/remove commands. Ticket setup, limits, logs, support-role configuration, and
+mass closing still require the **Manage Server** permission.
 
 **Ticket Channel Commands**
 
