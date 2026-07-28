@@ -16,6 +16,7 @@ const { getSettings } = require("@schemas/Guild");
 const { postToBin } = require("@helpers/HttpUtils");
 const { error } = require("@helpers/Logger");
 const { canCloseTicket } = require("@helpers/TicketPermissions");
+const { sendCategoryTicketNotification } = require("@helpers/TicketNotifications");
 
 const OPEN_PERMS = ["ManageChannels"];
 const CLOSE_PERMS = ["ManageChannels", "ReadMessageHistory"];
@@ -179,6 +180,7 @@ async function handleTicketOpen(interaction) {
   // check categories
   let catName = null;
   let catPerms = [];
+  let selectedCategory = null;
   const categories = settings.ticket.categories;
   if (categories.length > 0) {
     const options = [];
@@ -203,7 +205,8 @@ async function handleTicketOpen(interaction) {
     if (!res) return interaction.editReply({ content: "Timed out. Try again", components: [] });
     await interaction.editReply({ content: "Processing", components: [] });
     catName = res.values[0];
-    catPerms = categories.find((cat) => cat.name === catName)?.staff_roles || [];
+    selectedCategory = categories.find((cat) => cat.name === catName);
+    catPerms = selectedCategory?.staff_roles || [];
   }
 
   try {
@@ -261,6 +264,14 @@ async function handleTicketOpen(interaction) {
     );
 
     const sent = await tktChannel.send({ content: user.toString(), embeds: [embed], components: [buttonsRow] });
+
+    await sendCategoryTicketNotification({
+      guild,
+      user,
+      settings,
+      category: selectedCategory,
+      ticketMessage: sent,
+    }).catch((ex) => error("sendCategoryTicketNotification", ex));
 
     const dmEmbed = new EmbedBuilder()
       .setColor(TICKET.CREATE_EMBED)

@@ -226,11 +226,15 @@ mass closing still require the **Manage Server** permission.
 **Ticket Category Commands**
 
 - **!ticketcat list**: list all ticket categories
-- **!ticketcat add \<category> \| \<@roles>**: create a category with optional support roles
+- **!ticketcat add \<category> \| \<@roles> \| \<#notification-channel>**: create a category with optional support roles and notification channel
 - **!ticketcat remove \<category>**: remove a ticket category
 - **!ticketcat staff-add \<category> \| \<@role>**: add a support role to an existing category
 - **!ticketcat staff-remove \<category> \| \<@role>**: remove a support role from a category
+- **!ticketcat notify-set \<category> \| \<#channel>**: set where new-ticket notifications are sent for a category
+- **!ticketcat notify-clear \<category>**: disable new-ticket notifications for a category
 
-Slash commands use Discord role selectors: `/ticketcat add`, `/ticketcat staff-add`, and `/ticketcat staff-remove`.
+Slash commands use Discord role and channel selectors: `/ticketcat add`, `/ticketcat staff-add`,
+`/ticketcat staff-remove`, `/ticketcat notify-set`, and `/ticketcat notify-clear`.
 Adding or removing category support updates all currently open tickets in that category. A role that is also configured
-as global ticket support keeps its access when removed from a single category.
+as global ticket support keeps its access when removed from a single category. Category notifications include a link to
+the new ticket and mention that category's support roles together with global ticket support roles.

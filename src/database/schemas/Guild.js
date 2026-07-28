@@ -41,6 +41,7 @@ const Schema = new mongoose.Schema({
         _id: false,
         name: String,
         staff_roles: [String],
+        notification_channel: String,
       },
     ],
   },
