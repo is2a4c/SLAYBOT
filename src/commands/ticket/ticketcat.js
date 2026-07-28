@@ -1,4 +1,4 @@
-const { ApplicationCommandOptionType, EmbedBuilder } = require("discord.js");
+const { ApplicationCommandOptionType, ChannelType, EmbedBuilder } = require("discord.js");
 const { getTicketChannels } = require("@handlers/ticket");
 const { parseRoleIds, syncCategoryStaffRoleAccess } = require("@helpers/TicketPermissions");
 
@@ -23,7 +23,7 @@ module.exports = {
         description: "list all ticket categories",
       },
       {
-        trigger: "add <category> | <staff_roles>",
+        trigger: "add <category> | <staff_roles> | <#notification_channel>",
         description: "add a ticket category",
       },
       {
@@ -37,6 +37,14 @@ module.exports = {
       {
         trigger: "staff-remove <category> | <@role>",
         description: "remove a support role from a ticket category",
+      },
+      {
+        trigger: "notify-set <category> | <#channel>",
+        description: "set the notification channel for a ticket category",
+      },
+      {
+        trigger: "notify-clear <category>",
+        description: "clear the notification channel for a ticket category",
       },
     ],
   },
@@ -64,6 +72,13 @@ module.exports = {
             name: "staff_role",
             description: "an optional initial support role",
             type: ApplicationCommandOptionType.Role,
+            required: false,
+          },
+          {
+            name: "notification_channel",
+            description: "an optional channel for new ticket notifications",
+            type: ApplicationCommandOptionType.Channel,
+            channelTypes: [ChannelType.GuildText],
             required: false,
           },
         ],
@@ -119,6 +134,39 @@ module.exports = {
           },
         ],
       },
+      {
+        name: "notify-set",
+        description: "set the notification channel for a ticket category",
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: "category",
+            description: "the category name",
+            type: ApplicationCommandOptionType.String,
+            required: true,
+          },
+          {
+            name: "channel",
+            description: "the notification channel",
+            type: ApplicationCommandOptionType.Channel,
+            channelTypes: [ChannelType.GuildText],
+            required: true,
+          },
+        ],
+      },
+      {
+        name: "notify-clear",
+        description: "clear the notification channel for a ticket category",
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: "category",
+            description: "the category name",
+            type: ApplicationCommandOptionType.String,
+            required: true,
+          },
+        ],
+      },
     ],
   },
 
@@ -136,10 +184,13 @@ module.exports = {
       const split = args.slice(1).join(" ").split("|");
       const category = split[0].trim();
       const roleIds = resolveRoleIds(message.guild, split[1], message.mentions.roles);
+      const notificationChannel = resolveNotificationChannel(message.guild, split[2], message.mentions.channels);
       if (split[1]?.trim() && roleIds.length === 0) {
         response = "No valid staff roles found. Mention roles after the `|` separator.";
+      } else if (split[2]?.trim() && !notificationChannel) {
+        response = "Please provide a valid text notification channel after the second `|` separator.";
       } else {
-        response = await addCategory(data, category, roleIds);
+        response = await addCategory(data, category, roleIds, notificationChannel);
       }
     }
 
@@ -165,6 +216,20 @@ module.exports = {
       response = await removeCategoryStaffRole(message.guild, data.settings, category, role);
     }
 
+    // set category notification channel
+    else if (sub === "notify-set") {
+      const split = args.slice(1).join(" ").split("|");
+      const category = split[0].trim();
+      const channel = resolveNotificationChannel(message.guild, split[1], message.mentions.channels);
+      response = await setCategoryNotificationChannel(data.settings, category, channel);
+    }
+
+    // clear category notification channel
+    else if (sub === "notify-clear") {
+      const category = args.slice(1).join(" ").trim();
+      response = await clearCategoryNotificationChannel(data.settings, category);
+    }
+
     // invalid subcommand
     else {
       response = "Invalid subcommand.";
@@ -186,7 +251,8 @@ module.exports = {
     else if (sub === "add") {
       const category = interaction.options.getString("category");
       const role = interaction.options.getRole("staff_role");
-      response = await addCategory(data, category, role ? [role.id] : []);
+      const notificationChannel = interaction.options.getChannel("notification_channel");
+      response = await addCategory(data, category, role ? [role.id] : [], notificationChannel);
     }
 
     // remove
@@ -209,6 +275,19 @@ module.exports = {
       response = await removeCategoryStaffRole(interaction.guild, data.settings, category, role);
     }
 
+    // set category notification channel
+    else if (sub === "notify-set") {
+      const category = interaction.options.getString("category");
+      const channel = interaction.options.getChannel("channel");
+      response = await setCategoryNotificationChannel(data.settings, category, channel);
+    }
+
+    // clear category notification channel
+    else if (sub === "notify-clear") {
+      const category = interaction.options.getString("category");
+      response = await clearCategoryNotificationChannel(data.settings, category);
+    }
+
     //
     else response = "Invalid subcommand";
     await interaction.followUp(response);
@@ -222,13 +301,17 @@ function listCategories(data) {
   const fields = [];
   for (const category of categories.slice(0, MAX_CATEGORIES)) {
     const roleNames = (category.staff_roles || []).map((r) => `<@&${r}>`).join(", ");
-    fields.push({ name: category.name, value: `**Staff:** ${roleNames || "None"}` });
+    const notificationChannel = category.notification_channel ? `<#${category.notification_channel}>` : "None";
+    fields.push({
+      name: category.name,
+      value: `**Staff:** ${roleNames || "None"}\n**Notifications:** ${notificationChannel}`,
+    });
   }
   const embed = new EmbedBuilder().setAuthor({ name: "Ticket Categories" }).addFields(fields);
   return { embeds: [embed] };
 }
 
-async function addCategory(data, category, staffRoleIds) {
+async function addCategory(data, category, staffRoleIds, notificationChannel) {
   if (!category) return "Invalid usage! Missing category name.";
   if (category.includes("|")) return "Category names cannot contain `|`.";
   if (category.length > MAX_CATEGORY_NAME_LENGTH) {
@@ -243,10 +326,21 @@ async function addCategory(data, category, staffRoleIds) {
     return `Category \`${category}\` already exists.`;
   }
 
-  data.settings.ticket.categories.push({ name: category, staff_roles: staffRoleIds });
+  if (notificationChannel && !notificationChannel.canSendEmbeds()) {
+    return `I cannot send notification embeds to ${notificationChannel.toString()}.`;
+  }
+
+  data.settings.ticket.categories.push({
+    name: category,
+    staff_roles: staffRoleIds,
+    notification_channel: notificationChannel?.id,
+  });
   await data.settings.save();
 
-  return `Category \`${category}\` added.`;
+  return (
+    `Category \`${category}\` added.` +
+    (notificationChannel ? ` New ticket notifications will be sent to ${notificationChannel.toString()}.` : "")
+  );
 }
 
 async function removeCategory(guild, data, categoryName) {
@@ -308,6 +402,30 @@ async function removeCategoryStaffRole(guild, settings, categoryName, role) {
   );
 }
 
+async function setCategoryNotificationChannel(settings, categoryName, channel) {
+  if (!channel) return "Please provide a valid text notification channel.";
+  if (!channel.canSendEmbeds()) return `I cannot send notification embeds to ${channel.toString()}.`;
+
+  const category = settings.ticket.categories.find((entry) => entry.name === categoryName);
+  if (!category) return `Category \`${categoryName}\` does not exist.`;
+
+  category.notification_channel = channel.id;
+  await settings.save();
+  return `New tickets in category \`${categoryName}\` will notify ${channel.toString()}.`;
+}
+
+async function clearCategoryNotificationChannel(settings, categoryName) {
+  const category = settings.ticket.categories.find((entry) => entry.name === categoryName);
+  if (!category) return `Category \`${categoryName}\` does not exist.`;
+  if (!category.notification_channel) {
+    return `Category \`${categoryName}\` does not have a notification channel.`;
+  }
+
+  category.notification_channel = undefined;
+  await settings.save();
+  return `Notification channel cleared for category \`${categoryName}\`.`;
+}
+
 async function syncCategoryRoles(guild, settings, categoryName, roleIds, enabled) {
   const totals = { updated: 0, failed: 0 };
   const channels = getTicketChannels(guild);
@@ -331,4 +449,12 @@ function resolveRoleIds(guild, input, mentionedRoles) {
 function resolveSingleRole(guild, input, mentionedRoles) {
   const roleId = resolveRoleIds(guild, input, mentionedRoles)[0];
   return roleId ? guild.roles.cache.get(roleId) : null;
+}
+
+function resolveNotificationChannel(guild, input, mentionedChannels) {
+  const channelId = [...(mentionedChannels?.keys() || []), ...(input?.match(/\d{17,20}/g) || [])].find((id) => {
+    const channel = guild.channels.cache.get(id);
+    return channel?.type === ChannelType.GuildText;
+  });
+  return channelId ? guild.channels.cache.get(channelId) : null;
 }
