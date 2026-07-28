@@ -226,7 +226,7 @@ npm run slaynode:enroll
   <summary><strong>🎟️ Собрать self-service для комьюнити</strong></summary>
   <br>
 
-Объедините welcome/farewell, autorole, reaction roles, ticket categories, suggestions, invite ranks, giveaways и XP leaderboard. Все настройки изолированы на уровне конкретного Discord-сервера.
+Объедините welcome/farewell, autorole, reaction roles, ticket categories, suggestions, формы-опросники (<code>!form create</code>), invite ranks, giveaways и XP leaderboard. Все настройки изолированы на уровне конкретного Discord-сервера.
 
 </details>
 

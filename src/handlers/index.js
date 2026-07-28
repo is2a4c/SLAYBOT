@@ -3,6 +3,7 @@ module.exports = {
   commandHandler: require("./command"),
   contextHandler: require("./context"),
   counterHandler: require("./counter"),
+  formHandler: require("./form"),
   greetingHandler: require("./greeting"),
   inviteHandler: require("./invite"),
   presenceHandler: require("./presence"),
