@@ -226,5 +226,11 @@ mass closing still require the **Manage Server** permission.
 **Ticket Category Commands**
 
 - **!ticketcat list**: list all ticket categories
-- **!ticketcat add \<category> \| \<name>**: create a new ticket category
+- **!ticketcat add \<category> \| \<@roles>**: create a category with optional support roles
 - **!ticketcat remove \<category>**: remove a ticket category
+- **!ticketcat staff-add \<category> \| \<@role>**: add a support role to an existing category
+- **!ticketcat staff-remove \<category> \| \<@role>**: remove a support role from a category
+
+Slash commands use Discord role selectors: `/ticketcat add`, `/ticketcat staff-add`, and `/ticketcat staff-remove`.
+Adding or removing category support updates all currently open tickets in that category. A role that is also configured
+as global ticket support keeps its access when removed from a single category.

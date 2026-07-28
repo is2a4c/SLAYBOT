@@ -45,6 +45,11 @@ function canCloseTicket(member, userId, settings, channel) {
   return metadata?.ownerId === userId || isTicketStaff(member, settings, channel);
 }
 
+function parseRoleIds(input) {
+  if (!input) return [];
+  return [...new Set(input.match(/\d{17,20}/g) || [])];
+}
+
 async function syncStaffRoleAccess(channels, settings, role, enabled) {
   let updated = 0;
   let failed = 0;
@@ -73,6 +78,35 @@ async function syncStaffRoleAccess(channels, settings, role, enabled) {
   return { updated, failed };
 }
 
+async function syncCategoryStaffRoleAccess(channels, settings, categoryName, role, enabled) {
+  let updated = 0;
+  let failed = 0;
+  const roleId = role.id || role;
+  const remainsGlobalStaff = (settings.ticket.staff_roles || []).includes(roleId);
+
+  for (const [, channel] of channels) {
+    const metadata = getTicketMetadata(channel);
+    if (metadata?.categoryName !== categoryName) continue;
+
+    try {
+      if (enabled || remainsGlobalStaff) {
+        await channel.permissionOverwrites.edit(role, {
+          ViewChannel: true,
+          SendMessages: true,
+          ReadMessageHistory: true,
+        });
+      } else {
+        await channel.permissionOverwrites.delete(role);
+      }
+      updated += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+
+  return { updated, failed };
+}
+
 module.exports = {
   canCloseTicket,
   getMemberRoleIds,
@@ -80,5 +114,7 @@ module.exports = {
   getTicketStaffRoleIds,
   isTicketStaff,
   memberHasPermission,
+  parseRoleIds,
+  syncCategoryStaffRoleAccess,
   syncStaffRoleAccess,
 };

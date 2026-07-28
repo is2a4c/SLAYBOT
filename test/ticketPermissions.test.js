@@ -6,6 +6,8 @@ const {
   getTicketMetadata,
   getTicketStaffRoleIds,
   isTicketStaff,
+  parseRoleIds,
+  syncCategoryStaffRoleAccess,
   syncStaffRoleAccess,
 } = require("../src/helpers/TicketPermissions");
 
@@ -43,6 +45,14 @@ test("parses ticket owner and category from the channel topic", () => {
 test("combines global and category-specific support roles", () => {
   const roleIds = getTicketStaffRoleIds(settings, { topic: "tіcket|owner-1|Billing" });
   assert.deepEqual(new Set(roleIds), new Set(["global-support", "billing-support"]));
+});
+
+test("extracts raw and mentioned Discord role IDs", () => {
+  assert.deepEqual(parseRoleIds("<@&123456789012345678>, 234567890123456789, <@&123456789012345678>"), [
+    "123456789012345678",
+    "234567890123456789",
+  ]);
+  assert.deepEqual(parseRoleIds("not a role"), []);
 });
 
 test("recognizes configured support roles and administrators", () => {
@@ -112,6 +122,66 @@ test("keeps category access when a role is removed from global support", async (
   ]);
 
   assert.deepEqual(await syncStaffRoleAccess(channels, settings, { id: "billing-support" }, false), {
+    updated: 1,
+    failed: 0,
+  });
+  assert.equal(edited, 1);
+  assert.equal(deleted, 0);
+});
+
+test("updates only open tickets from the selected category", async () => {
+  const edits = [];
+  const channels = new Map([
+    [
+      "billing-ticket",
+      {
+        topic: "tіcket|owner-1|Billing",
+        permissionOverwrites: {
+          edit: async (role) => edits.push(role.id),
+          delete: async () => assert.fail("did not expect overwrite deletion"),
+        },
+      },
+    ],
+    [
+      "technical-ticket",
+      {
+        topic: "tіcket|owner-2|Technical",
+        permissionOverwrites: {
+          edit: async () => assert.fail("wrong category was updated"),
+          delete: async () => assert.fail("wrong category was updated"),
+        },
+      },
+    ],
+  ]);
+
+  assert.deepEqual(await syncCategoryStaffRoleAccess(channels, settings, "Billing", { id: "new-billing-role" }, true), {
+    updated: 1,
+    failed: 0,
+  });
+  assert.deepEqual(edits, ["new-billing-role"]);
+});
+
+test("retains a category overwrite when the role is also global staff", async () => {
+  let edited = 0;
+  let deleted = 0;
+  const channels = new Map([
+    [
+      "billing-ticket",
+      {
+        topic: "tіcket|owner-1|Billing",
+        permissionOverwrites: {
+          edit: async () => {
+            edited += 1;
+          },
+          delete: async () => {
+            deleted += 1;
+          },
+        },
+      },
+    ],
+  ]);
+
+  assert.deepEqual(await syncCategoryStaffRoleAccess(channels, settings, "Billing", "global-support", false), {
     updated: 1,
     failed: 0,
   });
