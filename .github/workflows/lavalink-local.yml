@@ -11,6 +11,7 @@ on:
         options:
           - status
           - diagnostics
+          - voice-debug
           - install
           - rollback
 
@@ -47,7 +48,17 @@ jobs:
           script: |
             set -e
             cd /opt/slaybot
-            if [ "${{ inputs.action }}" = "diagnostics" ]; then
+            if [ "${{ inputs.action }}" = "voice-debug" ]; then
+              install -d -m 0755 /run/systemd/system/hysteria-lavalink.service.d
+              printf '[Service]\nEnvironment=HYSTERIA_LOG_LEVEL=debug\n' \
+                >/run/systemd/system/hysteria-lavalink.service.d/voice-debug.conf
+              systemctl daemon-reload
+              systemctl restart hysteria-lavalink.service
+              pm2 reload slaybot
+              sleep 12
+              systemctl is-active hysteria-lavalink.service
+              pm2 describe slaybot | grep -E "status.*online"
+            elif [ "${{ inputs.action }}" = "diagnostics" ]; then
               bash ops/lavalink/install.sh status
               echo "=== Lavalink journal ==="
               journalctl -u lavalink.service --since "30 minutes ago" --no-pager |
