@@ -55,6 +55,20 @@ async function assertLavalinkV4ReasonStartsNext() {
   }
 }
 
+async function assertLavalinkV4LoadFailureStartsNext() {
+  const player = createFakePlayer();
+  const queue = player.queue;
+
+  queue.add([track("broken"), track("fallback")]);
+  await queue.start();
+  player.emit("trackEnd", { encoded: "encoded-broken" }, "loadFailed");
+  await waitForQueueHandler();
+
+  if (player.played.join(",") !== "encoded-broken,encoded-fallback") {
+    throw new Error(`expected lower-case loadFailed to start next track, got ${JSON.stringify(player.played)}`);
+  }
+}
+
 async function assertReplacedDoesNotStartNext() {
   const player = createFakePlayer();
   const queue = player.queue;
@@ -71,6 +85,7 @@ async function assertReplacedDoesNotStartNext() {
 
 (async () => {
   await assertLavalinkV4ReasonStartsNext();
+  await assertLavalinkV4LoadFailureStartsNext();
   await assertReplacedDoesNotStartNext();
   console.log("Music queue check passed");
 })().catch((error) => {
