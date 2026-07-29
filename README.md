@@ -304,7 +304,7 @@ Docker healthcheck становится успешным только после
 
 ## <a id="commands"></a>🎮 Карта команд
 
-В репозитории **137 command modules** в 16 категориях. Полный список и актуальные параметры — в документации; ниже — удобная карта возможностей v3.
+В репозитории **140 command modules** в 16 категориях. Полный список и актуальные параметры — в документации; ниже — удобная карта возможностей v3.
 
 | Пространство           | Что внутри                                                                                                        | Документация                                                                      |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
@@ -312,7 +312,7 @@ Docker healthcheck становится успешным только после
 | 🔨 **Moderation**      | warn, timeout, kick, ban, purge по фильтрам, voice moderation, nicknames                                          | [Moderation](docs/commands/moderation.md)                                         |
 | 🛰️ **SlayNode**        | enrollment, privacy policy, node health, limits, credits, tiers, rotation и audit log                             | [Architecture](docs/slaynode/architecture.md)                                     |
 | 🎫 **Server workflow** | тикеты, предложения, reaction roles, giveaways, invite tracking и постоянные Smart Invites                        | [Giveaways](docs/commands/giveaways.md) · [Invites](docs/commands/invites.md) · [Smart Invites](docs/smart-invites.md) |
-| 📈 **Community**       | XP, rank, leaderboard, reputation, экономика, daily и gamble                                                      | [Stats](docs/commands/stats.md) · [Economy](docs/commands/economy.md)             |
+| 📈 **Community**       | XP, глобальные сезоны, серверные кубки, постоянные титулы, сезонные призы, общая экономика, daily и gamble         | [Stats](docs/commands/stats.md) · [Economy](docs/commands/economy.md)             |
 | 🎵 **Media**           | play, queue, search, seek, filters, Spotify support и Lavalink                                                    | [Music](docs/commands/music.md)                                                   |
 | 🖼️ **Creative**        | filters, overlays и генераторы изображений                                                                        | [Image](docs/commands/image.md)                                                   |
 | 🧰 **Everyday tools**  | help, translation, weather, GitHub profile, bigemoji, paste, info                                                 | [Utility](docs/commands/utility.md) · [Information](docs/commands/information.md) |

@@ -4,6 +4,16 @@ const FixedSizeMap = require("fixedsize-map");
 
 const cache = new FixedSizeMap(CACHE_SIZE.USERS);
 
+const EcosystemTitleSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    label: { type: String, required: true },
+    season_id: { type: String, required: true },
+    earned_at: { type: Date, required: true },
+  },
+  { _id: false }
+);
+
 const Schema = new mongoose.Schema(
   {
     _id: String,
@@ -22,6 +32,10 @@ const Schema = new mongoose.Schema(
       streak: { type: Number, default: 0 },
       timestamp: Date,
     },
+    ecosystem: {
+      claimed_seasons: { type: [String], default: [] },
+      titles: { type: [EcosystemTitleSchema], default: [] },
+    },
   },
   {
     timestamps: {
@@ -34,6 +48,8 @@ const Schema = new mongoose.Schema(
 const Model = mongoose.models["user"] ? mongoose.model("user") : mongoose.model("user", Schema);
 
 module.exports = {
+  model: Model,
+
   /**
    * @param {import('discord.js').User} user
    */
@@ -71,5 +87,52 @@ module.exports = {
       .sort({ "reputation.received": -1, "reputation.given": 1 })
       .limit(limit)
       .lean();
+  },
+
+  claimEcosystemReward: async ({ userId, seasonId, amount, titles }) => {
+    if (!userId || !seasonId) throw new TypeError("userId and seasonId are required");
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      throw new TypeError("amount must be a positive safe integer");
+    }
+
+    const earnedAt = new Date();
+    const storedTitles = titles.map((title) => ({
+      id: title.id,
+      label: title.label,
+      season_id: title.seasonId,
+      earned_at: earnedAt,
+    }));
+    let updated;
+
+    try {
+      updated = await Model.findOneAndUpdate(
+        {
+          _id: userId,
+          "ecosystem.claimed_seasons": { $ne: seasonId },
+        },
+        {
+          $inc: { bank: amount },
+          $addToSet: {
+            "ecosystem.claimed_seasons": seasonId,
+            "ecosystem.titles": { $each: storedTitles },
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: false }
+      );
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+    }
+
+    if (!updated) {
+      const existing = await Model.findById(userId).lean();
+      return { claimed: false, bank: existing?.bank || 0 };
+    }
+
+    const cached = cache.get(userId);
+    if (cached) {
+      cached.bank = updated.bank;
+      cached.ecosystem = updated.ecosystem;
+    }
+    return { claimed: true, bank: updated.bank };
   },
 };

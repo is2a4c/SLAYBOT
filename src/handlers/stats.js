@@ -1,8 +1,10 @@
 const { getMemberStats } = require("@schemas/MemberStats");
 const { getRandomInt } = require("@helpers/Utils");
+const { EcosystemService } = require("@src/services/ecosystem/EcosystemService");
 
 const cooldownCache = new Map();
 const voiceStates = new Map();
+const ecosystem = new EcosystemService();
 
 /**
  * @param {string} guildId
@@ -35,10 +37,10 @@ module.exports = {
    * @param {import("discord.js").Message} message
    * @param {boolean} isCommand
    * @param {object} settings
-   * @param {{ skipXp?: boolean }} [options]
+   * @param {{ skipXp?: boolean, ecosystemService?: EcosystemService }} [options]
    */
   async trackMessageStats(message, isCommand, settings, options = {}) {
-    const { skipXp = false } = options;
+    const { skipXp = false, ecosystemService = ecosystem } = options;
     const statsDb = await getMemberStats(message.guildId, message.member.id);
     if (isCommand) statsDb.commands.prefix++;
     statsDb.messages++;
@@ -60,7 +62,8 @@ module.exports = {
     }
 
     // Update member's XP in DB
-    statsDb.xp += xpToAdd();
+    const earnedXp = xpToAdd();
+    statsDb.xp += earnedXp;
 
     // Check if member has levelled up
     let { xp, level } = statsDb;
@@ -85,6 +88,17 @@ module.exports = {
     }
     await statsDb.save();
     cooldownCache.set(key, Date.now());
+    await ecosystemService
+      .recordActivity({
+        eventId: message.id,
+        guildId: message.guildId,
+        userId: message.member.id,
+        xp: earnedXp,
+        occurredAt: message.createdAt,
+      })
+      .catch((error) => {
+        message.client.logger.warn(`Ecosystem activity was not recorded for message ${message.id}: ${error.message}`);
+      });
   },
 
   /**
