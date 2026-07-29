@@ -150,6 +150,35 @@ jobs:
             process.exit(0);
           "
 
+  slaynode:
+    name: 🛰️ SlayNode Production Path
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate installer syntax
+        run: bash -n scripts/install-slaynode.sh
+      - name: Validate Compose model
+        run: |
+          printf 'SLAYNODE_CONTROL_URL=https://control.example\nSLAYNODE_ID=ci-node\nSLAYNODE_SECRET=ci-secret\n' > .env
+          printf 'SLAYNODE_CONTROL_URL=https://control.example\nSLAYNODE_ENROLLMENT_TOKEN=ci-token\n' > .enroll.env
+          docker compose -f docker-compose.slaynode.yml config --quiet
+      - name: Build production worker image
+        run: docker build -f Dockerfile.slaynode -t slaynode-worker:ci .
+      - name: Run unit tests
+        run: |
+          cp example.config.js config.js
+          npm test
+      - name: Run real worker E2E
+        run: npm run slaynode:e2e
+
   debug-test:
     name: 🔬 Debug Load (develop only)
     runs-on: ubuntu-latest

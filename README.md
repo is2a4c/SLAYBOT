@@ -175,20 +175,114 @@ flowchart LR
 
 ### Подключение worker-а
 
-1. Включите <code>SLAYNODE.enabled</code> в <code>config.js</code> и задайте <code>SLAYNODE_MASTER_KEY</code> длиной не менее 32 символов.
-2. Разместите control plane за HTTPS reverse proxy.
-3. Создайте enrollment через <code>/slaynode enroll</code> с правом Manage Server.
-4. Запустите CLI enrollment с полученным токеном:
+SlayNode состоит из двух частей:
 
-```bash
-SLAYNODE_ENROLLMENT_TOKEN=... \
-SLAYNODE_CONTROL_URL=https://your-control.example \
-npm run slaynode:enroll
+- **Control plane** работает внутри основного SLAYBOT, хранит очередь в MongoDB и принимает решение, какие задания можно передать наружу.
+- **Worker** работает на отдельной машине в изолированном Docker-контейнере, сам подключается к control plane по HTTPS и выполняет только разрешённые OCR/vision jobs.
+
+Worker-у не нужны Discord token, MongoDB URL и исходный `config.js`.
+
+#### 1. Подготовьте основной SLAYBOT
+
+В `config.js` на сервере бота включите control plane:
+
+```js
+SLAYNODE: {
+  enabled: true,
+  host: "127.0.0.1",
+  port: 8090,
+}
 ```
 
-5. Сохраните возвращённые <code>SLAYNODE_ID</code> и <code>SLAYNODE_SECRET</code> только на worker-е и поднимите контейнер.
+Создайте отдельный master key и передайте его основному процессу SLAYBOT:
 
-Полное описание протокола, границ доверия, monitoring и переменных окружения — в [архитектуре SlayNode](docs/slaynode/architecture.md).
+```bash
+openssl rand -base64 48
+# сохраните результат как SLAYNODE_MASTER_KEY в environment/vault
+```
+
+Если используется встроенный GitHub Actions deploy, добавьте результат как repository/environment secret `SLAYNODE_MASTER_KEY`. Не меняйте его при обычных обновлениях: им шифруются credentials уже подключённых worker-ов.
+
+Опубликуйте локальный порт `8090` через HTTPS reverse proxy. Не открывайте HTTP control plane напрямую в интернет. Проверка готовности должна возвращать HTTP 200:
+
+```bash
+curl -fsS https://node-control.example/ready
+```
+
+#### 2. Создайте одноразовый token
+
+На Discord-сервере выполните `/slaynode enroll`. Команда доступна участнику с правом **Manage Server** и выдаёт token на 15 минут. Он применяется только один раз.
+
+#### 3. Установите worker через Docker
+
+Требования к машине worker-а:
+
+- Docker Engine 24+ и Docker Compose v2;
+- 2 CPU, 4 GB RAM и около 5 GB свободного диска;
+- исходящее HTTPS-соединение с control plane;
+- Linux x86_64/arm64. GPU необязателен.
+
+Скачайте и запустите единый installer:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/is2a4c/SLAYBOT/main/scripts/install-slaynode.sh
+chmod +x install-slaynode.sh
+./install-slaynode.sh
+```
+
+Installer спросит HTTPS URL control plane и одноразовый token. Затем он:
+
+1. скачает актуальные исходники SlayNode;
+2. локально соберёт non-root Docker image;
+3. выполнит enrollment внутри одноразового контейнера;
+4. сохранит уникальные `SLAYNODE_ID` и `SLAYNODE_SECRET` в `.env` с правами `0600`;
+5. создаст постоянный volume для моделей;
+6. запустит worker и дождётся реального heartbeat до статуса `healthy`.
+
+Для автоматической установки без вопросов:
+
+```bash
+SLAYNODE_CONTROL_URL=https://node-control.example \
+SLAYNODE_ENROLLMENT_TOKEN='token-from-discord' \
+SLAYNODE_INSTALL_DIR=/opt/slaynode \
+./install-slaynode.sh
+```
+
+> [!IMPORTANT]
+> Не передавайте `.env` другой ноде. Каждый worker должен получить собственный token через `/slaynode enroll` и собственную пару credentials.
+
+#### Эксплуатация
+
+По умолчанию файлы находятся в `./slaynode-worker`:
+
+```bash
+cd slaynode-worker
+docker compose -f docker-compose.slaynode.yml ps
+docker compose -f docker-compose.slaynode.yml logs -f slaynode
+docker compose -f docker-compose.slaynode.yml restart slaynode
+```
+
+Повторный запуск installer-а обновляет код и image, но сохраняет существующие credentials и model cache. Для плановой ротации secret используйте `/slaynode rotate`, замените `SLAYNODE_SECRET` в `.env` и перезапустите контейнер.
+
+Остановить worker:
+
+```bash
+docker compose -f docker-compose.slaynode.yml down
+```
+
+Удаление с `down -v` дополнительно уничтожит загруженный model cache. Файл `.env` удаляется отдельно вручную только при окончательном выводе ноды из эксплуатации.
+
+#### Как проходит job
+
+1. Worker отправляет подписанный heartbeat и просит lease.
+2. Control plane выбирает job по capability, privacy class и guild affinity.
+3. Worker запускает allowlisted executor в отдельном child process с memory limit и timeout.
+4. Результат возвращается через подписанный `ack`; ошибка — через `nack`, после чего очередь применяет retry/backoff.
+5. Control plane проверяет результат, записывает audit/credits и при необходимости выполняет central fallback.
+
+Docker healthcheck становится успешным только после связи с control plane и становится unhealthy, если heartbeat устарел. Контейнер работает без root, с read-only filesystem, без Linux capabilities, с CPU/RAM/PID limits и ограниченной ротацией логов.
+
+Полное описание протокола, privacy classes, monitoring и модели угроз — в [архитектуре SlayNode](docs/slaynode/architecture.md).
 
 ---
 
