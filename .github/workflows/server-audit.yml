@@ -63,3 +63,10 @@ jobs:
             echo "=== Smart Invites backend (read-only) ==="
             curl --silent --show-error --max-time 10 -D - http://127.0.0.1:8081/health || true
             ss -ltnp 'sport = :8081' 2>/dev/null || true
+
+            echo "=== network addresses (read-only) ==="
+            hostname -I || true
+            ip -brief address || true
+
+            echo "=== slaybot PM2 logs (read-only) ==="
+            pm2 logs slaybot --nostream --lines 80 || true
