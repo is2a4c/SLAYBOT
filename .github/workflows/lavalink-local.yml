@@ -79,5 +79,4 @@ jobs:
               -H "Authorization: $LAVALINK_LOCAL_PASSWORD" \
               http://127.0.0.1:2333/version
             tail -n 100 "$HOME/.pm2/logs/slaybot-out.log" |
-              grep -F 'Node "local-lavalink" connected' |
-              tail -1
+              grep -F 'Node "local-lavalink" connected'
