@@ -506,26 +506,15 @@ class SmartInviteService {
     const found = await this.findOwned(guildId, slug);
     const normalized = await this.validateRequestedSlug(newSlug, guildId);
     await this.assertSlugAvailable(normalized);
-    const now = this.now();
     const old = found.record.normalizedSlug;
-    const aliasExpiresAt = new Date(now.getTime() + this.config.aliasRetentionMs);
-    const claims = (found.record.slugClaims || [])
-      .filter((claim) => claim.normalizedSlug !== old)
-      .map((claim) => ({
-        normalizedSlug: claim.normalizedSlug,
-        expiresAt: claim.expiresAt || null,
-      }));
-    claims.push({ normalizedSlug: old, expiresAt: aliasExpiresAt }, { normalizedSlug: normalized, expiresAt: null });
     const updated = await this.model.findOneAndUpdate(
       { _id: found.record._id, normalizedSlug: old },
       {
-        $set: { slug: normalized, normalizedSlug: normalized, slugClaims: claims },
-        $push: {
-          aliases: {
-            slug: old,
-            normalizedSlug: old,
-            expiresAt: aliasExpiresAt,
-          },
+        $set: {
+          slug: normalized,
+          normalizedSlug: normalized,
+          aliases: [],
+          slugClaims: [{ normalizedSlug: normalized, expiresAt: null }],
         },
       },
       { new: true }
@@ -533,6 +522,32 @@ class SmartInviteService {
     if (!updated) throw new SmartInviteError("UPDATE_CONFLICT", "Ссылка была изменена другим процессом.");
     this.audit("smart_invite_updated", updated, { operation: "rename" });
     return updated;
+  }
+
+  async purgeLegacyRenameAliases() {
+    const records = await this.model
+      .find({ "aliases.0": { $exists: true } })
+      .select("_id normalizedSlug status reservedUntil");
+    let modifiedCount = 0;
+
+    for (const record of records) {
+      const expiresAt = record.status === "deleted" ? record.reservedUntil || this.now() : null;
+      const result = await this.model.updateOne(
+        { _id: record._id, "aliases.0": { $exists: true } },
+        {
+          $set: {
+            aliases: [],
+            slugClaims: [{ normalizedSlug: record.normalizedSlug, expiresAt }],
+          },
+        }
+      );
+      modifiedCount += result.modifiedCount;
+    }
+
+    if (modifiedCount) {
+      this.logger.log(JSON.stringify({ event: "smart_invite_legacy_aliases_purged", count: modifiedCount }));
+    }
+    return modifiedCount;
   }
 
   async softDelete(guildId, slug) {

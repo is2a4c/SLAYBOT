@@ -10,6 +10,7 @@ async function start(client) {
 
   const service = new SmartInviteService(client);
   await service.model.createIndexes();
+  await service.purgeLegacyRenameAliases();
   await service.recoverExpiredLeases();
   const scheduler = new SmartInviteScheduler(service);
   const app = createSmartInvitesApp(service);

@@ -118,7 +118,7 @@ module.exports = {
       },
       {
         name: "rename",
-        description: "переименовать ссылку, оставив временный alias",
+        description: "переименовать ссылку и удалить старый адрес",
         type: ApplicationCommandOptionType.Subcommand,
         options: [stringOption("slug", "текущий slug"), stringOption("new-slug", "новый slug")],
       },

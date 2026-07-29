@@ -178,7 +178,7 @@ test("uses a safe standard description when none was saved", async () => {
   assert.match(fixture.service.getPublicDescription(record), /Постоянная ссылка/);
 });
 
-test("enforces global slug uniqueness, aliases and per-guild limits", async () => {
+test("enforces global slug uniqueness, immediate rename cleanup and per-guild limits", async () => {
   const fixture = createFixture({ maxPerGuild: 1 });
   await fixture.service.create({
     guildId: fixture.guild.id,
@@ -207,8 +207,14 @@ test("enforces global slug uniqueness, aliases and per-guild limits", async () =
     { code: "SLUG_TAKEN" }
   );
   const renamed = await fixture.service.rename(fixture.guild.id, "first-link", "renamed-link");
-  assert.equal((await fixture.service.findBySlug("first-link")).record.id, renamed.id);
-  await assert.rejects(fixture.service.assertSlugAvailable("first-link"), { code: "SLUG_TAKEN" });
+  assert.equal(await fixture.service.findBySlug("first-link"), null);
+  await fixture.service.assertSlugAvailable("first-link");
+  assert.equal((await fixture.service.findBySlug("renamed-link")).record.id, renamed.id);
+  assert.deepEqual(renamed.aliases, []);
+  assert.deepEqual(
+    renamed.slugClaims.map((claim) => claim.normalizedSlug),
+    ["renamed-link"]
+  );
 });
 
 test("validates a live Discord invite without creating another one", async () => {
@@ -306,11 +312,10 @@ test("recovers expired leases and rejects writes after lease expiry", async () =
   });
 });
 
-test("soft deletion retains a slug, guildDelete disables links, and alias expires", async () => {
+test("soft deletion retains the current slug and guildDelete disables links", async () => {
   let clock = new Date("2026-01-01T00:00:00Z");
   const fixture = createFixture({
     deletedSlugRetentionMs: 1000,
-    aliasRetentionMs: 1000,
     now: () => new Date(clock),
   });
   const record = await createRecord(fixture, "delete-link");
@@ -319,20 +324,37 @@ test("soft deletion retains a slug, guildDelete disables links, and alias expire
   clock = new Date(clock.getTime() + 1001);
   await fixture.service.assertSlugAvailable("delete-link");
 
-  const renamed = await createRecord(fixture, "delete-alias");
-  await fixture.service.rename(fixture.guild.id, renamed.slug, "delete-current");
-  const aliasDeletedAt = new Date(clock);
-  await fixture.service.softDelete(fixture.guild.id, "delete-current");
-  clock = new Date(aliasDeletedAt.getTime() + 500);
-  await assert.rejects(fixture.service.assertSlugAvailable("delete-alias"), {
-    code: "SLUG_RETAINED",
-  });
-  clock = new Date(aliasDeletedAt.getTime() + 1001);
-  await fixture.service.assertSlugAvailable("delete-alias");
-
   const other = await createRecord(fixture, "guild-left");
   await fixture.service.handleGuildDeleted(fixture.guild.id);
   assert.equal((await SmartInvite.findById(other._id)).status, "disabled");
+});
+
+test("startup cleanup removes aliases created by older rename behavior", async () => {
+  const fixture = createFixture();
+  const record = await createRecord(fixture, "current-link");
+  record.aliases = [
+    {
+      slug: "legacy-link",
+      normalizedSlug: "legacy-link",
+      expiresAt: new Date(Date.now() + 60_000),
+    },
+  ];
+  record.slugClaims.push({
+    normalizedSlug: "legacy-link",
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+  await record.save();
+
+  assert.ok(await fixture.service.findBySlug("legacy-link"));
+  assert.equal(await fixture.service.purgeLegacyRenameAliases(), 1);
+  assert.equal(await fixture.service.findBySlug("legacy-link"), null);
+  await fixture.service.assertSlugAvailable("legacy-link");
+  const cleaned = await SmartInvite.findById(record._id);
+  assert.deepEqual(cleaned.aliases, []);
+  assert.deepEqual(
+    cleaned.slugClaims.map((claim) => claim.normalizedSlug),
+    ["current-link"]
+  );
 });
 
 test("blocks configured or owner-blocked guilds and reserves owner slugs", async () => {

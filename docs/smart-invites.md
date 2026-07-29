@@ -13,17 +13,17 @@ Smart Invites создают стабильный публичный адрес 
 Все изменяющие `/smart-invite` команды требуют `Manage Server`. В выбранном
 канале боту нужны `View Channel` и `Create Instant Invite`.
 
-| Команда | Действие |
-| --- | --- |
-| `/smart-invite create slug channel [description]` | Создать страницу и бессрочный внутренний Discord-инвайт |
-| `/smart-invite list` | Показать только ссылки текущего guild |
-| `/smart-invite info slug` | Показать описание, канал, статус и раздельные счётчики |
-| `/smart-invite refresh slug` | Принудительно заменить внутренний инвайт |
-| `/smart-invite set-channel slug channel` | Перенести ссылку на другой канал |
-| `/smart-invite set-description slug description` | Изменить публичное описание |
-| `/smart-invite remove-description slug` | Вернуть системное описание |
-| `/smart-invite rename slug new-slug` | Переименовать ссылку; старый адрес временно работает как alias |
-| `/smart-invite delete slug` | Показать кнопки подтверждения и деактивировать ссылку |
+| Команда                                           | Действие                                                           |
+| ------------------------------------------------- | ------------------------------------------------------------------ |
+| `/smart-invite create slug channel [description]` | Создать страницу и бессрочный внутренний Discord-инвайт            |
+| `/smart-invite list`                              | Показать только ссылки текущего guild                              |
+| `/smart-invite info slug`                         | Показать описание, канал, статус и раздельные счётчики             |
+| `/smart-invite refresh slug`                      | Принудительно заменить внутренний инвайт                           |
+| `/smart-invite set-channel slug channel`          | Перенести ссылку на другой канал                                   |
+| `/smart-invite set-description slug description`  | Изменить публичное описание                                        |
+| `/smart-invite remove-description slug`           | Вернуть системное описание                                         |
+| `/smart-invite rename slug new-slug`              | Переименовать ссылку; старый адрес сразу удаляется и освобождается |
+| `/smart-invite delete slug`                       | Показать кнопки подтверждения и деактивировать ссылку              |
 
 Owner-only `/smartinvite-admin` позволяет отключить ссылку, заблокировать или
 разблокировать guild, посмотреть безопасный технический статус, снять
@@ -82,7 +82,7 @@ Invite валидируется не чаще `validationTtlMs`. Удалени�
 - `host`/`port` — локальный listener, по умолчанию `127.0.0.1:8081`;
 - `maxPerGuild` — лимит активных ссылок, по умолчанию 5;
 - `redirectMode` — `preview` или `redirect`;
-- validation, scheduler, lease, alias и deleted-slug retention intervals;
+- validation, scheduler, lease и deleted-slug retention intervals;
 - reserved и blocked guild lists;
 - rate-limit window/max и concurrency фоновой очереди.
 
@@ -172,7 +172,7 @@ Reverse proxy обычно пишет IP в access log. Настройте ср�
 5. Удалить внутренний invite в Discord и одновременно открыть страницу
    несколькими запросами: должен появиться ровно один новый invite, а
    публичный URL не измениться.
-6. Проверить `/smart-invite info`, rename alias и delete confirmation.
+6. Проверить `/smart-invite info`, немедленное удаление старого адреса после rename и delete confirmation.
 7. Убедиться, что удалённый slug нельзя создать до окончания retention.
 8. Отключить функцию и убедиться, что Discord-бот запускается без HTTP
    listener.
