@@ -4,7 +4,12 @@ const { getMember } = require("@schemas/Member");
 const { addModAction } = require("@helpers/ModUtils");
 const { AUTOMOD } = require("@root/config");
 const { addAutoModLogToDb } = require("@schemas/AutomodLogs");
-const { classifyImage, isImageAttachment, DEFAULT_THRESHOLD } = require("@src/services/imageSpamClassifier");
+const {
+  classifyImage,
+  combineImageSpamResults,
+  isImageAttachment,
+  DEFAULT_THRESHOLD,
+} = require("@src/services/imageSpamClassifier");
 
 const antispamCache = new Map();
 const MESSAGE_SPAM_THRESHOLD = 3000;
@@ -76,42 +81,60 @@ async function inspectImageSpam(message, automod, classifier = classifyImage) {
   if (!images.length) return { shouldDelete: false, strikes: 0, fields };
 
   const threshold = Math.min(100, Math.max(50, automod.image_spam_threshold || DEFAULT_THRESHOLD));
-  // Any single spammy attachment is enough to act; stop at the first hit and fail
-  // open per-image so one classifier error never spares the rest of the message.
+  const results = [];
+  const recognizedContext = [];
+
+  // Analyze every attachment in order and carry recognized text forward. This
+  // lets later images be reviewed with the context found in earlier ones while
+  // still isolating download/OCR/vision failures to a single attachment.
   for (let index = 0; index < images.length; index += 1) {
     const image = images[index];
     try {
+      const accumulatedCaption = [
+        message.content,
+        recognizedContext.length ? `Text recognized in previous images:\n${recognizedContext.join("\n")}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
       const result = await classifier({
         url: image.url,
-        caption: message.content,
+        caption: accumulatedCaption,
         threshold,
         guildId: message.guildId,
       });
-      if (!result.risky) continue;
-
-      const label = images.length > 1 ? ` (image ${index + 1}/${images.length})` : "";
-      fields.push({
-        name: `Image-Spam Risk: ${result.score}/100${label}`,
-        value:
-          [`Model: ${result.model}`, ...result.reasons].join("\n").slice(0, 1024) ||
-          "multiple suspicious image signals",
-        inline: false,
-      });
-      if (result.ocrText) {
-        fields.push({
-          name: `OCR (${result.confidence}% confidence)`,
-          value: result.ocrText.slice(0, 1024),
-          inline: false,
-        });
+      results.push({ ...result, imageIndex: index });
+      if (result.ocrText?.trim() && result.confidence >= 25) {
+        recognizedContext.push(`Image ${index + 1}: ${result.ocrText.trim()}`);
       }
-      return { shouldDelete: true, strikes: 1, fields };
     } catch (error) {
       message.client.logger.warn(
-        `Image-spam analysis failed for an attachment on message ${message.id}; it was left untouched: ${error.message}`
+        `Image-spam analysis skipped attachment ${index + 1}/${images.length} on message ${message.id}: ${error.message}`
       );
     }
   }
-  return { shouldDelete: false, strikes: 0, fields };
+
+  const combined = combineImageSpamResults(results, { caption: message.content, threshold });
+  if (!combined.risky) return { shouldDelete: false, strikes: 0, fields };
+
+  const label =
+    images.length > 1 && combined.strongestIndex >= 0
+      ? ` (strongest image ${combined.strongestIndex + 1}/${images.length})`
+      : "";
+  fields.push({
+    name: `Image-Spam Risk: ${combined.score}/100${label}`,
+    value:
+      [`Model: ${combined.model}`, ...combined.reasons].join("\n").slice(0, 1024) ||
+      "multiple suspicious image signals",
+    inline: false,
+  });
+  if (combined.ocrText) {
+    fields.push({
+      name: `Combined OCR (${combined.confidence}% max confidence)`,
+      value: combined.ocrText.slice(0, 1024),
+      inline: false,
+    });
+  }
+  return { shouldDelete: true, strikes: 1, fields };
 }
 
 /**
@@ -119,7 +142,7 @@ async function inspectImageSpam(message, automod, classifier = classifyImage) {
  * @param {import('discord.js').Message} message
  * @param {object} settings
  */
-async function performAutomod(message, settings) {
+async function performAutomod(message, settings, imageClassifier = classifyImage) {
   const { automod } = settings;
   const ordinaryMember = shouldModerate(message);
 
@@ -138,10 +161,11 @@ async function performAutomod(message, settings) {
 
   const fields = [];
 
-  // Image spam is intentionally limited to ordinary members even when automod
-  // debug mode is enabled. A classifier outage must never block a message.
-  if (automod.anti_image_spam && ordinaryMember) {
-    const result = await inspectImageSpam(message, automod);
+  // Debug mode intentionally exercises automod against moderators/owners too,
+  // so a real message follows the same image-classification path as members.
+  // A classifier outage must never block a message.
+  if (automod.anti_image_spam && (ordinaryMember || automod.debug)) {
+    const result = await inspectImageSpam(message, automod, imageClassifier);
     fields.push(...result.fields);
     shouldDelete ||= result.shouldDelete;
     strikesTotal += result.strikes;

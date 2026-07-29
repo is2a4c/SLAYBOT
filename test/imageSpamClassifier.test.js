@@ -7,7 +7,9 @@ const {
   isImageAttachment,
   analyzeWithVision,
   analyzeVisionImages,
+  combineImageSpamResults,
   prepareImage,
+  runIoVision,
   selectVisionCandidate,
 } = require("../src/services/imageSpamClassifier");
 const { inspectImageSpam } = require("../src/handlers/automod");
@@ -184,6 +186,35 @@ test("local vision analyzes every prepared collage region", async () => {
   assert.match(seen[2].hint, /4600/);
   assert.equal(result.index, 2);
   assert.equal(result.score, 85);
+  assert.equal(result.regionsAnalyzed, 3);
+  assert.equal(result.regionsAvailable, 3);
+});
+
+test("local vision can cap regions while keeping the highest OCR-risk tile", async () => {
+  const previous = process.env.IMAGE_SPAM_VISION_MAX_REGIONS;
+  process.env.IMAGE_SPAM_VISION_MAX_REGIONS = "2";
+  try {
+    const images = [Buffer.from("full"), Buffer.from("ordinary-tile"), Buffer.from("risky-tile")];
+    const candidates = [
+      { text: "ordinary screenshot", confidence: 80 },
+      { text: "release notes", confidence: 80 },
+      { text: "$4600 reward withdrawal", confidence: 80 },
+    ];
+    const seen = [];
+    const result = await analyzeVisionImages(images, candidates, "bro", async (buffer) => {
+      seen.push(buffer.toString());
+      return buffer.toString() === "risky-tile" ? "IMAGE_SPAM" : "IMAGE_SAFE";
+    });
+
+    assert.deepEqual(seen, ["full", "risky-tile"]);
+    assert.equal(result.index, 2);
+    assert.equal(result.score, 85);
+    assert.equal(result.regionsAnalyzed, 2);
+    assert.equal(result.regionsAvailable, 3);
+  } finally {
+    if (previous === undefined) delete process.env.IMAGE_SPAM_VISION_MAX_REGIONS;
+    else process.env.IMAGE_SPAM_VISION_MAX_REGIONS = previous;
+  }
 });
 
 test("local vision adapter parses the model response", async () => {
@@ -203,6 +234,41 @@ test("local vision adapter uses the final label after the echoed prompt", async 
   });
 
   assert.equal(result.score, 10);
+});
+
+test("io.net vision sends multiple prepared regions in one authenticated request", async () => {
+  const previousKey = process.env.IO_INTELLIGENCE_API_KEY;
+  const previousModel = process.env.IMAGE_SPAM_REMOTE_MODEL;
+  const previousFetch = global.fetch;
+  process.env.IO_INTELLIGENCE_API_KEY = "test-secret";
+  process.env.IMAGE_SPAM_REMOTE_MODEL = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8";
+  let request;
+  global.fetch = async (url, options) => {
+    request = { url, options, body: JSON.parse(options.body) };
+    return {
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "IMAGE_SPAM" } }] }),
+    };
+  };
+
+  try {
+    const response = await runIoVision([Buffer.from("full"), Buffer.from("tile")], "bro", "$4600 reward");
+    assert.equal(response, "IMAGE_SPAM");
+    assert.equal(request.url, "https://api.intelligence.io.solutions/api/v1/chat/completions");
+    assert.equal(request.options.headers.Authorization, "Bearer test-secret");
+    assert.equal(request.body.model, "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8");
+    assert.equal(
+      request.body.messages[0].content.filter((item) => item.type === "image_url").length,
+      2
+    );
+    assert.match(request.body.messages[0].content[1].image_url.url, /^data:image\/png;base64,/);
+  } finally {
+    global.fetch = previousFetch;
+    if (previousKey === undefined) delete process.env.IO_INTELLIGENCE_API_KEY;
+    else process.env.IO_INTELLIGENCE_API_KEY = previousKey;
+    if (previousModel === undefined) delete process.env.IMAGE_SPAM_REMOTE_MODEL;
+    else process.env.IMAGE_SPAM_REMOTE_MODEL = previousModel;
+  }
 });
 
 test("image moderation returns deletion fields for a risky classifier result", async () => {
@@ -255,6 +321,121 @@ test("image moderation flags a spammy attachment that is not the first image", a
   assert.match(result.fields[0].name, /image 2\/2/);
 });
 
+test("image moderation analyzes every attachment before deciding", async () => {
+  const message = {
+    id: "message-all-images",
+    content: "",
+    attachments: new Map([
+      ["a", { name: "spam.png", contentType: "image/png", url: "https://cdn.test/spam.png" }],
+      ["b", { name: "cat.png", contentType: "image/png", url: "https://cdn.test/cat.png" }],
+      ["c", { name: "meme.png", contentType: "image/png", url: "https://cdn.test/meme.png" }],
+    ]),
+    client: { logger: { warn: () => assert.fail("unexpected warning") } },
+  };
+  const seen = [];
+  const classifier = async ({ url }) => {
+    seen.push(url);
+    return url.endsWith("spam.png")
+      ? { risky: true, score: 88, model: "test-vision", reasons: ["casino promo"], ocrText: "", confidence: 80 }
+      : { risky: false, score: 5, model: "test-vision", reasons: [], ocrText: "", confidence: 80 };
+  };
+
+  const result = await inspectImageSpam(message, { image_spam_threshold: 70 }, classifier);
+
+  assert.equal(result.shouldDelete, true);
+  assert.deepEqual(seen, ["https://cdn.test/spam.png", "https://cdn.test/cat.png", "https://cdn.test/meme.png"]);
+});
+
+test("combines OCR context spread across separate images", () => {
+  const combined = combineImageSpamResults(
+    [
+      {
+        imageIndex: 0,
+        risky: false,
+        score: 30,
+        model: "test-vision",
+        reasons: ["known scam brand"],
+        ocrText: "Меллстрой",
+        confidence: 80,
+      },
+      {
+        imageIndex: 1,
+        risky: false,
+        score: 42,
+        model: "test-vision",
+        reasons: ["casino promo"],
+        ocrText: "открыл своё казино и раздаёт бонус каждому новому пользователю",
+        confidence: 75,
+      },
+    ],
+    { threshold: 70 }
+  );
+
+  assert.equal(combined.risky, true);
+  assert.ok(combined.score >= 70);
+  assert.match(combined.ocrText, /Image 1:[\s\S]*Меллстрой/);
+  assert.match(combined.ocrText, /Image 2:[\s\S]*казино/);
+  assert.ok(combined.reasons.some((reason) => reason.includes("combined image context")));
+});
+
+test("does not aggregate unreliable OCR from another image", () => {
+  const combined = combineImageSpamResults(
+    [
+      {
+        imageIndex: 0,
+        risky: false,
+        score: 10,
+        model: "test-vision",
+        reasons: [],
+        ocrText: "Меллстрой казино раздаёт бонус каждому",
+        confidence: 12,
+      },
+      {
+        imageIndex: 1,
+        risky: false,
+        score: 0,
+        model: "test-vision",
+        reasons: [],
+        ocrText: "обычная фотография",
+        confidence: 90,
+      },
+    ],
+    { threshold: 70 }
+  );
+
+  assert.equal(combined.risky, false);
+  assert.doesNotMatch(combined.ocrText, /Меллстрой/);
+});
+
+test("later images receive OCR context accumulated from earlier images", async () => {
+  const message = {
+    id: "message-context",
+    content: "смотрите",
+    attachments: new Map([
+      ["a", { name: "first.png", contentType: "image/png", url: "https://cdn.test/first.png" }],
+      ["b", { name: "second.png", contentType: "image/png", url: "https://cdn.test/second.png" }],
+    ]),
+    client: { logger: { warn: () => assert.fail("unexpected warning") } },
+  };
+  const captions = [];
+  const classifier = async ({ url, caption }) => {
+    captions.push(caption);
+    return {
+      risky: false,
+      score: 10,
+      model: "test-vision",
+      reasons: [],
+      ocrText: url.endsWith("first.png") ? "Меллстрой" : "обычная картинка",
+      confidence: 80,
+    };
+  };
+
+  await inspectImageSpam(message, { image_spam_threshold: 70 }, classifier);
+
+  assert.equal(captions[0], "смотрите");
+  assert.match(captions[1], /Text recognized in previous images:[\s\S]*Меллстрой/);
+});
+
 test("image moderation fails open when the vision service errors", async () => {
   let warning = "";
   const message = {
@@ -272,5 +453,5 @@ test("image moderation fails open when the vision service errors", async () => {
 
   assert.equal(result.shouldDelete, false);
   assert.equal(result.strikes, 0);
-  assert.match(warning, /left untouched/);
+  assert.match(warning, /skipped attachment 1\/1/);
 });

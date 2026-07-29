@@ -72,6 +72,64 @@ test("antispam whitelist does not bypass mass mention detection", async () => {
   assert.equal(result.deleted, false);
 });
 
+test("debug mode analyzes image spam sent by a moderator", async () => {
+  const settings = createAutomodSettings({
+    debug: true,
+    anti_spam: false,
+    anti_image_spam: true,
+  });
+  const message = createMessage();
+  message.member.permissions.has = () => true;
+  message.attachments.set("image", {
+    name: "spam.png",
+    contentType: "image/png",
+    url: "https://cdn.test/spam.png",
+  });
+  let classifierCalls = 0;
+
+  const result = await performAutomod(message, settings, async () => {
+    classifierCalls += 1;
+    return {
+      risky: true,
+      score: 91,
+      threshold: 70,
+      model: "test-vision",
+      reasons: ["fake payout"],
+      ocrText: "",
+      confidence: 80,
+    };
+  });
+
+  assert.equal(classifierCalls, 1);
+  assert.equal(result.triggered, true);
+  assert.equal(result.deleted, true);
+});
+
+test("moderator image spam remains exempt when debug mode is disabled", async () => {
+  const settings = createAutomodSettings({
+    debug: false,
+    anti_spam: false,
+    anti_image_spam: true,
+  });
+  const message = createMessage();
+  message.member.permissions.has = () => true;
+  message.attachments.set("image", {
+    name: "spam.png",
+    contentType: "image/png",
+    url: "https://cdn.test/spam.png",
+  });
+  let classifierCalls = 0;
+
+  const result = await performAutomod(message, settings, async () => {
+    classifierCalls += 1;
+    throw new Error("classifier should not run");
+  });
+
+  assert.equal(classifierCalls, 0);
+  assert.equal(result.triggered, false);
+  assert.equal(result.deleted, false);
+});
+
 test("whitelist checks tolerate a message without a guild member", () => {
   const message = { author: { id: USER_ID } };
 

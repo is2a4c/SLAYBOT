@@ -1,5 +1,6 @@
 const sharp = require("sharp");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { createWorker, PSM } = require("tesseract.js");
 
@@ -10,6 +11,8 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT_MS = 15_000;
 const MAX_PENDING_ANALYSES = 2;
 const IMAGE_EXTENSIONS = /\.(?:avif|gif|jpe?g|png|webp)$/i;
+const IO_API_URL = "https://api.intelligence.io.solutions/api/v1/chat/completions";
+const DEFAULT_IO_MODEL = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8";
 
 let workerPromise;
 let localVisionPromise;
@@ -174,11 +177,24 @@ async function getLocalVision() {
       // dtype and model are configurable: a larger model or higher precision reads
       // image intent far better, at the cost of RAM and CPU latency.
       const dtype = process.env.IMAGE_SPAM_VISION_DTYPE || "q4";
+      const requestedThreads = Number.parseInt(process.env.IMAGE_SPAM_ONNX_THREADS, 10);
+      const availableThreads = os.availableParallelism?.() || os.cpus().length;
+      const inferenceThreads =
+        Number.isInteger(requestedThreads) && requestedThreads > 0
+          ? Math.min(requestedThreads, availableThreads)
+          : Math.max(1, Math.floor(availableThreads / 2));
       const [processor, model] = await Promise.all([
         AutoProcessor.from_pretrained(modelId),
-        AutoModelForImageTextToText.from_pretrained(modelId, { dtype, device: "cpu" }),
+        AutoModelForImageTextToText.from_pretrained(modelId, {
+          dtype,
+          device: "cpu",
+          session_options: {
+            intraOpNumThreads: inferenceThreads,
+            interOpNumThreads: 1,
+          },
+        }),
       ]);
-      return { processor, model, RawImage, modelId };
+      return { processor, model, RawImage, modelId, inferenceThreads };
     })().catch((error) => {
       localVisionPromise = undefined;
       throw error;
@@ -189,18 +205,23 @@ async function getLocalVision() {
 
 const VISION_SPLIT = process.env.IMAGE_SPAM_VISION_SPLIT !== "false";
 
+function buildVisionPrompt(caption, ocrHint = "") {
+  return (
+    "You are a Discord anti-spam reviewer. Decide if any supplied image is a get-rich-quick / reward scam. " +
+    "Scam traits: fake bank transfers or payment confirmations (e.g. Ozon, Sber, Tinkoff, a big +amount in ₽/$), " +
+    "in-game or app currency balances and coin/token giveaways (e.g. 'Coins', 'Balance'), casino or betting balances, " +
+    "'claim your reward / free money for new users / register to withdraw' promos, crypto wallets, and success screens. " +
+    "A single fraudulent panel inside a collage is enough. Ordinary memes, games, chats and real personal screenshots are safe. " +
+    "Judge the pictures themselves, not only the text. Reply with exactly one label: IMAGE_SPAM or IMAGE_SAFE. " +
+    `Caption: ${JSON.stringify(caption || "")}. ` +
+    `OCR text found in the image: ${JSON.stringify(ocrHint.slice(0, 1200))}`
+  );
+}
+
 async function runLocalVision(buffer, caption, ocrHint = "", split = VISION_SPLIT) {
   const runtime = await getLocalVision();
   const job = visionQueue.then(async () => {
-    const prompt =
-      "You are a Discord anti-spam reviewer. Decide if this image is a get-rich-quick / reward scam. " +
-      "Scam traits: fake bank transfers or payment confirmations (e.g. Ozon, Sber, Tinkoff, a big +amount in ₽/$), " +
-      "in-game or app currency balances and coin/token giveaways (e.g. 'Coins', 'Balance'), casino or betting balances, " +
-      "'claim your reward / free money for new users / register to withdraw' promos, crypto wallets, and success screens. " +
-      "A single fraudulent panel inside a collage is enough. Ordinary memes, games, chats and real personal screenshots are safe. " +
-      "Judge the picture itself, not only the text. Reply with exactly one label: IMAGE_SPAM or IMAGE_SAFE. " +
-      `Caption: ${JSON.stringify(caption || "")}. ` +
-      `OCR text found in the image: ${JSON.stringify(ocrHint.slice(0, 600))}`;
+    const prompt = buildVisionPrompt(caption, ocrHint);
     const messages = [{ role: "user", content: [{ type: "image" }, { type: "text", text: prompt }] }];
     const formatted = runtime.processor.tokenizer.apply_chat_template(messages, {
       add_generation_prompt: true,
@@ -215,13 +236,61 @@ async function runLocalVision(buffer, caption, ocrHint = "", split = VISION_SPLI
   return job;
 }
 
-function parseVisionResponse(text) {
-  const label = [...text.matchAll(/\bIMAGE_(SPAM|SAFE)\b/gi)].at(-1)?.[1]?.toUpperCase();
-  if (!label) throw new Error(`local vision returned no classification: ${text.slice(-500)}`);
-  if (label === "SPAM") {
-    return { score: 85, reasons: ["local vision detected financial reward spam"], detectedText: "" };
+async function runIoVision(buffers, caption, ocrHint = "") {
+  const apiKey = process.env.IO_INTELLIGENCE_API_KEY;
+  if (!apiKey) throw new Error("IO_INTELLIGENCE_API_KEY is not configured");
+
+  const requestedTimeout = Number.parseInt(process.env.IMAGE_SPAM_REMOTE_TIMEOUT_MS, 10);
+  const timeoutMs =
+    Number.isInteger(requestedTimeout) && requestedTimeout > 0 ? requestedTimeout : 45_000;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const content = [{ type: "text", text: buildVisionPrompt(caption, ocrHint) }];
+    for (const buffer of buffers) {
+      content.push({
+        type: "image_url",
+        image_url: { url: `data:image/png;base64,${buffer.toString("base64")}` },
+      });
+    }
+
+    const response = await fetch(IO_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: process.env.IMAGE_SPAM_REMOTE_MODEL || DEFAULT_IO_MODEL,
+        messages: [{ role: "user", content }],
+        temperature: 0,
+        max_tokens: 64,
+      }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`io.net vision returned HTTP ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const result = payload?.choices?.[0]?.message?.content;
+    if (typeof result !== "string") throw new Error("io.net vision returned an invalid response");
+    return result;
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error(`io.net vision timed out after ${timeoutMs} ms`);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return { score: 10, reasons: ["local vision found no convincing spam pattern"], detectedText: "" };
+}
+
+function parseVisionResponse(text, source = "local vision") {
+  const label = [...text.matchAll(/\bIMAGE_(SPAM|SAFE)\b/gi)].at(-1)?.[1]?.toUpperCase();
+  if (!label) throw new Error(`${source} returned no classification: ${text.slice(-500)}`);
+  if (label === "SPAM") {
+    return { score: 85, reasons: [`${source} detected financial reward spam`], detectedText: "" };
+  }
+  return { score: 10, reasons: [`${source} found no convincing spam pattern`], detectedText: "" };
 }
 
 async function analyzeWithVision(buffer, caption, engine = runLocalVision, ocrHint = "", split = VISION_SPLIT) {
@@ -230,24 +299,83 @@ async function analyzeWithVision(buffer, caption, engine = runLocalVision, ocrHi
   return { ...result, model: `${modelName} (${process.env.IMAGE_SPAM_VISION_DTYPE || "q4"})` };
 }
 
-async function analyzeVisionImages(visionImages, candidates, caption, engine = runLocalVision) {
+function selectVisionIndexes(visionImages, candidates, caption) {
+  const requestedMax = Number.parseInt(process.env.IMAGE_SPAM_VISION_MAX_REGIONS, 10);
+  const maxRegions =
+    Number.isInteger(requestedMax) && requestedMax > 0
+      ? Math.min(requestedMax, visionImages.length)
+      : visionImages.length;
+  const rankedTiles = visionImages
+    .map((_, index) => index)
+    .slice(1)
+    .sort((left, right) => {
+      const risk = (index) => {
+        const candidate = candidates[index] || { text: "", confidence: 0 };
+        return scoreImageSpam({
+          caption,
+          ocrText: candidate.text,
+          confidence: candidate.confidence,
+        }).score;
+      };
+      return risk(right) - risk(left);
+    });
+  return maxRegions === visionImages.length
+    ? visionImages.map((_, index) => index)
+    : [0, ...rankedTiles].slice(0, maxRegions);
+}
+
+async function analyzeVisionImages(visionImages, candidates, caption, engine) {
+  const selectedIndexes = selectVisionIndexes(visionImages, candidates, caption);
+  if (!engine && process.env.IO_INTELLIGENCE_API_KEY) {
+    const ocrHint = selectedIndexes
+      .map((index) => candidates[index])
+      .filter((candidate) => candidate && candidate.confidence >= 25 && candidate.text)
+      .map((candidate) => candidate.text)
+      .join("\n");
+    const result = parseVisionResponse(
+      await runIoVision(
+        selectedIndexes.map((index) => visionImages[index]),
+        caption,
+        ocrHint
+      ),
+      "io.net vision"
+    );
+    const modelName = process.env.IMAGE_SPAM_REMOTE_MODEL || DEFAULT_IO_MODEL;
+    return {
+      ...result,
+      model: `${modelName} (io.net)`,
+      index: selectedIndexes[0],
+      regionsAnalyzed: selectedIndexes.length,
+      regionsAvailable: visionImages.length,
+    };
+  }
+
+  const selectedEngine = engine || runLocalVision;
   const results = [];
-  for (let index = 0; index < visionImages.length; index += 1) {
+  for (const index of selectedIndexes) {
     const candidate = candidates[index] || { text: "", confidence: 0 };
     const ocrHint = candidate.confidence >= 25 ? candidate.text : "";
     const result = await analyzeWithVision(
       visionImages[index],
       caption,
-      engine,
+      selectedEngine,
       ocrHint,
       index === 0 ? VISION_SPLIT : false
     );
     results.push({ ...result, index });
   }
-  return results.reduce((best, result) => (result.score > best.score ? result : best));
+  const strongest = results.reduce((best, result) => (result.score > best.score ? result : best));
+  return {
+    ...strongest,
+    regionsAnalyzed: results.length,
+    regionsAvailable: visionImages.length,
+  };
 }
 
 async function preloadVisionModel() {
+  if (process.env.IO_INTELLIGENCE_API_KEY) {
+    return process.env.IMAGE_SPAM_REMOTE_MODEL || DEFAULT_IO_MODEL;
+  }
   const runtime = await getLocalVision();
   return runtime.modelId;
 }
@@ -339,6 +467,56 @@ function scoreImageSpam({ caption = "", ocrText = "", confidence = 0, visual = {
   return { score: Math.min(100, score), reasons };
 }
 
+function combineImageSpamResults(results, { caption = "", threshold = DEFAULT_THRESHOLD } = {}) {
+  if (!results.length) {
+    return {
+      score: 0,
+      risky: false,
+      threshold,
+      reasons: [],
+      ocrText: "",
+      confidence: 0,
+      model: "unavailable",
+      strongestIndex: -1,
+    };
+  }
+
+  const strongest = results.reduce((best, result) => (result.score > best.score ? result : best));
+  const reliableOcrResults = results.filter(
+    (result) => result.ocrText?.trim() && (Number(result.confidence) || 0) >= 25
+  );
+  const ocrText = reliableOcrResults
+    .map((result) => {
+      return `Image ${result.imageIndex + 1}:\n${result.ocrText.trim()}`;
+    })
+    .join("\n\n");
+  const confidence = Math.max(0, ...reliableOcrResults.map((result) => Number(result.confidence) || 0));
+  const contextual = scoreImageSpam({
+    caption,
+    ocrText,
+    confidence,
+  });
+  const score = Math.max(strongest.score, contextual.score);
+  const models = [...new Set(results.map((result) => result.model).filter(Boolean))];
+  const reasons = [
+    `all ${results.length} image(s) analyzed as one message`,
+    ...(contextual.score > strongest.score
+      ? contextual.reasons.map((reason) => `combined image context: ${reason}`)
+      : (strongest.reasons || []).map((reason) => `image ${strongest.imageIndex + 1}: ${reason}`)),
+  ];
+
+  return {
+    score,
+    risky: results.some((result) => result.risky) || score >= threshold,
+    threshold,
+    reasons,
+    ocrText: ocrText.slice(0, 2000),
+    confidence: Math.round(confidence),
+    model: models.join(", ") || "unavailable",
+    strongestIndex: strongest.imageIndex,
+  };
+}
+
 function selectVisionCandidate({ candidates = [] }, visionImages, caption, visual) {
   let selectedIndex = 0;
   let selectedScore = -1;
@@ -403,7 +581,7 @@ async function classifyImageBuffer({
     });
     const combinedReasons = [
       `region: ${selected.index === 0 ? "full image" : `tile ${selected.index}`} selected (${selected.ocrRisk}/100 OCR risk)`,
-      `vision: ${visionImages.length} regions analyzed; strongest was ${
+      `vision: ${vision.regionsAnalyzed}/${vision.regionsAvailable} regions analyzed; strongest was ${
         vision.index === 0 ? "full image" : `tile ${vision.index}`
       }`,
       ...vision.reasons.map((reason) => `vision: ${reason}`),
@@ -437,9 +615,11 @@ module.exports = {
   scoreImageSpam,
   analyzeWithVision,
   analyzeVisionImages,
+  combineImageSpamResults,
   parseVisionResponse,
   preloadVisionModel,
   prepareImage,
   recognizeAll,
+  runIoVision,
   selectVisionCandidate,
 };

@@ -1,6 +1,7 @@
 const { ActivityType } = require("discord.js");
 
 let messageIndex = 0;
+let presenceTimer;
 const VALID_STATUSES = new Set(["online", "idle", "dnd", "invisible"]);
 
 /**
@@ -66,7 +67,12 @@ function updatePresence(client) {
   }
 }
 
-module.exports = function handlePresence(client) {
+function handlePresence(client) {
   updatePresence(client);
-  setInterval(() => updatePresence(client), 10 * 60 * 1000);
-};
+  if (!presenceTimer) {
+    presenceTimer = setInterval(() => updatePresence(client), 10 * 60 * 1000);
+  }
+}
+
+module.exports = handlePresence;
+module.exports.updatePresence = updatePresence;
