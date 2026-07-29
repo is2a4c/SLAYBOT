@@ -114,6 +114,8 @@ module.exports = {
 
 async function addInviteRank({ guild }, role, invites, settings) {
   if (!settings.invite.tracking) return `Invite tracking is disabled in this server`;
+  invites = Number.parseInt(invites, 10);
+  if (!Number.isInteger(invites) || invites < 1) return "Invites must be a positive number";
 
   if (role.managed) {
     return "You cannot assign a bot role";

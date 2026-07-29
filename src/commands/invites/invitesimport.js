@@ -50,6 +50,7 @@ async function importInvites({ guild }, user) {
   for (const invite of invites.values()) {
     const inviter = invite.inviter;
     if (!inviter || invite.uses === 0) continue;
+    if (user && inviter.id !== user.id) continue;
     if (!tempMap.has(inviter.id)) tempMap.set(inviter.id, invite.uses);
     else {
       const uses = tempMap.get(inviter.id) + invite.uses;

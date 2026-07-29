@@ -215,28 +215,37 @@ module.exports = {
     // channel
     else if (sub == "channel") {
       const input = args[1];
-      let matched = message.guild.findMatchingChannels(input);
-      if (matched.length == 0) response = `No matching channels found for ${input}`;
-      else if (matched.length > 1) response = `Multiple channels found for ${input}. Please be more specific.`;
-      else response = await setChannel(data.settings, matched[0]);
+      if (isDisableInput(input)) response = await setChannel(data.settings, null);
+      else {
+        let matched = message.guild.findMatchingChannels(input);
+        if (matched.length == 0) response = `No matching channels found for ${input}`;
+        else if (matched.length > 1) response = `Multiple channels found for ${input}. Please be more specific.`;
+        else response = await setChannel(data.settings, matched[0]);
+      }
     }
 
     // appch
     else if (sub == "appch") {
       const input = args[1];
-      let matched = message.guild.findMatchingChannels(input);
-      if (matched.length == 0) response = `No matching channels found for ${input}`;
-      else if (matched.length > 1) response = `Multiple channels found for ${input}. Please be more specific.`;
-      else response = await setApprovedChannel(data.settings, matched[0]);
+      if (isDisableInput(input)) response = await setApprovedChannel(data.settings, null);
+      else {
+        let matched = message.guild.findMatchingChannels(input);
+        if (matched.length == 0) response = `No matching channels found for ${input}`;
+        else if (matched.length > 1) response = `Multiple channels found for ${input}. Please be more specific.`;
+        else response = await setApprovedChannel(data.settings, matched[0]);
+      }
     }
 
     // appch
     else if (sub == "rejch") {
       const input = args[1];
-      let matched = message.guild.findMatchingChannels(input);
-      if (matched.length == 0) response = `No matching channels found for ${input}`;
-      else if (matched.length > 1) response = `Multiple channels found for ${input}. Please be more specific.`;
-      else response = await setRejectedChannel(data.settings, matched[0]);
+      if (isDisableInput(input)) response = await setRejectedChannel(data.settings, null);
+      else {
+        let matched = message.guild.findMatchingChannels(input);
+        if (matched.length == 0) response = `No matching channels found for ${input}`;
+        else if (matched.length > 1) response = `Multiple channels found for ${input}. Please be more specific.`;
+        else response = await setRejectedChannel(data.settings, matched[0]);
+      }
     }
 
     // approve
@@ -320,14 +329,16 @@ module.exports = {
     else if (sub == "approve") {
       const channel = interaction.options.getChannel("channel_name");
       const messageId = interaction.options.getString("message_id");
-      response = await approveSuggestion(interaction.member, channel, messageId);
+      const reason = interaction.options.getString("reason");
+      response = await approveSuggestion(interaction.member, channel, messageId, reason);
     }
 
     // reject
     else if (sub == "reject") {
       const channel = interaction.options.getChannel("channel_name");
       const messageId = interaction.options.getString("message_id");
-      response = await rejectSuggestion(interaction.member, channel, messageId);
+      const reason = interaction.options.getString("reason");
+      response = await rejectSuggestion(interaction.member, channel, messageId, reason);
     }
 
     // staffadd
@@ -347,6 +358,10 @@ module.exports = {
     await interaction.followUp(response);
   },
 };
+
+function isDisableInput(input) {
+  return ["off", "none", "disable"].includes(input?.toLowerCase());
+}
 
 async function setStatus(settings, status) {
   const enabled = status.toUpperCase() === "ON" ? true : false;

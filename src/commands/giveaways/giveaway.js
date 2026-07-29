@@ -295,7 +295,7 @@ async function runModalSetup({ member, channel, guild }, targetCh) {
 
   // validate channel perms
   if (!targetCh) return channel.safeSend("Giveaway setup has been cancelled. You did not mention a channel");
-  if (targetCh.type !== ChannelType.GuildText && !targetCh.permissionsFor(guild.members.me).has(SETUP_PERMS)) {
+  if (targetCh.type !== ChannelType.GuildText || !targetCh.permissionsFor(guild.members.me).has(SETUP_PERMS)) {
     return channel.safeSend(
       `Giveaway setup has been cancelled.\nI need ${parsePermissions(SETUP_PERMS)} in ${targetCh}`
     );
@@ -374,7 +374,7 @@ async function runModalSetup({ member, channel, guild }, targetCh) {
   const modal = await btnInteraction
     .awaitModalSubmit({
       time: 1 * 60 * 1000,
-      filter: (m) => m.customId === "giveaway-modalSetup" && m.member.id === member.id && m.message.id === sentMsg.id,
+      filter: (m) => m.customId === "giveaway-modalSetup" && m.member.id === member.id && m.message?.id === sentMsg.id,
     })
     .catch((ex) => {
       channel.client.logger.error("Button interaction timeout", ex);
@@ -401,7 +401,8 @@ async function runModalSetup({ member, channel, guild }, targetCh) {
     modal.fields
       .getTextInputValue("roles")
       ?.split(",")
-      ?.filter((roleId) => guild.roles.cache.get(roleId.trim())) || [];
+      ?.map((roleId) => roleId.trim())
+      ?.filter((roleId) => guild.roles.cache.get(roleId)) || [];
 
   // host
   const hostId = modal.fields.getTextInputValue("host");
@@ -483,7 +484,7 @@ async function runModalEdit(message, messageId) {
   const modal = await btnInteraction
     .awaitModalSubmit({
       time: 1 * 60 * 1000,
-      filter: (m) => m.customId === "giveaway-modalEdit" && m.member.id === member.id && m.message.id === sentMsg.id,
+      filter: (m) => m.customId === "giveaway-modalEdit" && m.member.id === member.id && m.message?.id === sentMsg.id,
     })
     .catch((ex) => {
       channel.client.logger.error("Button interaction timeout", ex);
@@ -495,16 +496,24 @@ async function runModalEdit(message, messageId) {
   await modal.reply("Updating the giveaway...");
 
   // duration
-  const addDuration = ems(modal.fields.getTextInputValue("duration"));
-  if (isNaN(addDuration)) return modal.editReply("Update has been cancelled. You did not specify a valid add duration");
+  const durationInput = modal.fields.getTextInputValue("duration");
+  const addDuration = durationInput ? ems(durationInput) : null;
+  if (durationInput && (!addDuration || isNaN(addDuration))) {
+    return modal.editReply("Update has been cancelled. You did not specify a valid add duration");
+  }
 
   // prize
   const newPrize = modal.fields.getTextInputValue("prize");
 
   // winner count
-  const newWinnerCount = parseInt(modal.fields.getTextInputValue("winners"));
-  if (isNaN(newWinnerCount)) {
+  const winnersInput = modal.fields.getTextInputValue("winners");
+  const newWinnerCount = winnersInput ? parseInt(winnersInput, 10) : null;
+  if (winnersInput && (isNaN(newWinnerCount) || newWinnerCount < 1)) {
     return modal.editReply("Update has been cancelled. You did not specify a valid winner count");
+  }
+
+  if (!addDuration && !newPrize && !newWinnerCount) {
+    return modal.editReply("Update has been cancelled. You did not provide anything to update");
   }
 
   const response = await edit(message.member, messageId, addDuration, newPrize, newWinnerCount);

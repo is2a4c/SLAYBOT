@@ -13,7 +13,7 @@ module.exports = {
   command: {
     enabled: true,
     usage: "<ID|@member> <channel> [reason]",
-    minArgsCount: 1,
+    minArgsCount: 2,
   },
 
   async messageRun(message, args) {
@@ -23,7 +23,7 @@ module.exports = {
     const channels = message.guild.findMatchingVoiceChannels(args[1]);
     if (!channels.length) return message.safeReply("No matching channels found");
     const targetChannel = channels.pop();
-    if (!targetChannel.type === ChannelType.GuildVoice && !targetChannel.type === ChannelType.GuildStageVoice) {
+    if (![ChannelType.GuildVoice, ChannelType.GuildStageVoice].includes(targetChannel.type)) {
       return message.safeReply("Target channel is not a voice channel");
     }
 

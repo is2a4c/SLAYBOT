@@ -43,6 +43,7 @@ async function cacheGuildInvites(guild) {
  */
 const checkInviteRewards = async (guild, inviterData = {}, isAdded) => {
   const settings = await getSettings(guild);
+  if (!inviterData?.member_id || inviterData.member_id === "VANITY") return;
   if (settings.invite.ranks.length > 0 && inviterData?.member_id) {
     const inviter = await guild.members.fetch(inviterData?.member_id).catch(() => {});
     if (!inviter) return;

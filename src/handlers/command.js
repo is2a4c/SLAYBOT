@@ -27,7 +27,14 @@ module.exports = {
     // callback validations
     if (cmd.validations) {
       for (const validation of cmd.validations) {
-        if (!validation.callback(message)) {
+        let valid;
+        try {
+          valid = validation.callback(message);
+        } catch (ex) {
+          message.client.logger.error("prefixCommandValidation", ex);
+          return message.safeReply("An error occurred while validating this command");
+        }
+        if (!valid) {
           return message.safeReply(validation.message);
         }
       }
@@ -89,7 +96,17 @@ module.exports = {
     // callback validations
     if (cmd.validations) {
       for (const validation of cmd.validations) {
-        if (!validation.callback(interaction)) {
+        let valid;
+        try {
+          valid = validation.callback(interaction);
+        } catch (ex) {
+          interaction.client.logger.error("slashCommandValidation", ex);
+          return interaction.reply({
+            content: "An error occurred while validating this command",
+            ephemeral: true,
+          });
+        }
+        if (!valid) {
           return interaction.reply({
             content: validation.message,
             ephemeral: true,

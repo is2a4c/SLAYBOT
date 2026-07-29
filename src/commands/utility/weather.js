@@ -44,7 +44,9 @@ module.exports = {
 };
 
 async function weather(place) {
-  const response = await getJson(`https://api.weatherstack.com/current?access_key=${API_KEY}&query=${place}`);
+  const response = await getJson(
+    `https://api.weatherstack.com/current?access_key=${API_KEY}&query=${encodeURIComponent(place)}`
+  );
   if (!response.success) return MESSAGES.API_ERROR;
 
   const json = response.data;
@@ -53,25 +55,30 @@ async function weather(place) {
   const embed = new EmbedBuilder()
     .setTitle("Weather")
     .setColor(EMBED_COLORS.BOT_EMBED)
-    .setThumbnail(json.current?.weather_icons[0])
+    .setThumbnail(json.current?.weather_icons?.[0] || null)
     .addFields(
       { name: "City", value: json.location?.name || "NA", inline: true },
       { name: "Region", value: json.location?.region || "NA", inline: true },
       { name: "Country", value: json.location?.country || "NA", inline: true },
-      { name: "Weather condition", value: json.current?.weather_descriptions[0] || "NA", inline: true },
-      { name: "Date", value: json.location?.localtime.slice(0, 10) || "NA", inline: true },
-      { name: "Time", value: json.location?.localtime.slice(11, 16) || "NA", inline: true },
-      { name: "Temperature", value: `${json.current?.temperature}°C`, inline: true },
-      { name: "CloudCover", value: `${json.current?.cloudcover}%`, inline: true },
-      { name: "Wind Speed", value: `${json.current?.wind_speed} km/h`, inline: true },
+      { name: "Weather condition", value: json.current?.weather_descriptions?.[0] || "NA", inline: true },
+      { name: "Date", value: json.location?.localtime?.slice(0, 10) || "NA", inline: true },
+      { name: "Time", value: json.location?.localtime?.slice(11, 16) || "NA", inline: true },
+      { name: "Temperature", value: formatValue(json.current?.temperature, "°C"), inline: true },
+      { name: "CloudCover", value: formatValue(json.current?.cloudcover, "%"), inline: true },
+      { name: "Wind Speed", value: formatValue(json.current?.wind_speed, " km/h"), inline: true },
       { name: "Wind Direction", value: json.current?.wind_dir || "NA", inline: true },
-      { name: "Pressure", value: `${json.current?.pressure} mb`, inline: true },
-      { name: "Precipitation", value: `${json.current?.precip.toString()} mm`, inline: true },
-      { name: "Humidity", value: json.current?.humidity.toString() || "NA", inline: true },
-      { name: "Visual Distance", value: `${json.current?.visibility} km`, inline: true },
-      { name: "UV Index", value: json.current?.uv_index.toString() || "NA", inline: true }
+      { name: "Pressure", value: formatValue(json.current?.pressure, " mb"), inline: true },
+      { name: "Precipitation", value: formatValue(json.current?.precip, " mm"), inline: true },
+      { name: "Humidity", value: formatValue(json.current?.humidity, "%"), inline: true },
+      { name: "Visual Distance", value: formatValue(json.current?.visibility, " km"), inline: true },
+      { name: "UV Index", value: formatValue(json.current?.uv_index), inline: true }
     )
-    .setFooter({ text: `Last checked at ${json.current?.observation_time} GMT` });
+    .setFooter({ text: `Last checked at ${json.current?.observation_time || "NA"} GMT` });
 
   return { embeds: [embed] };
+}
+
+function formatValue(value, suffix = "") {
+  if (value === null || value === undefined || value === "") return "NA";
+  return `${value}${suffix}`;
 }

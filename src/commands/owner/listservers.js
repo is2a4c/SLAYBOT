@@ -60,7 +60,7 @@ module.exports = {
 
         let settings = await getSettings(server).catch(() => null);
 
-        const inviteUrl = settings?.inviteUrl ? settings.inviteUrl : settings.data.inviteUrl;
+        const inviteUrl = settings?.data?.inviteUrl;
 
         description += `**${server.name}** \`(${server.id})\`\n`;
         description += `👑 ${owner ? owner.username : server.ownerId}\n`;

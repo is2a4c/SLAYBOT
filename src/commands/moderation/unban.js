@@ -88,7 +88,7 @@ async function getMatchingBans(guild, match) {
   if (matched.length === 0) return `No user found matching ${match}`;
 
   const options = [];
-  for (const user of matched) {
+  for (const user of matched.slice(0, 25)) {
     options.push({ label: user.globalName || user.username, value: user.id });
   }
 
@@ -114,6 +114,7 @@ async function waitForBan(issuer, reason, sent) {
 
   //
   collector.on("collect", async (response) => {
+    await response.deferUpdate();
     const userId = response.values[0];
     const user = await issuer.client.users.fetch(userId, { cache: true });
 

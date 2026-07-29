@@ -133,7 +133,7 @@ async function embedSetup(channel, member) {
   const modal = await btnInteraction
     .awaitModalSubmit({
       time: 1 * 60 * 1000,
-      filter: (m) => m.customId === "EMBED_MODAL" && m.member.id === member.id && m.message.id === sentMsg.id,
+      filter: (m) => m.customId === "EMBED_MODAL" && m.member.id === member.id && m.message?.id === sentMsg.id,
     })
     .catch((ex) => {});
 
@@ -172,8 +172,10 @@ async function embedSetup(channel, member) {
 
   const collector = channel.createMessageComponentCollector({
     componentType: ComponentType.Button,
-    filter: (i) => i.member.id === member.id,
-    message: sentMsg,
+    filter: (i) =>
+      i.member.id === member.id &&
+      i.message.id === sentMsg.id &&
+      ["EMBED_FIELD_ADD", "EMBED_FIELD_REM", "EMBED_FIELD_DONE"].includes(i.customId),
     idle: 5 * 60 * 1000,
   });
 
@@ -214,7 +216,8 @@ async function embedSetup(channel, member) {
       const modal = await interaction
         .awaitModalSubmit({
           time: 5 * 60 * 1000,
-          filter: (m) => m.customId === "EMBED_ADD_FIELD_MODAL" && m.member.id === member.id,
+          filter: (m) =>
+            m.customId === "EMBED_ADD_FIELD_MODAL" && m.member.id === member.id && m.message?.id === sentMsg.id,
         })
         .catch((ex) => {});
 
@@ -249,6 +252,7 @@ async function embedSetup(channel, member) {
 
     // done
     else if (interaction.customId === "EMBED_FIELD_DONE") {
+      await interaction.deferUpdate();
       return collector.stop();
     }
 
