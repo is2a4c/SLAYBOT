@@ -55,22 +55,29 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
+    env:
+      LAVALINK_LOCAL_PASSWORD: ${{ secrets.LAVALINK_LOCAL_PASSWORD }}
     steps:
       - name: Reload and verify the bot
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          LAVALINK_LOCAL_PASSWORD: ${{ env.LAVALINK_LOCAL_PASSWORD }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script_stop: true
+          envs: LAVALINK_LOCAL_PASSWORD
           script: |
             set -e
             cd /opt/slaybot
             pm2 reload slaybot --update-env
             sleep 12
             pm2 describe slaybot | grep -E "status.*online"
-            curl -fsS --max-time 5 http://127.0.0.1:2333/version
+            curl -fsS --max-time 5 \
+              -H "Authorization: $LAVALINK_LOCAL_PASSWORD" \
+              http://127.0.0.1:2333/version
             tail -n 100 "$HOME/.pm2/logs/slaybot-out.log" |
               grep -F 'Node "local-lavalink" connected' |
               tail -1
