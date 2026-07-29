@@ -286,6 +286,9 @@ function applySmartInviteEnvironment(config) {
   if (process.env.SMART_INVITES_BASE_URL) {
     smartInvites.baseURL = process.env.SMART_INVITES_BASE_URL;
   }
+  if (process.env.SMART_INVITES_HOST) {
+    smartInvites.host = process.env.SMART_INVITES_HOST;
+  }
   if (process.env.SMART_INVITES_OFFICIAL_GUILD_ID) {
     smartInvites.officialGuildId = process.env.SMART_INVITES_OFFICIAL_GUILD_ID;
   }

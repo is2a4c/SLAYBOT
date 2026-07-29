@@ -124,18 +124,22 @@ test("applies explicit Smart Invites production environment overrides", () => {
   const previous = {
     enabled: process.env.SMART_INVITES_ENABLED,
     baseURL: process.env.SMART_INVITES_BASE_URL,
+    host: process.env.SMART_INVITES_HOST,
     guildId: process.env.SMART_INVITES_OFFICIAL_GUILD_ID,
   };
   process.env.SMART_INVITES_ENABLED = "true";
   process.env.SMART_INVITES_BASE_URL = "https://slaybot.televibe.host";
+  process.env.SMART_INVITES_HOST = "0.0.0.0";
   process.env.SMART_INVITES_OFFICIAL_GUILD_ID = "1229090248273957046";
   const config = { SMART_INVITES: { ...baseConfig, enabled: false, officialGuildId: "" } };
   applySmartInviteEnvironment(config);
   assert.equal(config.SMART_INVITES.enabled, true);
   assert.equal(config.SMART_INVITES.baseURL, "https://slaybot.televibe.host");
+  assert.equal(config.SMART_INVITES.host, "0.0.0.0");
   assert.equal(config.SMART_INVITES.officialGuildId, "1229090248273957046");
   restoreEnvironment("SMART_INVITES_ENABLED", previous.enabled);
   restoreEnvironment("SMART_INVITES_BASE_URL", previous.baseURL);
+  restoreEnvironment("SMART_INVITES_HOST", previous.host);
   restoreEnvironment("SMART_INVITES_OFFICIAL_GUILD_ID", previous.guildId);
 });
 
