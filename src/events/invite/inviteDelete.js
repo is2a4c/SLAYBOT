@@ -11,4 +11,8 @@ module.exports = async (client, invite) => {
   if (cachedInvites && cachedInvites.get(invite.code)) {
     cachedInvites.get(invite.code).deletedTimestamp = Date.now();
   }
+
+  if (client.smartInvites) {
+    await client.smartInvites.handleInviteDeleted(invite);
+  }
 };

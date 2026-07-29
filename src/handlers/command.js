@@ -161,7 +161,7 @@ module.exports = {
       const settings = await getSettings(interaction.guild);
       await cmd.interactionRun(interaction, { settings });
     } catch (ex) {
-      await respondToInteractionError(interaction);
+      await respondToInteractionError(interaction, ex);
       interaction.client.logger.error("interactionRun", ex);
     } finally {
       if (cmd.cooldown > 0) applyCooldown(interaction.user.id, cmd);
@@ -246,9 +246,9 @@ function getRemainingCooldown(memberId, cmd) {
 /**
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
-async function respondToInteractionError(interaction) {
+async function respondToInteractionError(interaction, error) {
   await interaction.safeFollowUp({
-    content: "Oops! An error occurred while running the command",
+    content: error?.safeMessage || "Oops! An error occurred while running the command",
     ephemeral: true,
   });
 }

@@ -44,6 +44,9 @@ process.on("unhandledRejection", (err) => client.logger.error(`Unhandled excepti
 
 async function shutdown(signal) {
   client.logger.log(`Received ${signal}, shutting down`);
+  await require("@src/services/smart-invites/runtime")
+    .stop(client)
+    .catch(() => {});
   await require("@src/slaynode/control/runtime")
     .stop()
     .catch(() => {});

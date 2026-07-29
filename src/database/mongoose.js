@@ -30,5 +30,7 @@ module.exports = {
     Suggestions: require("./schemas/Suggestions").model,
     BlockedServer: require("./schemas/BlockedServer"),
     SlayNode: require("./schemas/slaynode"),
+    SmartInvite: require("./schemas/SmartInvite"),
+    SmartInviteControl: require("./schemas/SmartInviteControl"),
   },
 };

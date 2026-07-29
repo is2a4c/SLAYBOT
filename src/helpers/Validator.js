@@ -3,6 +3,7 @@ const permissions = require("./permissions");
 const config = require("@root/config");
 const { log, warn, error } = require("./Logger");
 const { ApplicationCommandType } = require("discord.js");
+const { validateSmartInviteConfiguration } = require("@src/services/smart-invites/config");
 
 module.exports = class Validator {
   static validateConfiguration() {
@@ -21,6 +22,12 @@ module.exports = class Validator {
     }
     if (config.SLAYNODE?.enabled && (!process.env.SLAYNODE_MASTER_KEY || process.env.SLAYNODE_MASTER_KEY.length < 32)) {
       error("env: SLAYNODE_MASTER_KEY must contain at least 32 characters when SlayNode is enabled");
+      process.exit(1);
+    }
+
+    const smartInviteErrors = validateSmartInviteConfiguration(config.SMART_INVITES);
+    if (smartInviteErrors.length > 0) {
+      smartInviteErrors.forEach((message) => error(`config.js: ${message}`));
       process.exit(1);
     }
 
