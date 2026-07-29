@@ -257,10 +257,7 @@ test("io.net vision sends multiple prepared regions in one authenticated request
     assert.equal(request.url, "https://api.intelligence.io.solutions/api/v1/chat/completions");
     assert.equal(request.options.headers.Authorization, "Bearer test-secret");
     assert.equal(request.body.model, "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8");
-    assert.equal(
-      request.body.messages[0].content.filter((item) => item.type === "image_url").length,
-      2
-    );
+    assert.equal(request.body.messages[0].content.filter((item) => item.type === "image_url").length, 2);
     assert.match(request.body.messages[0].content[1].image_url.url, /^data:image\/png;base64,/);
   } finally {
     global.fetch = previousFetch;

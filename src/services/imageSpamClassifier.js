@@ -241,8 +241,7 @@ async function runIoVision(buffers, caption, ocrHint = "") {
   if (!apiKey) throw new Error("IO_INTELLIGENCE_API_KEY is not configured");
 
   const requestedTimeout = Number.parseInt(process.env.IMAGE_SPAM_REMOTE_TIMEOUT_MS, 10);
-  const timeoutMs =
-    Number.isInteger(requestedTimeout) && requestedTimeout > 0 ? requestedTimeout : 45_000;
+  const timeoutMs = Number.isInteger(requestedTimeout) && requestedTimeout > 0 ? requestedTimeout : 45_000;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
