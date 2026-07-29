@@ -83,6 +83,14 @@ module.exports = {
     rrCache.set(key, data.roles);
   },
 
+  replaceReactionRoles: async (guildId, channelId, messageId, roles) => {
+    const filter = { guild_id: guildId, channel_id: channelId, message_id: messageId };
+    const data = await Model.findOneAndUpdate(filter, { $set: { roles } }, { upsert: true, new: true }).lean();
+
+    const key = getKey(guildId, channelId, messageId);
+    rrCache.set(key, data.roles);
+  },
+
   removeReactionRole: async (guildId, channelId, messageId) => {
     await Model.deleteOne({
       guild_id: guildId,

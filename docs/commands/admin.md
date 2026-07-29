@@ -192,8 +192,14 @@ _Enabling this feature will allow members to simply react to any message with a 
 
 **Create Reaction Role**
 
-- **Usage**: `!addrr <#channel> <messageId> <role> <emote>`
+- **Usage**: `!addrr <#channel> <messageId> <emote> <role>`
 - **Description**: setup reaction role for the specified message
+
+**Configure Multiple Reaction Roles**
+
+- **Usage**: `!setrr <#channel> <messageId> <emoji @role, emoji @role ...>`
+- **Slash command**: `/setrr channel:#channel message_id:123 pairs:😀 @Member, 🎮 @Gamer`
+- **Description**: validates and replaces all reaction roles for a message in one command (maximum 20)
 
 **Remove Reaction Roles**
 
