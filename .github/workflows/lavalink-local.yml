@@ -12,6 +12,7 @@ on:
           - status
           - diagnostics
           - voice-debug
+          - voice-debug-off
           - install
           - rollback
 
@@ -48,7 +49,12 @@ jobs:
           script: |
             set -e
             cd /opt/slaybot
-            if [ "${{ inputs.action }}" = "voice-debug" ]; then
+            if [ "${{ inputs.action }}" = "voice-debug-off" ]; then
+              rm -f /run/systemd/system/hysteria-lavalink.service.d/voice-debug.conf
+              systemctl daemon-reload
+              systemctl restart hysteria-lavalink.service
+              systemctl is-active hysteria-lavalink.service
+            elif [ "${{ inputs.action }}" = "voice-debug" ]; then
               install -d -m 0755 /run/systemd/system/hysteria-lavalink.service.d
               printf '[Service]\nEnvironment=HYSTERIA_LOG_LEVEL=debug\n' \
                 >/run/systemd/system/hysteria-lavalink.service.d/voice-debug.conf
