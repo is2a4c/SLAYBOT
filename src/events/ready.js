@@ -1,6 +1,7 @@
 const { counterHandler, inviteHandler, presenceHandler } = require("@src/handlers");
 const { cacheReactionRoles } = require("@schemas/ReactionRoles");
 const { getSettings } = require("@schemas/Guild");
+const { getActiveBlock } = require("@src/services/blockedServers");
 
 /**
  * @param {import('@src/structures').BotClient} client
@@ -44,6 +45,16 @@ module.exports = async (client) => {
   }
 
   for (const guild of client.guilds.cache.values()) {
+    const block = await getActiveBlock(guild.id).catch((error) => {
+      client.logger.error(`Failed to check server block for ${guild.id}`, error);
+      return null;
+    });
+    if (block) {
+      client.logger.warn(`Leaving blocked guild on startup: ${guild.name} (${guild.id})`);
+      await guild.leave().catch((error) => client.logger.error(`Failed to leave blocked guild ${guild.id}`, error));
+      continue;
+    }
+
     const settings = await getSettings(guild);
 
     // initialize counter

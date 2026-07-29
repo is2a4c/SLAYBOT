@@ -1,5 +1,6 @@
 const { EmbedBuilder, PermissionFlagsBits } = require("discord.js");
 const { getSettings: registerGuild } = require("@schemas/Guild");
+const { getActiveBlock } = require("@src/services/blockedServers");
 
 /**
  * @param {import('@src/structures').BotClient} client
@@ -7,6 +8,16 @@ const { getSettings: registerGuild } = require("@schemas/Guild");
  */
 module.exports = async (client, guild) => {
   if (!guild.available) return;
+  const block = await getActiveBlock(guild.id).catch((error) => {
+    client.logger.error(`Failed to check server block for ${guild.id}`, error);
+    return null;
+  });
+  if (block) {
+    client.logger.warn(`Blocked guild rejected: ${guild.name} (${guild.id})`);
+    await guild.leave().catch((error) => client.logger.error(`Failed to leave blocked guild ${guild.id}`, error));
+    return;
+  }
+
   if (!guild.members.cache.has(guild.ownerId)) await guild.fetchOwner({ cache: true }).catch(() => {});
   client.logger.log(`Guild Joined: ${guild.name} Members: ${guild.memberCount}`);
   await registerGuild(guild);
