@@ -43,6 +43,7 @@ jobs:
       IMAGE_SPAM_E2E_IMAGE: ${{ secrets.IMAGE_SPAM_E2E_IMAGE }}
       SMART_INVITES_ENABLED: ${{ vars.SMART_INVITES_ENABLED }}
       SMART_INVITES_BASE_URL: ${{ vars.SMART_INVITES_BASE_URL }}
+      SMART_INVITES_HOST: ${{ vars.SMART_INVITES_HOST }}
       SMART_INVITES_OFFICIAL_GUILD_ID: ${{ vars.SMART_INVITES_OFFICIAL_GUILD_ID }}
     steps:
       - uses: actions/checkout@v4
@@ -87,6 +88,7 @@ jobs:
           IMAGE_SPAM_E2E_IMAGE: ${{ env.IMAGE_SPAM_E2E_IMAGE }}
           SMART_INVITES_ENABLED: ${{ env.SMART_INVITES_ENABLED }}
           SMART_INVITES_BASE_URL: ${{ env.SMART_INVITES_BASE_URL }}
+          SMART_INVITES_HOST: ${{ env.SMART_INVITES_HOST }}
           SMART_INVITES_OFFICIAL_GUILD_ID: ${{ env.SMART_INVITES_OFFICIAL_GUILD_ID }}
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -94,7 +96,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script_stop: true
-          envs: BOT_TOKEN,MONGO_CONNECTION,ERROR_LOGS,JOIN_LEAVE_LOGS,BOT_SECRET,SESSION_PASSWORD,WEATHERSTACK_KEY,STRANGE_API_KEY,SPOTIFY_CLIENT_ID,SPOTIFY_CLIENT_SECRET,LAVALINK_LOCAL_PASSWORD,IMAGE_SPAM_E2E_IMAGE,SMART_INVITES_ENABLED,SMART_INVITES_BASE_URL,SMART_INVITES_OFFICIAL_GUILD_ID
+          envs: BOT_TOKEN,MONGO_CONNECTION,ERROR_LOGS,JOIN_LEAVE_LOGS,BOT_SECRET,SESSION_PASSWORD,WEATHERSTACK_KEY,STRANGE_API_KEY,SPOTIFY_CLIENT_ID,SPOTIFY_CLIENT_SECRET,LAVALINK_LOCAL_PASSWORD,IMAGE_SPAM_E2E_IMAGE,SMART_INVITES_ENABLED,SMART_INVITES_BASE_URL,SMART_INVITES_HOST,SMART_INVITES_OFFICIAL_GUILD_ID
           script: |
             set -e
 
@@ -119,7 +121,7 @@ jobs:
             # Update server .env from GitHub secrets.
             # Skipped when the BOT_TOKEN secret is empty so an existing server .env is never wiped.
             if [ -n "$BOT_TOKEN" ]; then
-              node -e 'const fs=require("fs"); const keys=["BOT_TOKEN","MONGO_CONNECTION","ERROR_LOGS","JOIN_LEAVE_LOGS","BOT_SECRET","SESSION_PASSWORD","WEATHERSTACK_KEY","STRANGE_API_KEY","SPOTIFY_CLIENT_ID","SPOTIFY_CLIENT_SECRET","LAVALINK_LOCAL_PASSWORD","SMART_INVITES_ENABLED","SMART_INVITES_BASE_URL","SMART_INVITES_OFFICIAL_GUILD_ID"]; fs.writeFileSync(".env", keys.map((key)=>`${key}=${process.env[key]||""}`).join("\n")+"\n", {mode:0o600});'
+              node -e 'const fs=require("fs"); const keys=["BOT_TOKEN","MONGO_CONNECTION","ERROR_LOGS","JOIN_LEAVE_LOGS","BOT_SECRET","SESSION_PASSWORD","WEATHERSTACK_KEY","STRANGE_API_KEY","SPOTIFY_CLIENT_ID","SPOTIFY_CLIENT_SECRET","LAVALINK_LOCAL_PASSWORD","SMART_INVITES_ENABLED","SMART_INVITES_BASE_URL","SMART_INVITES_HOST","SMART_INVITES_OFFICIAL_GUILD_ID"]; fs.writeFileSync(".env", keys.map((key)=>`${key}=${process.env[key]||""}`).join("\n")+"\n", {mode:0o600});'
             else
               echo "BOT_TOKEN secret is empty; keeping existing server .env"
             fi
