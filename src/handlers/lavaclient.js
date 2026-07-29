@@ -2,31 +2,24 @@ const { EmbedBuilder } = require("discord.js");
 const { Cluster } = require("lavaclient");
 const prettyMs = require("pretty-ms");
 const { load: loadSpotify, SpotifyItemType } = require("@lavaclient/spotify");
-const { Queue, LoopType, load: loadQueue } = require("@lavaclient/queue");
+const { Queue, load: loadQueue } = require("@lavaclient/queue");
+const { mayStartNext } = require("@lavaclient/types/v3");
 const { getLavalinkNodes } = require("@helpers/LavalinkNodes");
 
-const LAVALINK_V4_MAY_START_NEXT = {
+Object.assign(mayStartNext, {
   finished: true,
   loadFailed: true,
   stopped: false,
   replaced: false,
   cleanup: false,
-};
+});
 
 loadQueue((player) => {
-  const queue = new Queue(player, {
+  return new Queue(player, {
     play: async (_queue, song) => {
       await player.play(song.track);
     },
   });
-
-  player.on("trackEnd", async (_track, reason) => {
-    if (!Object.prototype.hasOwnProperty.call(LAVALINK_V4_MAY_START_NEXT, reason)) return;
-    if (!LAVALINK_V4_MAY_START_NEXT[reason]) return;
-    await startNextTrack(queue);
-  });
-
-  return queue;
 });
 
 /**
@@ -153,7 +146,18 @@ function normalizeNodes(nodes, client) {
 
 function addLegacyPlayerAliases(lavaclient, client) {
   lavaclient.getPlayer = (guildId) => wrapLegacyPlayer(lavaclient.players.resolve(guildId));
-  lavaclient.createPlayer = (guildId) => wrapLegacyPlayer(lavaclient.players.create(guildId));
+  lavaclient.createPlayer = (guildId, options = {}) => {
+    const existing = lavaclient.players.resolve(guildId);
+    if (existing) return wrapLegacyPlayer(existing);
+
+    const excluded = new Set(options.excludedNodeIdentifiers || []);
+    if (!excluded.size) return wrapLegacyPlayer(lavaclient.players.create(guildId));
+
+    const node = selectFallbackNode(lavaclient.nodes.values(), excluded);
+
+    if (!node) throw new Error("No fallback Lavalink nodes available");
+    return wrapLegacyPlayer(node.players.create(guildId));
+  };
   lavaclient.destroyPlayer = (guildId) => lavaclient.players.destroy(guildId, true);
   lavaclient.handleVoiceUpdate = (data) => {
     const player = lavaclient.players.resolve(data.guild_id);
@@ -180,30 +184,10 @@ function wrapLegacyPlayer(player) {
   return player;
 }
 
-async function startNextTrack(queue) {
-  queue.last = queue.current;
-
-  if (queue.current) {
-    switch (queue.loop.type) {
-      case LoopType.Song:
-        await queue.options.play(queue, queue.current);
-        return;
-
-      case LoopType.Queue:
-        queue.previous.push(queue.current);
-        break;
-
-      case LoopType.None:
-        break;
-    }
-
-    queue.emit("trackEnd", queue.current);
-  }
-
-  if (!queue.tracks.length) {
-    queue.tracks = queue.previous;
-    queue.previous = [];
-  }
-
-  await queue.next();
+function selectFallbackNode(nodes, excludedNodeIdentifiers) {
+  return [...nodes]
+    .filter((candidate) => candidate.ws.active && !excludedNodeIdentifiers.has(candidate.identifier))
+    .sort((left, right) => left.penalties.calculate() - right.penalties.calculate())[0];
 }
+
+module.exports.selectFallbackNode = selectFallbackNode;

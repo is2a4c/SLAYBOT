@@ -2,7 +2,7 @@
 
 require("module-alias/register");
 require("@helpers/ConfigDefaults").applyConfigDefaults();
-require("@handlers/lavaclient");
+const { selectFallbackNode } = require("@handlers/lavaclient");
 
 const { EventEmitter } = require("events");
 const { Player } = require("lavaclient");
@@ -55,6 +55,20 @@ async function assertLavalinkV4ReasonStartsNext() {
   }
 }
 
+async function assertLavalinkV4LoadFailureStartsNext() {
+  const player = createFakePlayer();
+  const queue = player.queue;
+
+  queue.add([track("broken"), track("fallback")]);
+  await queue.start();
+  player.emit("trackEnd", { encoded: "encoded-broken" }, "loadFailed");
+  await waitForQueueHandler();
+
+  if (player.played.join(",") !== "encoded-broken,encoded-fallback") {
+    throw new Error(`expected lower-case loadFailed to start next track, got ${JSON.stringify(player.played)}`);
+  }
+}
+
 async function assertReplacedDoesNotStartNext() {
   const player = createFakePlayer();
   const queue = player.queue;
@@ -69,9 +83,27 @@ async function assertReplacedDoesNotStartNext() {
   }
 }
 
+function assertFallbackNodeSelection() {
+  const node = (identifier, active, penalty) => ({
+    identifier,
+    ws: { active },
+    penalties: { calculate: () => penalty },
+  });
+  const selected = selectFallbackNode(
+    [node("local-lavalink", true, 0), node("public-a", true, 5), node("public-b", false, 1)],
+    new Set(["local-lavalink"])
+  );
+
+  if (selected?.identifier !== "public-a") {
+    throw new Error(`expected active public fallback, got ${selected?.identifier || "none"}`);
+  }
+}
+
 (async () => {
   await assertLavalinkV4ReasonStartsNext();
+  await assertLavalinkV4LoadFailureStartsNext();
   await assertReplacedDoesNotStartNext();
+  assertFallbackNodeSelection();
   console.log("Music queue check passed");
 })().catch((error) => {
   console.error(error);

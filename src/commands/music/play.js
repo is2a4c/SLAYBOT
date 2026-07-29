@@ -215,22 +215,36 @@ async function play({ member, guild, channel }, query) {
 
   // create a player and/or join the member's vc
   if (!player?.connected) {
-    try {
-      player = mm.createPlayer(guild.id);
-      player.queue.data.channel = channel;
-      guild.client.logger.log(`Music voice connect requested for guild=${guild.id}, channel=${voiceChannel.id}`);
-      player.connect(voiceChannel.id, { deafened: true });
-      await waitForVoiceConnection(player, voiceChannel.id);
-      guild.client.logger.log(
-        `Music voice connected for guild=${guild.id}, channel=${voiceChannel.id}, node=${player.node.identifier}`
-      );
-    } catch (error) {
-      guild.client.logger.error(
-        `Music voice connection failed for guild=${guild.id}, channel=${voiceChannel.id}`,
-        toError(error)
-      );
-      player?.disconnect();
-      await mm.destroyPlayer(guild.id).catch(() => {});
+    const excludedNodeIdentifiers = new Set();
+    const maxAttempts = Math.max(1, mm.nodes?.size || 1);
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        player ||= mm.createPlayer(guild.id, { excludedNodeIdentifiers });
+        player.queue.data.channel = channel;
+        guild.client.logger.log(
+          `Music voice connect requested for guild=${guild.id}, channel=${voiceChannel.id}, node=${player.node.identifier}`
+        );
+        player.connect(voiceChannel.id, { deafened: true });
+        await waitForVoiceConnection(player, voiceChannel.id);
+        guild.client.logger.log(
+          `Music voice connected for guild=${guild.id}, channel=${voiceChannel.id}, node=${player.node.identifier}`
+        );
+        break;
+      } catch (error) {
+        const failedNodeIdentifier = player?.node?.identifier;
+        if (failedNodeIdentifier) excludedNodeIdentifiers.add(failedNodeIdentifier);
+        guild.client.logger.error(
+          `Music voice connection failed for guild=${guild.id}, channel=${voiceChannel.id}, node=${failedNodeIdentifier || "unknown"}`,
+          toError(error)
+        );
+        player?.disconnect();
+        await mm.destroyPlayer(guild.id).catch(() => {});
+        player = null;
+      }
+    }
+
+    if (!player?.connected) {
       return "🚫 I could not connect to your voice channel. Check my channel permissions and try again";
     }
   }
