@@ -52,9 +52,14 @@ jobs:
               echo "=== Lavalink journal ==="
               journalctl -u lavalink.service --since "30 minutes ago" --no-pager |
                 tail -n 250 || true
+              echo "=== Lavalink file log ==="
+              tail -n 300 /opt/lavalink/logs/*.log 2>/dev/null || true
               echo "=== Hysteria journal ==="
               journalctl -u hysteria-lavalink.service --since "30 minutes ago" --no-pager |
                 tail -n 120 || true
+              echo "=== Routing counters ==="
+              iptables -t mangle -L LAVALINK_MARK -n -v || true
+              iptables -t mangle -L LAVALINK_TPROXY -n -v || true
               echo "=== Bot music log ==="
               grep -hE "Music voice|Track(Start|End|Exception|Stuck)|Lavalink|local-lavalink" \
                 logs/combined-*.log 2>/dev/null | tail -n 200 || true
