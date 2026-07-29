@@ -170,8 +170,8 @@ write_configuration() {
     printf 'auth: %s\n' "$HYSTERIA_AUTH"
     printf 'tls:\n  sni: %s\n  insecure: false\n' "$HYSTERIA_SNI"
     printf 'quic:\n  keepAlivePeriod: 10s\n'
-    printf 'tcpTProxy:\n  listen: 127.0.0.1:%s\n' "$TPROXY_PORT"
-    printf 'udpTProxy:\n  listen: 127.0.0.1:%s\n  timeout: 2m\n' "$TPROXY_PORT"
+    printf 'tcpTProxy:\n  listen: :%s\n' "$TPROXY_PORT"
+    printf 'udpTProxy:\n  listen: :%s\n  timeout: 2m\n' "$TPROXY_PORT"
   } >/etc/hysteria-lavalink/config.yaml
   chown hysteria-lavalink:hysteria-lavalink /etc/hysteria-lavalink/config.yaml
   chmod 0600 /etc/hysteria-lavalink/config.yaml
@@ -224,7 +224,11 @@ iptables -t mangle -A LAVALINK_MARK -m owner --uid-owner lavalink -p udp -j MARK
 iptables -t mangle -A OUTPUT -j LAVALINK_MARK
 
 iptables -t mangle -N LAVALINK_TPROXY
-iptables -t mangle -A LAVALINK_TPROXY -m mark ! --mark "$MARK" -j RETURN
+iptables -t mangle -A LAVALINK_TPROXY -p tcp -m socket --transparent \
+  -j MARK --set-mark "$MARK"
+iptables -t mangle -A LAVALINK_TPROXY -p udp -m socket --transparent \
+  -j MARK --set-mark "$MARK"
+iptables -t mangle -A LAVALINK_TPROXY -m socket -j RETURN
 for subnet in \
   0.0.0.0/8 10.0.0.0/8 127.0.0.0/8 169.254.0.0/16 \
   172.16.0.0/12 192.168.0.0/16 224.0.0.0/4 240.0.0.0/4; do
