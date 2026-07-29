@@ -109,10 +109,25 @@ validate_inputs() {
 }
 
 install_packages() {
+  local java_package
+
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq
+
+  for java_package in openjdk-21-jre-headless openjdk-17-jre-headless; do
+    if apt-cache show "$java_package" >/dev/null 2>&1; then
+      break
+    fi
+    java_package=""
+  done
+
+  [[ -n "$java_package" ]] || {
+    echo "No supported Java runtime (21 or 17) is available" >&2
+    exit 1
+  }
+
   apt-get install -y --no-install-recommends \
-    ca-certificates curl iproute2 iptables jq libcap2-bin openjdk-17-jre-headless
+    ca-certificates curl iproute2 iptables jq libcap2-bin "$java_package"
 }
 
 install_binaries() {
