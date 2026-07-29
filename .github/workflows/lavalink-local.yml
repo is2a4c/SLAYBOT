@@ -4,12 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: Install, inspect, or roll back the isolated Lavalink stack
+        description: Install, diagnose, inspect, or roll back the isolated Lavalink stack
         required: true
         default: status
         type: choice
         options:
           - status
+          - diagnostics
           - install
           - rollback
 
@@ -46,7 +47,20 @@ jobs:
           script: |
             set -e
             cd /opt/slaybot
-            bash ops/lavalink/install.sh "${{ inputs.action }}"
+            if [ "${{ inputs.action }}" = "diagnostics" ]; then
+              bash ops/lavalink/install.sh status
+              echo "=== Lavalink journal ==="
+              journalctl -u lavalink.service --since "30 minutes ago" --no-pager |
+                tail -n 250 || true
+              echo "=== Hysteria journal ==="
+              journalctl -u hysteria-lavalink.service --since "30 minutes ago" --no-pager |
+                tail -n 120 || true
+              echo "=== Bot music log ==="
+              grep -hE "Music voice|Track(Start|End|Exception|Stuck)|Lavalink|local-lavalink" \
+                logs/combined-*.log 2>/dev/null | tail -n 200 || true
+            else
+              bash ops/lavalink/install.sh "${{ inputs.action }}"
+            fi
 
   reconnect-bot:
     name: Reconnect SLAYBOT
