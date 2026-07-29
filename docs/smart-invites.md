@@ -80,7 +80,6 @@ Invite валидируется не чаще `validationTtlMs`. Удалени�
 
 - `baseURL` — канонический URL без доверия заголовку `Host`;
 - `host`/`port` — локальный listener, по умолчанию `127.0.0.1:8081`;
-- `tlsEnabled`, `tlsKeyPath`, `tlsCertPath` — TLS внутреннего listener;
 - `maxPerGuild` — лимит активных ссылок, по умолчанию 5;
 - `redirectMode` — `preview` или `redirect`;
 - validation, scheduler, lease, alias и deleted-slug retention intervals;
@@ -114,11 +113,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/slaybot.televibe.host/privkey.pem;
 
     location / {
-        proxy_pass https://127.0.0.1:8081;
-        proxy_ssl_trusted_certificate /opt/slaybot/.tls/backend.cert.pem;
-        proxy_ssl_verify on;
-        proxy_ssl_server_name on;
-        proxy_ssl_name slaybot.televibe.host;
+        proxy_pass http://127.0.0.1:8081;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -138,23 +133,13 @@ server {
 
 ```caddy
 slaybot.televibe.host {
-    reverse_proxy https://127.0.0.1:8081 {
-        transport http {
-            tls_trusted_ca_certs /opt/slaybot/.tls/backend.cert.pem
-            tls_server_name slaybot.televibe.host
-        }
-    }
+    reverse_proxy 127.0.0.1:8081
 }
 ```
 
-Production deploy хранит отдельный внутренний сертификат и ключ в
-`/opt/slaybot/.tls`, включает TLS listener через
-`SMART_INVITES_TLS_ENABLED=true` и проверяет сертификат при health-check.
-Это не заменяет публичный сертификат reverse proxy на порту 443.
-
 ## Эксплуатация, backup и диагностика
 
-HTTPS runtime использует уже открытое Mongoose-соединение. Повторный start в
+HTTP runtime использует уже открытое Mongoose-соединение. Повторный start в
 одном процессе идемпотентен. При `SIGINT`/`SIGTERM` listener перестаёт
 принимать запросы, scheduler останавливается, незавершённая работа получает
 ограниченное время, затем закрывается MongoDB.

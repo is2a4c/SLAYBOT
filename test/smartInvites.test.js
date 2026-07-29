@@ -2,11 +2,6 @@ require("module-alias/register");
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { execFileSync } = require("child_process");
-const fs = require("fs");
-const https = require("https");
-const os = require("os");
-const path = require("path");
 const mongoose = require("mongoose");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 const { ChannelType, Collection, PermissionFlagsBits } = require("discord.js");
@@ -32,9 +27,6 @@ const baseConfig = {
   pathPrefix: "",
   host: "127.0.0.1",
   port: 8081,
-  tlsEnabled: false,
-  tlsKeyPath: ".tls/backend.key.pem",
-  tlsCertPath: ".tls/backend.cert.pem",
   maxPerGuild: 5,
   validationTtlMs: 300000,
   healthCheckIntervalMs: 900000,
@@ -133,25 +125,21 @@ test("applies explicit Smart Invites production environment overrides", () => {
     enabled: process.env.SMART_INVITES_ENABLED,
     baseURL: process.env.SMART_INVITES_BASE_URL,
     host: process.env.SMART_INVITES_HOST,
-    tlsEnabled: process.env.SMART_INVITES_TLS_ENABLED,
     guildId: process.env.SMART_INVITES_OFFICIAL_GUILD_ID,
   };
   process.env.SMART_INVITES_ENABLED = "true";
   process.env.SMART_INVITES_BASE_URL = "https://slaybot.televibe.host";
   process.env.SMART_INVITES_HOST = "0.0.0.0";
-  process.env.SMART_INVITES_TLS_ENABLED = "true";
   process.env.SMART_INVITES_OFFICIAL_GUILD_ID = "1229090248273957046";
   const config = { SMART_INVITES: { ...baseConfig, enabled: false, officialGuildId: "" } };
   applySmartInviteEnvironment(config);
   assert.equal(config.SMART_INVITES.enabled, true);
   assert.equal(config.SMART_INVITES.baseURL, "https://slaybot.televibe.host");
   assert.equal(config.SMART_INVITES.host, "0.0.0.0");
-  assert.equal(config.SMART_INVITES.tlsEnabled, true);
   assert.equal(config.SMART_INVITES.officialGuildId, "1229090248273957046");
   restoreEnvironment("SMART_INVITES_ENABLED", previous.enabled);
   restoreEnvironment("SMART_INVITES_BASE_URL", previous.baseURL);
   restoreEnvironment("SMART_INVITES_HOST", previous.host);
-  restoreEnvironment("SMART_INVITES_TLS_ENABLED", previous.tlsEnabled);
   restoreEnvironment("SMART_INVITES_OFFICIAL_GUILD_ID", previous.guildId);
 });
 
@@ -501,7 +489,7 @@ test("invite tracking cache synchronization does not count a technical invite as
   }
 });
 
-test("runtime stays disabled or starts once and shuts its web server down", async () => {
+test("runtime stays disabled or starts once and shuts its HTTP server down", async () => {
   const disabled = createFixture({ enabled: false });
   assert.equal(await runtime.start(disabled.client), null);
 
@@ -514,69 +502,6 @@ test("runtime stays disabled or starts once and shuts its web server down", asyn
   assert.equal(await runtime.start(enabled.client), started);
   await runtime.stop(enabled.client);
   assert.equal(started.server.listening, false);
-});
-
-test("runtime serves Smart Invites over verified TLS", async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slaybot-smart-invites-tls-"));
-  const keyPath = path.join(directory, "backend.key.pem");
-  const certPath = path.join(directory, "backend.cert.pem");
-  let server;
-  try {
-    execFileSync(
-      "openssl",
-      [
-        "req",
-        "-x509",
-        "-newkey",
-        "rsa:2048",
-        "-sha256",
-        "-nodes",
-        "-days",
-        "1",
-        "-subj",
-        "/CN=slaybot.televibe.host",
-        "-addext",
-        "subjectAltName=DNS:slaybot.televibe.host,IP:127.0.0.1",
-        "-keyout",
-        keyPath,
-        "-out",
-        certPath,
-      ],
-      { stdio: "ignore" }
-    );
-    server = await runtime.createSmartInvitesServer((_request, response) => response.end('{"status":"ok"}'), {
-      tlsEnabled: true,
-      tlsKeyPath: keyPath,
-      tlsCertPath: certPath,
-    });
-    await new Promise((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(0, "127.0.0.1", resolve);
-    });
-    const body = await new Promise((resolve, reject) => {
-      https
-        .get(
-          {
-            hostname: "127.0.0.1",
-            port: server.address().port,
-            path: "/health",
-            ca: fs.readFileSync(certPath),
-            servername: "slaybot.televibe.host",
-          },
-          (response) => {
-            let value = "";
-            response.setEncoding("utf8");
-            response.on("data", (chunk) => (value += chunk));
-            response.on("end", () => resolve(value));
-          }
-        )
-        .on("error", reject);
-    });
-    assert.equal(body, '{"status":"ok"}');
-  } finally {
-    if (server?.listening) await new Promise((resolve) => server.close(resolve));
-    fs.rmSync(directory, { recursive: true, force: true });
-  }
 });
 
 function createFixture(overrides = {}) {
