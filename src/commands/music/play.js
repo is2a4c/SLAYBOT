@@ -1,8 +1,9 @@
-const { EmbedBuilder, ApplicationCommandOptionType } = require("discord.js");
+const { EmbedBuilder, ApplicationCommandOptionType, PermissionFlagsBits } = require("discord.js");
 const prettyMs = require("pretty-ms");
 const { EMBED_COLORS, MUSIC } = require("@root/config");
 const { SpotifyItemType } = require("@lavaclient/spotify");
 const { loadTracks, normalizeLoadResult, toError, toQueueTrack } = require("@helpers/LavalinkUtils");
+const { waitForVoiceConnection } = require("@helpers/VoiceConnection");
 
 const search_prefix = {
   YT: "ytsearch",
@@ -57,6 +58,20 @@ async function play({ member, guild, channel }, query) {
 
   const mm = guild.client.musicManager;
   if (!mm) return "🚫 Music system is not available. Try again later";
+
+  const voiceChannel = member.voice.channel;
+  const voicePermissions = voiceChannel.permissionsFor(guild.members.me);
+  const missingVoicePermissions = [
+    [PermissionFlagsBits.ViewChannel, "View Channel"],
+    [PermissionFlagsBits.Connect, "Connect"],
+    [PermissionFlagsBits.Speak, "Speak"],
+  ]
+    .filter(([permission]) => !voicePermissions?.has(permission))
+    .map(([, label]) => label);
+
+  if (missingVoicePermissions.length) {
+    return `🚫 I need these permissions in ${voiceChannel}: ${missingVoicePermissions.join(", ")}`;
+  }
 
   let player = mm.getPlayer(guild.id);
   if (player && !guild.members.me.voice.channel) {
@@ -200,9 +215,24 @@ async function play({ member, guild, channel }, query) {
 
   // create a player and/or join the member's vc
   if (!player?.connected) {
-    player = mm.createPlayer(guild.id);
-    player.queue.data.channel = channel;
-    player.connect(member.voice.channel.id, { deafened: true });
+    try {
+      player = mm.createPlayer(guild.id);
+      player.queue.data.channel = channel;
+      guild.client.logger.log(`Music voice connect requested for guild=${guild.id}, channel=${voiceChannel.id}`);
+      player.connect(voiceChannel.id, { deafened: true });
+      await waitForVoiceConnection(player, voiceChannel.id);
+      guild.client.logger.log(
+        `Music voice connected for guild=${guild.id}, channel=${voiceChannel.id}, node=${player.node.identifier}`
+      );
+    } catch (error) {
+      guild.client.logger.error(
+        `Music voice connection failed for guild=${guild.id}, channel=${voiceChannel.id}`,
+        toError(error)
+      );
+      player?.disconnect();
+      await mm.destroyPlayer(guild.id).catch(() => {});
+      return "🚫 I could not connect to your voice channel. Check my channel permissions and try again";
+    }
   }
 
   // do queue things
