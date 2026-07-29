@@ -60,6 +60,9 @@ jobs:
               echo "=== Routing counters ==="
               iptables -t mangle -L LAVALINK_MARK -n -v || true
               iptables -t mangle -L LAVALINK_TPROXY -n -v || true
+              echo "=== Lavalink sockets ==="
+              ss -tpn | grep -E "java|hysteria" || true
+              ss -upn | grep -E "java|hysteria" || true
               echo "=== Bot music log ==="
               grep -hE "Music voice|Track(Start|End|Exception|Stuck)|Lavalink|local-lavalink" \
                 logs/combined-*.log 2>/dev/null | tail -n 200 || true
