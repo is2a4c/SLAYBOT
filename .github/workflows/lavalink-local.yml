@@ -78,5 +78,16 @@ jobs:
             curl -fsS --max-time 5 \
               -H "Authorization: $LAVALINK_LOCAL_PASSWORD" \
               http://127.0.0.1:2333/version
-            tail -n 100 "$HOME/.pm2/logs/slaybot-out.log" |
-              grep -F 'Node "local-lavalink" connected'
+            for _ in $(seq 1 10); do
+              if connection_log="$(
+                grep -hF 'Node \"local-lavalink\" connected' logs/combined-*.log 2>/dev/null
+              )"; then
+                printf '%s\n' "$connection_log" | tail -1
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "No local Lavalink connection was recorded" >&2
+            grep -hE 'local-lavalink|Lavalink|Node "' logs/combined-*.log 2>/dev/null |
+              tail -n 20 >&2 || true
+            exit 1
