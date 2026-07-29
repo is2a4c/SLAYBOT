@@ -163,9 +163,6 @@ const DEFAULT_CONFIG = {
     pathPrefix: "",
     host: "127.0.0.1",
     port: 8081,
-    tlsEnabled: false,
-    tlsKeyPath: ".tls/backend.key.pem",
-    tlsCertPath: ".tls/backend.cert.pem",
     maxPerGuild: 5,
     validationTtlMs: 300000,
     healthCheckIntervalMs: 900000,
@@ -291,9 +288,6 @@ function applySmartInviteEnvironment(config) {
   }
   if (process.env.SMART_INVITES_HOST) {
     smartInvites.host = process.env.SMART_INVITES_HOST;
-  }
-  if (process.env.SMART_INVITES_TLS_ENABLED !== undefined) {
-    smartInvites.tlsEnabled = process.env.SMART_INVITES_TLS_ENABLED === "true";
   }
   if (process.env.SMART_INVITES_OFFICIAL_GUILD_ID) {
     smartInvites.officialGuildId = process.env.SMART_INVITES_OFFICIAL_GUILD_ID;

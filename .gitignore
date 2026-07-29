@@ -1,5 +1,4 @@
 .env
-.tls/
 node_modules/
 logs/*
 config.js
