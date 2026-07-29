@@ -146,6 +146,20 @@ npm run image-spam:check
 > [!NOTE]
 > Image Spam Guard сознательно работает в режиме **fail-open**: сомнительное или неуспешно обработанное изображение не удаляется автоматически. Настройте порог под правила конкретного сервера.
 
+### Whitelist повторяющихся сообщений
+
+Пользователей и роли, которым нужно легитимно отправлять одинаковый текст (например, Discord-ботов и webhook-системы уведомлений), можно вручную исключить только из проверки Anti Spam:
+
+```text
+!anti spam-whitelist user add @NotificationBot
+!anti spam-whitelist role add @Trusted
+
+/anti spam-whitelist-user action:ADD user:@NotificationBot
+/anti spam-whitelist-role action:ADD role:@Trusted
+```
+
+Whitelist не отключает AutoMod целиком: Anti Links, Anti Invites, Anti Attachments, Anti Mass Mention, Image Spam, лимиты строк и упоминаний, а также остальные проверки продолжают работать. Автоматически все боты в whitelist не добавляются. Для управления требуется право **Manage Server** (`ManageGuild`); полный список команд находится в [документации администратора](docs/commands/admin.md#anti-spam-whitelist).
+
 ---
 
 ## <a id="slaynode"></a>🛰️ SlayNode Partner

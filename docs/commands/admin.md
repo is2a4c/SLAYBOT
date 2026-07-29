@@ -48,6 +48,41 @@ or paid service is required. Enable it with `!anti imagespam on 70`. If model
 loading or OCR fails, the message is left untouched.
 | **!anti massmention \<on\|off> \[threshold]** | enable or disable massmention detection (default threshold is 3 mentions] |
 
+#### Anti-Spam Whitelist
+
+The anti-spam whitelist exempts selected users or roles only from the repeated-message check. Anti Links, Anti Invites, Anti Attachments, Anti Mass Mention, Image Spam, line limits, mention limits, strikes, and all other AutoMod checks continue to apply.
+
+This is useful for notification bots and webhook-backed systems that legitimately send the same text often. Bots are never added automatically. A member with **Manage Server** (`ManageGuild`) permission must add each user or role explicitly.
+
+Prefix commands:
+
+```text
+!anti spam-whitelist user add @NotificationBot
+!anti spam-whitelist user remove 123456789012345678
+!anti spam-whitelist user list
+!anti spam-whitelist user clear
+
+!anti spam-whitelist role add @Trusted
+!anti spam-whitelist role remove 345678901234567890
+!anti spam-whitelist role list
+!anti spam-whitelist role clear
+```
+
+Slash commands:
+
+```text
+/anti spam-whitelist-user action:ADD user:@NotificationBot
+/anti spam-whitelist-user action:REMOVE user:@NotificationBot
+/anti spam-whitelist-role action:ADD role:@Trusted
+/anti spam-whitelist-role action:REMOVE role:@Trusted
+/anti spam-whitelist-list
+/anti spam-whitelist-clear target:USERS
+/anti spam-whitelist-clear target:ROLES
+/anti spam-whitelist-clear target:ALL
+```
+
+Raw Discord snowflake IDs are accepted by prefix add/remove commands. Unknown IDs remain stored and are shown as `Unknown User` or `Unknown Role`; the bot does not fetch every guild member or remove entries automatically. `@everyone` and managed integration roles cannot be added.
+
 **Autodelete**
 
 | Name                                   | Description                                                                 |

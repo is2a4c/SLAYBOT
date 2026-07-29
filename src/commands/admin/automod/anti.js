@@ -22,6 +22,10 @@ module.exports = {
         description: "enable or disable antispam detection",
       },
       {
+        trigger: "spam-whitelist <user|role> <add|remove|list|clear> [user|role ID]",
+        description: "manage antispam-only user and role exemptions",
+      },
+      {
         trigger: "imagespam test [caption]",
         description: "owner-only image analysis without deleting the message",
       },
@@ -77,6 +81,75 @@ module.exports = {
                 name: "OFF",
                 value: "OFF",
               },
+            ],
+          },
+        ],
+      },
+      {
+        name: "spam-whitelist-user",
+        description: "add or remove a user from the antispam whitelist",
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: "action",
+            description: "whitelist action",
+            required: true,
+            type: ApplicationCommandOptionType.String,
+            choices: [
+              { name: "ADD", value: "ADD" },
+              { name: "REMOVE", value: "REMOVE" },
+            ],
+          },
+          {
+            name: "user",
+            description: "user to add or remove",
+            required: true,
+            type: ApplicationCommandOptionType.User,
+          },
+        ],
+      },
+      {
+        name: "spam-whitelist-role",
+        description: "add or remove a role from the antispam whitelist",
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: "action",
+            description: "whitelist action",
+            required: true,
+            type: ApplicationCommandOptionType.String,
+            choices: [
+              { name: "ADD", value: "ADD" },
+              { name: "REMOVE", value: "REMOVE" },
+            ],
+          },
+          {
+            name: "role",
+            description: "role to add or remove",
+            required: true,
+            type: ApplicationCommandOptionType.Role,
+          },
+        ],
+      },
+      {
+        name: "spam-whitelist-list",
+        description: "show the antispam user and role whitelist",
+        type: ApplicationCommandOptionType.Subcommand,
+      },
+      {
+        name: "spam-whitelist-clear",
+        description: "clear antispam whitelist entries",
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: "target",
+            description: "entries to clear",
+            required: true,
+            type: ApplicationCommandOptionType.String,
+            choices: [
+              { name: "USERS", value: "USERS" },
+              { name: "ROLES", value: "ROLES" },
+              { name: "ALL", value: "ALL" },
             ],
           },
         ],
@@ -157,6 +230,11 @@ module.exports = {
     }
 
     //
+    else if (sub === "spam-whitelist") {
+      response = await runPrefixWhitelist(message, settings, args.slice(1));
+    }
+
+    //
     else if (sub == "imagespam") {
       if (args[1]?.toLowerCase() !== "test") return message.safeReply("Use `/anti imagespam` to change settings");
       return testImageSpam(message, settings, args.slice(2).join(" "));
@@ -182,7 +260,24 @@ module.exports = {
     let response;
     if (sub == "ghostping") response = await antiGhostPing(settings, interaction.options.getString("status"));
     else if (sub == "spam") response = await antiSpam(settings, interaction.options.getString("status"));
-    else if (sub == "imagespam") {
+    else if (sub === "spam-whitelist-user") {
+      response = await updateWhitelist(
+        settings,
+        "users",
+        interaction.options.getString("action"),
+        interaction.options.getUser("user")?.id
+      );
+    } else if (sub === "spam-whitelist-role") {
+      const role = interaction.options.getRole("role");
+      response = await updateWhitelist(settings, "roles", interaction.options.getString("action"), role?.id, {
+        guild: interaction.guild,
+        role,
+      });
+    } else if (sub === "spam-whitelist-list") {
+      response = formatWhitelist(settings.automod, interaction.guild);
+    } else if (sub === "spam-whitelist-clear") {
+      response = await clearWhitelist(settings, interaction.options.getString("target"));
+    } else if (sub == "imagespam") {
       response = await antiImageSpam(
         settings,
         interaction.options.getString("status"),
@@ -212,6 +307,123 @@ async function antiSpam(settings, input) {
   settings.automod.anti_spam = status;
   await settings.save();
   return `Antispam detection is now ${status ? "enabled" : "disabled"}`;
+}
+
+function normalizeSnowflake(input) {
+  const value = String(input || "").trim();
+  if (/^\d{17,20}$/.test(value)) return value;
+  return value.match(/^<@(?:!?|&)(\d{17,20})>$/)?.[1] || null;
+}
+
+function getWhitelist(settings, target) {
+  const key = target === "users" ? "spam_whitelist_users" : "spam_whitelist_roles";
+  const values = settings.automod[key] || [];
+  settings.automod[key] = [...new Set(values.filter((id) => normalizeSnowflake(id)))];
+  return { key, values: settings.automod[key] };
+}
+
+async function addWhitelistEntry(settings, target, input, context = {}) {
+  const id = normalizeSnowflake(input);
+  if (!id) return `Invalid ${target === "users" ? "user" : "role"} ID.`;
+
+  const { key, values } = getWhitelist(settings, target);
+  if (values.includes(id)) {
+    return `${target === "users" ? "User" : "Role"} \`${id}\` is already in the antispam whitelist.`;
+  }
+
+  if (target === "roles") {
+    const role = context.role || context.guild?.roles?.cache?.get(id);
+    if (id === context.guild?.id) return "The @everyone role cannot be added to the antispam whitelist.";
+    if (role?.managed) return "Managed integration roles cannot be added to the antispam whitelist.";
+  }
+
+  settings.automod[key] = [...values, id];
+  await settings.save();
+  return `${target === "users" ? "User" : "Role"} \`${id}\` was added to the antispam whitelist.`;
+}
+
+async function removeWhitelistEntry(settings, target, input) {
+  const id = normalizeSnowflake(input);
+  if (!id) return `Invalid ${target === "users" ? "user" : "role"} ID.`;
+
+  const { key, values } = getWhitelist(settings, target);
+  if (!values.includes(id)) {
+    return `${target === "users" ? "User" : "Role"} \`${id}\` is not in the antispam whitelist.`;
+  }
+
+  settings.automod[key] = values.filter((entry) => entry !== id);
+  await settings.save();
+  return `${target === "users" ? "User" : "Role"} \`${id}\` was removed from the antispam whitelist.`;
+}
+
+async function clearWhitelist(settings, input) {
+  const target = String(input || "").toLowerCase();
+  if (!["users", "roles", "all"].includes(target)) return "Invalid target. Use `users`, `roles`, or `all`.";
+
+  if (target === "users" || target === "all") settings.automod.spam_whitelist_users = [];
+  if (target === "roles" || target === "all") settings.automod.spam_whitelist_roles = [];
+  await settings.save();
+  return `Cleared antispam whitelist ${target === "all" ? "users and roles" : target}.`;
+}
+
+async function updateWhitelist(settings, target, action, input, context) {
+  if (String(action).toUpperCase() === "ADD") {
+    return addWhitelistEntry(settings, target, input, context);
+  }
+  if (String(action).toUpperCase() === "REMOVE") {
+    return removeWhitelistEntry(settings, target, input);
+  }
+  return "Invalid action. Use `add` or `remove`.";
+}
+
+function formatWhitelist(automod, guild, limit = 1950) {
+  const userIds = [...new Set((automod.spam_whitelist_users || []).filter((id) => normalizeSnowflake(id)))];
+  const roleIds = [...new Set((automod.spam_whitelist_roles || []).filter((id) => normalizeSnowflake(id)))];
+  const userEntries = userIds.map((id) => {
+    const known = guild?.members?.cache?.has(id);
+    return known ? `• <@${id}> (\`${id}\`)` : `• Unknown User (\`${id}\`)`;
+  });
+  const roleEntries = roleIds.map((id) => {
+    const known = guild?.roles?.cache?.has(id);
+    return known ? `• <@&${id}> (\`${id}\`)` : `• Unknown Role (\`${id}\`)`;
+  });
+  const visibleUsers = [...userEntries];
+  const visibleRoles = [...roleEntries];
+
+  const render = () => {
+    const hidden = userEntries.length + roleEntries.length - visibleUsers.length - visibleRoles.length;
+    return [
+      "**Antispam Whitelist**",
+      "",
+      `**Users — ${userIds.length}**`,
+      ...(visibleUsers.length ? visibleUsers : ["• None"]),
+      "",
+      `**Roles — ${roleIds.length}**`,
+      ...(visibleRoles.length ? visibleRoles : ["• None"]),
+      ...(hidden ? [`… and ${hidden} more ${hidden === 1 ? "entry" : "entries"}.`] : []),
+    ].join("\n");
+  };
+
+  while (render().length > limit && (visibleUsers.length || visibleRoles.length)) {
+    if (visibleUsers.length >= visibleRoles.length && visibleUsers.length) visibleUsers.pop();
+    else visibleRoles.pop();
+  }
+  return render().slice(0, limit);
+}
+
+async function runPrefixWhitelist(message, settings, args) {
+  const target = args[0]?.toLowerCase();
+  const action = args[1]?.toLowerCase();
+  if (!["user", "role"].includes(target)) {
+    return "Invalid target. Use `user` or `role`.";
+  }
+  const pluralTarget = `${target}s`;
+  if (action === "list") return formatWhitelist(settings.automod, message.guild);
+  if (action === "clear") return clearWhitelist(settings, pluralTarget);
+  if (!["add", "remove"].includes(action)) {
+    return "Invalid action. Use `add`, `remove`, `list`, or `clear`.";
+  }
+  return updateWhitelist(settings, pluralTarget, action, args[2], { guild: message.guild });
 }
 
 async function antiImageSpam(settings, input, requestedThreshold) {
@@ -280,3 +492,13 @@ async function antiMassMention(settings, input, threshold) {
   await settings.save();
   return `Mass mention detection is now ${status ? "enabled" : "disabled"}`;
 }
+
+Object.assign(module.exports, {
+  normalizeSnowflake,
+  addWhitelistEntry,
+  removeWhitelistEntry,
+  clearWhitelist,
+  updateWhitelist,
+  formatWhitelist,
+  runPrefixWhitelist,
+});

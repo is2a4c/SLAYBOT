@@ -9,6 +9,37 @@ const { classifyImage, isImageAttachment, DEFAULT_THRESHOLD } = require("@src/se
 const antispamCache = new Map();
 const MESSAGE_SPAM_THRESHOLD = 3000;
 
+function isAntiSpamWhitelisted(message, automod) {
+  const userIds = automod.spam_whitelist_users || [];
+  const roleIds = automod.spam_whitelist_roles || [];
+
+  if (userIds.includes(message.author.id)) {
+    return true;
+  }
+
+  if (message.member?.roles?.cache?.some((role) => roleIds.includes(role.id))) {
+    return true;
+  }
+
+  return false;
+}
+
+function isRepeatedMessage(message, timestamp = Date.now()) {
+  const key = message.author.id + "|" + message.guildId;
+  const antispamInfo = antispamCache.get(key);
+  const repeated =
+    antispamInfo?.content === message.content && timestamp - antispamInfo.timestamp < MESSAGE_SPAM_THRESHOLD;
+
+  if (!repeated) {
+    antispamCache.set(key, {
+      content: message.content,
+      timestamp,
+    });
+  }
+
+  return repeated;
+}
+
 // Cleanup the cache
 setInterval(
   () => {
@@ -179,25 +210,12 @@ async function performAutomod(message, settings) {
   }
 
   // Anti Spam
-  if (automod.anti_spam) {
-    const key = author.id + "|" + message.guildId;
-    if (antispamCache.has(key)) {
-      let antispamInfo = antispamCache.get(key);
-      if (antispamInfo.content === content && Date.now() - antispamInfo.timestamp < MESSAGE_SPAM_THRESHOLD) {
-        fields.push({ name: "AntiSpam Detection", value: "✓", inline: true });
-        shouldDelete = true;
-        strikesTotal += 1;
-      } else {
-        antispamCache.set(key, {
-          content,
-          timestamp: Date.now(),
-        });
-      }
-    } else {
-      antispamCache.set(key, {
-        content,
-        timestamp: Date.now(),
-      });
+  const antiSpamWhitelisted = isAntiSpamWhitelisted(message, automod);
+  if (automod.anti_spam && !antiSpamWhitelisted) {
+    if (isRepeatedMessage(message)) {
+      fields.push({ name: "AntiSpam Detection", value: "✓", inline: true });
+      shouldDelete = true;
+      strikesTotal += 1;
     }
   }
 
@@ -287,4 +305,7 @@ async function performAutomod(message, settings) {
 module.exports = {
   performAutomod,
   inspectImageSpam,
+  isAntiSpamWhitelisted,
+  isRepeatedMessage,
+  antispamCache,
 };

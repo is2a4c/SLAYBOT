@@ -73,6 +73,8 @@ const DEFAULT_CONFIG = {
     anti_invites: false,
     anti_links: false,
     anti_spam: false,
+    spam_whitelist_users: [],
+    spam_whitelist_roles: [],
     anti_image_spam: false,
     image_spam_threshold: 70,
     anti_ghostping: false,

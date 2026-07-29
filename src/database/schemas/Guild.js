@@ -54,6 +54,14 @@ const Schema = new mongoose.Schema({
     anti_invites: Boolean,
     anti_links: Boolean,
     anti_spam: Boolean,
+    spam_whitelist_users: {
+      type: [String],
+      default: [],
+    },
+    spam_whitelist_roles: {
+      type: [String],
+      default: [],
+    },
     anti_image_spam: { type: Boolean, default: false },
     image_spam_threshold: { type: Number, default: 70, min: 50, max: 100 },
     anti_ghostping: Boolean,
