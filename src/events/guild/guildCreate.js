@@ -77,9 +77,11 @@ module.exports = async (client, guild) => {
     )
     .setFooter({ text: `Guild #${client.guilds.cache.size}` });
 
-  client.joinLeaveWebhook.send({
-    username: "Join",
-    avatarURL: client.user.displayAvatarURL(),
-    embeds: [embed],
-  });
+  await client.joinLeaveWebhook
+    .send({
+      username: "Join",
+      avatarURL: client.user.displayAvatarURL(),
+      embeds: [embed],
+    })
+    .catch((error) => client.logger.error(`Failed to send guild join webhook for ${guild.id}`, error));
 };
