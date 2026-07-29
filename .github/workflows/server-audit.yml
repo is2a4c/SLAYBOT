@@ -61,7 +61,11 @@ jobs:
             tail -n 30 /root/.pm2/logs/slaybot-error.log 2>/dev/null || echo "no slaybot-error.log"
 
             echo "=== Smart Invites backend (read-only) ==="
-            curl --silent --show-error --max-time 10 -D - http://127.0.0.1:8081/health || true
+            curl --silent --show-error --max-time 10 -D - \
+              --cacert /opt/slaybot/.tls/backend.cert.pem \
+              --resolve "slaybot.televibe.host:8081:127.0.0.1" \
+              https://slaybot.televibe.host:8081/health || true
+            openssl x509 -in /opt/slaybot/.tls/backend.cert.pem -noout -subject -issuer -dates -fingerprint -sha256 || true
             ss -ltnp 'sport = :8081' 2>/dev/null || true
 
             echo "=== network addresses (read-only) ==="

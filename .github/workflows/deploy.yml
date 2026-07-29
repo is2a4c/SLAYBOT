@@ -44,6 +44,7 @@ jobs:
       SMART_INVITES_ENABLED: ${{ vars.SMART_INVITES_ENABLED }}
       SMART_INVITES_BASE_URL: ${{ vars.SMART_INVITES_BASE_URL }}
       SMART_INVITES_HOST: ${{ vars.SMART_INVITES_HOST }}
+      SMART_INVITES_TLS_ENABLED: ${{ vars.SMART_INVITES_TLS_ENABLED }}
       SMART_INVITES_OFFICIAL_GUILD_ID: ${{ vars.SMART_INVITES_OFFICIAL_GUILD_ID }}
     steps:
       - uses: actions/checkout@v4
@@ -89,6 +90,7 @@ jobs:
           SMART_INVITES_ENABLED: ${{ env.SMART_INVITES_ENABLED }}
           SMART_INVITES_BASE_URL: ${{ env.SMART_INVITES_BASE_URL }}
           SMART_INVITES_HOST: ${{ env.SMART_INVITES_HOST }}
+          SMART_INVITES_TLS_ENABLED: ${{ env.SMART_INVITES_TLS_ENABLED }}
           SMART_INVITES_OFFICIAL_GUILD_ID: ${{ env.SMART_INVITES_OFFICIAL_GUILD_ID }}
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -96,7 +98,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script_stop: true
-          envs: BOT_TOKEN,MONGO_CONNECTION,ERROR_LOGS,JOIN_LEAVE_LOGS,BOT_SECRET,SESSION_PASSWORD,WEATHERSTACK_KEY,STRANGE_API_KEY,SPOTIFY_CLIENT_ID,SPOTIFY_CLIENT_SECRET,LAVALINK_LOCAL_PASSWORD,IMAGE_SPAM_E2E_IMAGE,SMART_INVITES_ENABLED,SMART_INVITES_BASE_URL,SMART_INVITES_HOST,SMART_INVITES_OFFICIAL_GUILD_ID
+          envs: BOT_TOKEN,MONGO_CONNECTION,ERROR_LOGS,JOIN_LEAVE_LOGS,BOT_SECRET,SESSION_PASSWORD,WEATHERSTACK_KEY,STRANGE_API_KEY,SPOTIFY_CLIENT_ID,SPOTIFY_CLIENT_SECRET,LAVALINK_LOCAL_PASSWORD,IMAGE_SPAM_E2E_IMAGE,SMART_INVITES_ENABLED,SMART_INVITES_BASE_URL,SMART_INVITES_HOST,SMART_INVITES_TLS_ENABLED,SMART_INVITES_OFFICIAL_GUILD_ID
           script: |
             set -e
 
@@ -121,7 +123,7 @@ jobs:
             # Update server .env from GitHub secrets.
             # Skipped when the BOT_TOKEN secret is empty so an existing server .env is never wiped.
             if [ -n "$BOT_TOKEN" ]; then
-              node -e 'const fs=require("fs"); const keys=["BOT_TOKEN","MONGO_CONNECTION","ERROR_LOGS","JOIN_LEAVE_LOGS","BOT_SECRET","SESSION_PASSWORD","WEATHERSTACK_KEY","STRANGE_API_KEY","SPOTIFY_CLIENT_ID","SPOTIFY_CLIENT_SECRET","LAVALINK_LOCAL_PASSWORD","SMART_INVITES_ENABLED","SMART_INVITES_BASE_URL","SMART_INVITES_HOST","SMART_INVITES_OFFICIAL_GUILD_ID"]; fs.writeFileSync(".env", keys.map((key)=>`${key}=${process.env[key]||""}`).join("\n")+"\n", {mode:0o600});'
+              node -e 'const fs=require("fs"); const keys=["BOT_TOKEN","MONGO_CONNECTION","ERROR_LOGS","JOIN_LEAVE_LOGS","BOT_SECRET","SESSION_PASSWORD","WEATHERSTACK_KEY","STRANGE_API_KEY","SPOTIFY_CLIENT_ID","SPOTIFY_CLIENT_SECRET","LAVALINK_LOCAL_PASSWORD","SMART_INVITES_ENABLED","SMART_INVITES_BASE_URL","SMART_INVITES_HOST","SMART_INVITES_TLS_ENABLED","SMART_INVITES_OFFICIAL_GUILD_ID"]; fs.writeFileSync(".env", keys.map((key)=>`${key}=${process.env[key]||""}`).join("\n")+"\n", {mode:0o600});'
             else
               echo "BOT_TOKEN secret is empty; keeping existing server .env"
             fi
@@ -161,6 +163,27 @@ jobs:
             # Optional end-to-end check using an ephemeral encrypted Actions secret.
             if [ -n "$IMAGE_SPAM_E2E_IMAGE" ]; then npm run image-spam:e2e; fi
 
+            # Keep backend transport encrypted between Zoraxy and SLAYBOT.
+            if [ "$SMART_INVITES_TLS_ENABLED" = "true" ]; then
+              TLS_DIR="$DEPLOY_DIR/.tls"
+              TLS_KEY="$TLS_DIR/backend.key.pem"
+              TLS_CERT="$TLS_DIR/backend.cert.pem"
+              mkdir -p "$TLS_DIR"
+              chmod 700 "$TLS_DIR"
+              if [ ! -s "$TLS_KEY" ] || [ ! -s "$TLS_CERT" ] || ! openssl x509 -checkend 2592000 -noout -in "$TLS_CERT"; then
+                PRIVATE_IP="$(hostname -I | awk '{print $1}')"
+                umask 077
+                openssl req -x509 -newkey rsa:3072 -sha256 -nodes -days 365 \
+                  -subj "/CN=slaybot.televibe.host" \
+                  -addext "subjectAltName=DNS:slaybot.televibe.host,IP:$PRIVATE_IP,IP:127.0.0.1" \
+                  -keyout "$TLS_KEY.new" -out "$TLS_CERT.new"
+                mv "$TLS_KEY.new" "$TLS_KEY"
+                mv "$TLS_CERT.new" "$TLS_CERT"
+              fi
+              chmod 600 "$TLS_KEY"
+              chmod 644 "$TLS_CERT"
+            fi
+
             if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
               sudo -n env PM2_HOME=/root/.pm2 pm2 delete SLAYBOT 2>/dev/null || true
               sudo -n pkill -f "[n]ode /root/SLAYBOT/bot.js" 2>/dev/null || true
@@ -192,7 +215,10 @@ jobs:
             pm2 describe slaybot | grep -E "status.*online"
             health=""
             for attempt in $(seq 1 12); do
-              if health="$(curl --fail --silent --show-error --max-time 10 http://127.0.0.1:8081/health)"; then
+              if health="$(curl --fail --silent --show-error --max-time 10 \
+                --cacert "$DEPLOY_DIR/.tls/backend.cert.pem" \
+                --resolve "slaybot.televibe.host:8081:127.0.0.1" \
+                https://slaybot.televibe.host:8081/health)"; then
                 break
               fi
               echo "Smart Invites health check attempt $attempt/12 failed; retrying in 5 seconds"
@@ -201,4 +227,4 @@ jobs:
             printf '%s\n' "$health" | grep -F '"service":"slaybot-smart-invites"'
             printf '%s\n' "$health" | grep -F '"status":"ok"'
             echo "slaybot is online from $DEPLOY_DIR/bot.js"
-            echo "Smart Invites backend is healthy on 127.0.0.1:8081"
+            echo "Smart Invites backend TLS is healthy on 127.0.0.1:8081"

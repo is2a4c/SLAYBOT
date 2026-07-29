@@ -1,8 +1,20 @@
+const fs = require("fs/promises");
+const http = require("http");
+const https = require("https");
 const { SmartInviteService } = require("./SmartInviteService");
 const SmartInviteScheduler = require("./SmartInviteScheduler");
 const { createSmartInvitesApp } = require("@src/web/smart-invites/app");
 
 const runtimes = new WeakMap();
+
+async function createSmartInvitesServer(app, config) {
+  if (!config.tlsEnabled) return http.createServer(app);
+  const tlsOptions = {
+    key: await fs.readFile(config.tlsKeyPath),
+    cert: await fs.readFile(config.tlsCertPath),
+  };
+  return https.createServer(tlsOptions, app);
+}
 
 async function start(client) {
   if (!client.config.SMART_INVITES.enabled) return null;
@@ -17,10 +29,9 @@ async function start(client) {
   runtimes.set(client, runtime);
 
   try {
+    const server = await createSmartInvitesServer(app, client.config.SMART_INVITES);
     runtime.server = await new Promise((resolve, reject) => {
-      const server = app.listen(client.config.SMART_INVITES.port, client.config.SMART_INVITES.host, () =>
-        resolve(server)
-      );
+      server.listen(client.config.SMART_INVITES.port, client.config.SMART_INVITES.host, () => resolve(server));
       server.once("error", reject);
     });
   } catch (error) {
@@ -30,7 +41,7 @@ async function start(client) {
   scheduler.start();
   client.smartInvites = service;
   client.logger.success(
-    `Smart Invites listening on ${client.config.SMART_INVITES.host}:${client.config.SMART_INVITES.port}`
+    `Smart Invites listening on ${client.config.SMART_INVITES.tlsEnabled ? "https" : "http"}://${client.config.SMART_INVITES.host}:${client.config.SMART_INVITES.port}`
   );
   return runtime;
 }
@@ -60,4 +71,5 @@ module.exports = {
   start,
   stop,
   get,
+  createSmartInvitesServer,
 };
