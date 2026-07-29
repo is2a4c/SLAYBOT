@@ -1,6 +1,7 @@
 require("dotenv").config();
 require("module-alias/register");
 const { fork } = require("child_process");
+const fs = require("fs");
 const path = require("path");
 const ControlClient = require("../src/slaynode/control/client");
 const { PROTOCOL_VERSION } = require("../src/slaynode/protocol");
@@ -14,6 +15,36 @@ const client = new ControlClient({
 });
 let stopping = false;
 let running = 0;
+const healthPath = process.env.SLAYNODE_HEALTH_FILE || "/tmp/slaynode-health.json";
+const health = {
+  startedAt: Date.now(),
+  lastConnectedAt: 0,
+  lastErrorAt: 0,
+  lastError: "",
+  running: 0,
+  stopping: false,
+};
+
+function writeHealth(patch = {}) {
+  Object.assign(health, patch, { running, stopping });
+  const temporary = `${healthPath}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify(health));
+  fs.renameSync(temporary, healthPath);
+}
+
+async function heartbeat() {
+  try {
+    const result = await client.heartbeat({ running });
+    writeHealth({ lastConnectedAt: Date.now(), lastError: "" });
+    return result;
+  } catch (error) {
+    writeHealth({
+      lastErrorAt: Date.now(),
+      lastError: String(error.message || error).slice(0, 200),
+    });
+    throw error;
+  }
+}
 
 function isolatedExecute(job) {
   return new Promise((resolve, reject) => {
@@ -58,7 +89,7 @@ async function runOne(job) {
     await client.nack(job.leaseId, String(error.message || "WORKER_ERROR").slice(0, 64)).catch(() => {});
   } finally {
     running -= 1;
-    await client.heartbeat({ running }).catch(() => {});
+    await heartbeat().catch(() => {});
   }
 }
 async function loop() {
@@ -77,17 +108,18 @@ async function loop() {
     await new Promise((resolve) => setTimeout(resolve, 1500));
   }
 }
-setInterval(() => client.heartbeat({ running }).catch(() => {}), 15_000).unref();
+writeHealth();
+setInterval(() => heartbeat().catch(() => {}), 15_000).unref();
 for (const signal of ["SIGTERM", "SIGINT"])
   process.on(signal, async () => {
     stopping = true;
+    writeHealth();
     const deadline = Date.now() + 30_000;
     while (running && Date.now() < deadline) await new Promise((r) => setTimeout(r, 250));
     process.exit(running ? 1 : 0);
   });
 if (!process.env.SLAYNODE_CONTROL_URL || !process.env.SLAYNODE_ID || !process.env.SLAYNODE_SECRET)
   throw new Error("SLAYNODE_CONTROL_URL, SLAYNODE_ID and SLAYNODE_SECRET are required");
-client
-  .heartbeat({ running })
+heartbeat()
   .catch(() => {})
   .finally(loop);

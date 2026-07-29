@@ -1,9 +1,14 @@
 .DS_Store
 node_modules/
 .git/
+.github/
 .vscode/
 docs/
+test/
+coverage/
+.cache/
 *.log
 *.tar.gz
 *.tar
 .env
+*.env

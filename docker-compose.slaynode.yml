@@ -1,24 +1,87 @@
+name: ${SLAYNODE_PROJECT_NAME:-slaynode}
+
 services:
   slaynode:
+    image: slaynode-worker:${SLAYNODE_IMAGE_TAG:-local}
     build:
       context: .
       dockerfile: Dockerfile.slaynode
     restart: unless-stopped
+    env_file:
+      - ${SLAYNODE_ENV_FILE:-.env}
     read_only: true
     tmpfs:
       - /tmp:size=256m,mode=1777
-      - /app/.cache:size=2g,uid=1001,gid=1001
+    volumes:
+      - model-cache:/app/.cache
     environment:
-      SLAYNODE_CONTROL_URL: ${SLAYNODE_CONTROL_URL:?required}
-      SLAYNODE_ID: ${SLAYNODE_ID:?required}
-      SLAYNODE_SECRET: ${SLAYNODE_SECRET:?required}
       SLAYNODE_PARALLELISM: ${SLAYNODE_PARALLELISM:-1}
-      SLAYNODE_RAM_MB: ${SLAYNODE_RAM_MB:-1024}
+      SLAYNODE_RAM_MB: ${SLAYNODE_RAM_MB:-2048}
       SLAYNODE_JOB_TIMEOUT_MS: ${SLAYNODE_JOB_TIMEOUT_MS:-120000}
+      SLAYNODE_HEALTH_MAX_AGE_MS: ${SLAYNODE_HEALTH_MAX_AGE_MS:-45000}
+      IMAGE_SPAM_MODEL_CACHE: /app/.cache/image-spam
+      IMAGE_SPAM_VISION_MODEL: ${IMAGE_SPAM_VISION_MODEL:-HuggingFaceTB/SmolVLM-Instruct}
+      IMAGE_SPAM_VISION_DTYPE: ${IMAGE_SPAM_VISION_DTYPE:-q4}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - slaynode/healthcheck.js
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
     cpus: ${SLAYNODE_CPU_LIMIT:-1.0}
-    mem_limit: ${SLAYNODE_MEMORY_LIMIT:-1536m}
+    mem_limit: ${SLAYNODE_MEMORY_LIMIT:-3g}
     pids_limit: 128
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    networks:
+      - egress
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  enroll:
+    image: slaynode-worker:${SLAYNODE_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile.slaynode
+    profiles:
+      - tools
+    env_file:
+      - ${SLAYNODE_ENROLL_ENV_FILE:-.enroll.env}
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    environment:
+      SLAYNODE_PARALLELISM: ${SLAYNODE_PARALLELISM:-1}
+      SLAYNODE_GPU: ${SLAYNODE_GPU:-false}
+      SLAYNODE_WORKER_DIGEST: ${SLAYNODE_WORKER_DIGEST:-docker-local}
+    mem_limit: 512m
+    pids_limit: 64
+    healthcheck:
+      disable: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - egress
+    entrypoint:
+      - /sbin/tini
+      - --
+    command:
+      - node
+      - slaynode/enroll.js
+
+volumes:
+  model-cache:
+
+networks:
+  egress:
+    driver: bridge
