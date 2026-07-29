@@ -146,7 +146,18 @@ function normalizeNodes(nodes, client) {
 
 function addLegacyPlayerAliases(lavaclient, client) {
   lavaclient.getPlayer = (guildId) => wrapLegacyPlayer(lavaclient.players.resolve(guildId));
-  lavaclient.createPlayer = (guildId) => wrapLegacyPlayer(lavaclient.players.create(guildId));
+  lavaclient.createPlayer = (guildId, options = {}) => {
+    const existing = lavaclient.players.resolve(guildId);
+    if (existing) return wrapLegacyPlayer(existing);
+
+    const excluded = new Set(options.excludedNodeIdentifiers || []);
+    if (!excluded.size) return wrapLegacyPlayer(lavaclient.players.create(guildId));
+
+    const node = selectFallbackNode(lavaclient.nodes.values(), excluded);
+
+    if (!node) throw new Error("No fallback Lavalink nodes available");
+    return wrapLegacyPlayer(node.players.create(guildId));
+  };
   lavaclient.destroyPlayer = (guildId) => lavaclient.players.destroy(guildId, true);
   lavaclient.handleVoiceUpdate = (data) => {
     const player = lavaclient.players.resolve(data.guild_id);
@@ -172,3 +183,11 @@ function wrapLegacyPlayer(player) {
   player._legacyAliasesAdded = true;
   return player;
 }
+
+function selectFallbackNode(nodes, excludedNodeIdentifiers) {
+  return [...nodes]
+    .filter((candidate) => candidate.ws.active && !excludedNodeIdentifiers.has(candidate.identifier))
+    .sort((left, right) => left.penalties.calculate() - right.penalties.calculate())[0];
+}
+
+module.exports.selectFallbackNode = selectFallbackNode;
