@@ -58,9 +58,11 @@ module.exports = class BotClient extends Client {
     this.counterUpdateQueue = []; // store guildId's that needs counter update
 
     // initialize webhook for sending guild join/leave details
-    this.joinLeaveWebhook = process.env.JOIN_LEAVE_LOGS
-      ? new WebhookClient({ url: process.env.JOIN_LEAVE_LOGS })
-      : undefined;
+    this.botLogChannelId = /^\d{17,20}$/.test(process.env.BOT_LOG_CHANNEL || "") ? process.env.BOT_LOG_CHANNEL : null;
+    this.joinLeaveWebhook =
+      !this.botLogChannelId && process.env.JOIN_LEAVE_LOGS
+        ? new WebhookClient({ url: process.env.JOIN_LEAVE_LOGS })
+        : undefined;
 
     // Giveaways
     if (this.config.GIVEAWAYS.enabled) this.giveawaysManager = giveawaysHandler(this);
@@ -73,6 +75,17 @@ module.exports = class BotClient extends Client {
 
     // Discord Together
     this.discordTogether = new DiscordTogether(this);
+  }
+
+  async sendGuildLog(payload) {
+    if (this.botLogChannelId) {
+      const channel =
+        this.channels.cache.get(this.botLogChannelId) || (await this.channels.fetch(this.botLogChannelId));
+      if (!channel?.isTextBased()) throw new Error(`BOT_LOG_CHANNEL ${this.botLogChannelId} is not text-based`);
+      return channel.send(payload);
+    }
+    if (this.joinLeaveWebhook) return this.joinLeaveWebhook.send(payload);
+    return null;
   }
 
   /**

@@ -14,7 +14,7 @@ module.exports = async (client, guild) => {
   settings.data.leftAt = new Date();
   await settings.save();
 
-  if (!client.joinLeaveWebhook) return;
+  if (!client.botLogChannelId && !client.joinLeaveWebhook) return;
 
   let ownerTag;
   const ownerId = guild.ownerId || settings.data.owner;
@@ -53,11 +53,7 @@ module.exports = async (client, guild) => {
     )
     .setFooter({ text: `Guild #${client.guilds.cache.size}` });
 
-  await client.joinLeaveWebhook
-    .send({
-      username: "Leave",
-      avatarURL: client.user.displayAvatarURL(),
-      embeds: [embed],
-    })
+  await client
+    .sendGuildLog({ embeds: [embed] })
     .catch((error) => client.logger.error(`Failed to send guild leave webhook for ${guild.id}`, error));
 };

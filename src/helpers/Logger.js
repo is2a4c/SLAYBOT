@@ -1,8 +1,12 @@
 const config = require("@root/config");
-const { EmbedBuilder, WebhookClient } = require("discord.js");
+const { EmbedBuilder, REST, Routes, WebhookClient } = require("discord.js");
 const pino = require("pino");
 
-const webhookLogger = process.env.ERROR_LOGS ? new WebhookClient({ url: process.env.ERROR_LOGS }) : undefined;
+const botLogChannelId = /^\d{17,20}$/.test(process.env.BOT_LOG_CHANNEL || "") ? process.env.BOT_LOG_CHANNEL : null;
+const channelLogger =
+  botLogChannelId && process.env.BOT_TOKEN ? new REST({ version: "10" }).setToken(process.env.BOT_TOKEN) : null;
+const webhookLogger =
+  !channelLogger && process.env.ERROR_LOGS ? new WebhookClient({ url: process.env.ERROR_LOGS }) : null;
 
 const today = new Date();
 const pinoLogger = pino.default(
@@ -51,7 +55,7 @@ function truncate(value, maxLength) {
   return `${text.slice(0, maxLength - 14)}\n… truncated`;
 }
 
-function sendWebhook(content, err) {
+function sendDiscordLog(content, err) {
   if (!content && !err) return;
 
   try {
@@ -65,7 +69,15 @@ function sendWebhook(content, err) {
         { name: "Details", value: `\`\`\`js\n${details}\n\`\`\`` }
       );
 
-    webhookLogger.send({ username: "Logs", embeds: [embed] }).catch(() => {});
+    if (channelLogger) {
+      channelLogger
+        .post(Routes.channelMessages(botLogChannelId), {
+          body: { embeds: [embed.toJSON()] },
+        })
+        .catch(() => {});
+    } else if (webhookLogger) {
+      webhookLogger.send({ username: "Logs", embeds: [embed] }).catch(() => {});
+    }
   } catch (webhookError) {
     pinoLogger.error({ details: webhookError?.stack || String(webhookError) }, "Failed to format webhook log");
   }
@@ -116,7 +128,7 @@ module.exports = class Logger {
 
     pinoLogger.error({ details }, message);
 
-    if (webhookLogger) sendWebhook(content, { name: "Error", stack: details, message });
+    if (channelLogger || webhookLogger) sendDiscordLog(content, { name: "Error", stack: details, message });
   }
 
   /**

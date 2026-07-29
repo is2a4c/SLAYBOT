@@ -42,7 +42,7 @@ module.exports = async (client, guild) => {
     client.logger.error(`Не удалось создать инвайт для ${guild.name}: ${e.message}`);
   }
 
-  if (!client.joinLeaveWebhook) return;
+  if (!client.botLogChannelId && !client.joinLeaveWebhook) return;
 
   const embed = new EmbedBuilder()
     .setTitle("Guild Joined")
@@ -77,11 +77,7 @@ module.exports = async (client, guild) => {
     )
     .setFooter({ text: `Guild #${client.guilds.cache.size}` });
 
-  await client.joinLeaveWebhook
-    .send({
-      username: "Join",
-      avatarURL: client.user.displayAvatarURL(),
-      embeds: [embed],
-    })
+  await client
+    .sendGuildLog({ embeds: [embed] })
     .catch((error) => client.logger.error(`Failed to send guild join webhook for ${guild.id}`, error));
 };
