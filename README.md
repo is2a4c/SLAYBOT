@@ -124,19 +124,20 @@ v3 умеет анализировать вложенные изображени
 
 ```text
 Attachment → image safety limits → OCR (RU + EN) → visual preparation
-           → SmolVLM classification → score fusion → AutoMod action
+           → io.net vision classification → score fusion → AutoMod action
 ```
 
 ### Включение в сервере
 
 ```text
 !anti imagespam on 70
+!anti strikes-reset @User
 ```
 
-- Модель **SmolVLM 500M** используется по умолчанию в quantized-режиме <code>q4</code>, чтобы AutoMod оставался отзывчивым на CPU.
-- Для более точного, но требовательного анализа укажите <code>IMAGE_SPAM_VISION_MODEL=HuggingFaceTB/SmolVLM-Instruct</code>.
-- Cache по умолчанию: <code>.cache/image-spam</code>. Его можно перенести через <code>IMAGE_SPAM_MODEL_CACHE</code>.
-- Модель можно прогреть вручную, но это **не требуется** для старта: загрузка ленивая, а deploy не блокируется из-за временной ошибки сети.
+- При настроенном <code>IO_INTELLIGENCE_API_KEY</code> изображения анализируются удалённой vision-моделью io.net, поэтому локальный ONNX не нагружает CPU бота.
+- Без ключа используется локальный fallback **SmolVLM 500M** в quantized-режиме <code>q4</code>.
+- Cache локального fallback по умолчанию: <code>.cache/image-spam</code>. Его можно перенести через <code>IMAGE_SPAM_MODEL_CACHE</code>.
+- Локальную fallback-модель можно прогреть вручную, но это **не требуется** для старта: загрузка ленивая.
 
 ```bash
 npm run image-spam:model:download
@@ -156,6 +157,7 @@ npm run image-spam:check
 
 /anti spam-whitelist-user action:ADD user:@NotificationBot
 /anti spam-whitelist-role action:ADD role:@Trusted
+/anti strikes-reset user:@User
 ```
 
 Whitelist не отключает AutoMod целиком: Anti Links, Anti Invites, Anti Attachments, Anti Mass Mention, Image Spam, лимиты строк и упоминаний, а также остальные проверки продолжают работать. Автоматически все боты в whitelist не добавляются. Для управления требуется право **Manage Server** (`ManageGuild`); полный список команд находится в [документации администратора](docs/commands/admin.md#anti-spam-whitelist).

@@ -1,5 +1,6 @@
 const { ApplicationCommandOptionType } = require("discord.js");
 const { classifyImage, isImageAttachment } = require("@src/services/imageSpamClassifier");
+const { getMember } = require("@schemas/Member");
 
 /**
  * @type {import("@structures/Command")}
@@ -24,6 +25,10 @@ module.exports = {
       {
         trigger: "spam-whitelist <user|role> <add|remove|list|clear> [user|role ID]",
         description: "manage antispam-only user and role exemptions",
+      },
+      {
+        trigger: "strikes-reset <user>",
+        description: "reset all automod strikes for a user",
       },
       {
         trigger: "imagespam test [caption]",
@@ -155,6 +160,19 @@ module.exports = {
         ],
       },
       {
+        name: "strikes-reset",
+        description: "reset all automod strikes for a user",
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: "user",
+            description: "user whose automod strikes should be reset",
+            required: true,
+            type: ApplicationCommandOptionType.User,
+          },
+        ],
+      },
+      {
         name: "imagespam",
         description: "detect image spam with local OCR",
         type: ApplicationCommandOptionType.Subcommand,
@@ -235,6 +253,11 @@ module.exports = {
     }
 
     //
+    else if (sub === "strikes-reset") {
+      response = await resetMemberStrikes(message.guildId, args[1]);
+    }
+
+    //
     else if (sub == "imagespam") {
       if (args[1]?.toLowerCase() !== "test") return message.safeReply("Use `/anti imagespam` to change settings");
       return testImageSpam(message, settings, args.slice(2).join(" "));
@@ -277,6 +300,8 @@ module.exports = {
       response = formatWhitelist(settings.automod, interaction.guild);
     } else if (sub === "spam-whitelist-clear") {
       response = await clearWhitelist(settings, interaction.options.getString("target"));
+    } else if (sub === "strikes-reset") {
+      response = await resetMemberStrikes(interaction.guildId, interaction.options.getUser("user")?.id);
     } else if (sub == "imagespam") {
       response = await antiImageSpam(
         settings,
@@ -307,6 +332,21 @@ async function antiSpam(settings, input) {
   settings.automod.anti_spam = status;
   await settings.save();
   return `Antispam detection is now ${status ? "enabled" : "disabled"}`;
+}
+
+async function resetMemberStrikes(guildId, input, memberLoader = getMember) {
+  const userId = normalizeSnowflake(input);
+  if (!userId) return "Invalid user. Mention a server member or provide a valid user ID.";
+
+  const memberDb = await memberLoader(guildId, userId);
+  const previousStrikes = Math.max(0, Number(memberDb.strikes) || 0);
+  if (previousStrikes === 0) {
+    return `User \`${userId}\` has no AutoMod strikes to reset.`;
+  }
+
+  memberDb.strikes = 0;
+  await memberDb.save();
+  return `Reset AutoMod strikes for user \`${userId}\`: ${previousStrikes} → 0.`;
 }
 
 function normalizeSnowflake(input) {
@@ -501,4 +541,5 @@ Object.assign(module.exports, {
   updateWhitelist,
   formatWhitelist,
   runPrefixWhitelist,
+  resetMemberStrikes,
 });

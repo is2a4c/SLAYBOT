@@ -41,12 +41,24 @@ By default, Auto moderation events are ignored for members who have the followin
 | **!anti ghostping \<on\|off>**             | logs ghost mentions in your server (Requires `/modlog` channel to be setup) |
 | **!anti spam \<on\|off>**                  | enable or disable antispam detection                                        |
 | **!anti imagespam \<on\|off> [threshold]** | detect suspicious images locally with OCR (recommended threshold: 70)       |
+| **!anti strikes-reset \<user>**            | reset all AutoMod strikes for a selected user                               |
 
-`anti imagespam` runs a quantized SmolVLM model and OCR directly inside the bot
-process. The deployment downloads the model into the server cache; no API key
-or paid service is required. Enable it with `!anti imagespam on 70`. If model
-loading or OCR fails, the message is left untouched.
+`anti imagespam` uses local OCR and sends prepared image regions to the
+configured io.net vision model. If no io.net key is configured, the bot can
+fall back to the local quantized SmolVLM model. Enable it with
+`!anti imagespam on 70`. If OCR or vision analysis fails, the message is left
+untouched.
 | **!anti massmention \<on\|off> \[threshold]** | enable or disable massmention detection (default threshold is 3 mentions] |
+
+Reset all AutoMod strikes for one user:
+
+```text
+!anti strikes-reset @User
+/anti strikes-reset user:@User
+```
+
+The reset changes only the member's current AutoMod strike counter. Existing
+moderation and AutoMod log entries are retained for audit history.
 
 #### Anti-Spam Whitelist
 
