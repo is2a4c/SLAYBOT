@@ -52,6 +52,18 @@ function validateSmartInviteConfiguration(config, environment = process.env.NODE
     errors.push("SMART_INVITES.reservedSlugs и blockedGuildIds должны быть массивами.");
   }
   if (typeof config.host !== "string" || !config.host) errors.push("SMART_INVITES.host не задан.");
+  if (typeof config.tlsEnabled !== "boolean") {
+    errors.push("SMART_INVITES.tlsEnabled должен быть boolean.");
+  }
+  if (
+    config.tlsEnabled &&
+    (typeof config.tlsKeyPath !== "string" ||
+      !config.tlsKeyPath ||
+      typeof config.tlsCertPath !== "string" ||
+      !config.tlsCertPath)
+  ) {
+    errors.push("SMART_INVITES.tlsKeyPath и tlsCertPath обязательны при включённом TLS.");
+  }
   if (
     typeof config.pathPrefix !== "string" ||
     (config.pathPrefix &&
