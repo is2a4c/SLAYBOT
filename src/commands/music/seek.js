@@ -47,6 +47,8 @@ module.exports = {
 function seekTo({ client, guildId }, time) {
   const player = client.musicManager?.getPlayer(guildId);
   const seekTo = durationToMillis(time);
+  if (!Number.isFinite(seekTo) || seekTo < 0) return "Please provide a valid duration. Example: 1:30";
+  if (!player?.queue?.current) return "There is no current track to seek";
 
   if (seekTo > player.queue.current.length) {
     return "The duration you provide exceeds the duration of the current track";

@@ -25,7 +25,7 @@ module.exports = async (client, message) => {
       const cmd = client.getCommand(invoke);
       if (cmd) {
         isCommand = true;
-        commandHandler.handlePrefixCommand(message, cmd, settings);
+        await commandHandler.handlePrefixCommand(message, cmd, settings);
       }
     }
   }

@@ -161,7 +161,7 @@ async function rejectSuggestion(member, channel, messageId, reason) {
   // validate if document exists
   const doc = await findSuggestion(guild.id, messageId);
   if (!doc) return "Suggestion not found";
-  if (doc.is_rejected) return "Suggestion already rejected";
+  if (doc.status === "REJECTED") return "Suggestion already rejected";
 
   let message;
   try {

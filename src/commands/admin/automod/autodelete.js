@@ -147,8 +147,8 @@ module.exports = {
     //
     else if (sub === "maxlines") {
       const max = args[1];
-      if (isNaN(max) || Number.parseInt(max) < 1) {
-        return message.safeReply("Max Lines must be a valid number greater than 0");
+      if (isNaN(max) || Number.parseInt(max, 10) < 0) {
+        return message.safeReply("Max Lines must be a valid number greater than or equal to 0");
       }
       response = await maxLines(settings, max);
     }
@@ -200,14 +200,14 @@ async function antilinks(settings, input) {
 }
 
 async function maxLines(settings, input) {
-  const lines = Number.parseInt(input);
-  if (isNaN(lines)) return "Please enter a valid number input";
+  const lines = Number.parseInt(input, 10);
+  if (isNaN(lines) || lines < 0) return "Please enter a valid number input";
 
   settings.automod.max_lines = lines;
   await settings.save();
   return `${
-    input === 0
+    lines === 0
       ? "Maximum line limit is disabled"
-      : `Messages longer than \`${input}\` lines will now be automatically deleted`
+      : `Messages longer than \`${lines}\` lines will now be automatically deleted`
   }`;
 }

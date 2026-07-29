@@ -110,6 +110,7 @@ module.exports = {
 async function viewReputation(target) {
   const userData = await getUser(target);
   if (!userData) return `${target.username} has no reputation yet`;
+  const reputation = userData.reputation || {};
 
   const embed = new EmbedBuilder()
     .setAuthor({ name: `Reputation for ${target.username}` })
@@ -118,12 +119,12 @@ async function viewReputation(target) {
     .addFields(
       {
         name: "Given",
-        value: userData.reputation?.given.toString(),
+        value: String(reputation.given || 0),
         inline: true,
       },
       {
         name: "Received",
-        value: userData.reputation?.received.toString(),
+        value: String(reputation.received || 0),
         inline: true,
       }
     );
@@ -136,7 +137,8 @@ async function giveReputation(user, target) {
   if (target.id === user.id) return "You cannot give reputation to yourself";
 
   const userData = await getUser(user);
-  if (userData && userData.reputation.timestamp) {
+  userData.reputation ||= { given: 0, received: 0 };
+  if (userData.reputation.timestamp) {
     const lastRep = new Date(userData.reputation.timestamp);
     const diff = diffHours(new Date(), lastRep);
     if (diff < 24) {
@@ -146,10 +148,11 @@ async function giveReputation(user, target) {
   }
 
   const targetData = await getUser(target);
+  targetData.reputation ||= { given: 0, received: 0 };
 
-  userData.reputation.given += 1;
+  userData.reputation.given = (userData.reputation.given || 0) + 1;
   userData.reputation.timestamp = new Date();
-  targetData.reputation.received += 1;
+  targetData.reputation.received = (targetData.reputation.received || 0) + 1;
 
   await userData.save();
   await targetData.save();

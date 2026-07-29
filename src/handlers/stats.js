@@ -75,10 +75,10 @@ module.exports = {
     if (level !== statsDb.level) {
       statsDb.xp = xp;
       statsDb.level = level;
-      let lvlUpMessage = settings.stats.xp.message;
+      let lvlUpMessage = settings?.stats?.xp?.message || message.client.config.STATS.DEFAULT_LVL_UP_MSG;
       lvlUpMessage = parse(lvlUpMessage, message.member, level);
 
-      const xpChannel = settings.stats.xp.channel && message.guild.channels.cache.get(settings.stats.xp.channel);
+      const xpChannel = settings?.stats?.xp?.channel && message.guild.channels.cache.get(settings.stats.xp.channel);
       const lvlUpChannel = xpChannel || message.channel;
 
       lvlUpChannel.safeSend(lvlUpMessage);

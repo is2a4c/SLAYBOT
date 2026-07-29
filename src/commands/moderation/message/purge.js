@@ -16,9 +16,10 @@ module.exports = {
   },
 
   async messageRun(message, args) {
-    const amount = args[0];
+    const amount = Number.parseInt(args[0], 10);
 
     if (isNaN(amount)) return message.safeReply("Numbers are only allowed");
+    if (amount < 1) return message.safeReply("Amount must be greater than 0");
     if (parseInt(amount) > 99) return message.safeReply("The max amount of messages that I can delete is 99");
 
     const { channel } = message;

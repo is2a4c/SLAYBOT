@@ -56,6 +56,7 @@ module.exports = {
 
 async function addInvites({ guild }, user, amount) {
   if (user.bot) return "Oops! You cannot add invites to bots";
+  if (!Number.isInteger(amount) || amount < 1) return "Invite amount must be a positive number";
 
   const memberDb = await getMember(guild.id, user.id);
   memberDb.invite_data.added += amount;

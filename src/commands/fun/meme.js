@@ -46,9 +46,13 @@ module.exports = {
       embeds: [embed],
       components: [buttonRow],
     });
+    if (!sentMsg) return;
 
     const collector = message.channel.createMessageComponentCollector({
-      filter: (reactor) => reactor.user.id === message.author.id,
+      filter: (reactor) =>
+        reactor.user.id === message.author.id &&
+        reactor.message.id === sentMsg.id &&
+        reactor.customId === "regenMemeBtn",
       time: this.cooldown * 1000,
       max: 3,
       dispose: true,
@@ -81,13 +85,16 @@ module.exports = {
     );
     const embed = await getRandomEmbed(choice);
 
-    await interaction.followUp({
+    const sentMsg = await interaction.editReply({
       embeds: [embed],
       components: [buttonRow],
     });
 
     const collector = interaction.channel.createMessageComponentCollector({
-      filter: (reactor) => reactor.user.id === interaction.user.id,
+      filter: (reactor) =>
+        reactor.user.id === interaction.user.id &&
+        reactor.message.id === sentMsg.id &&
+        reactor.customId === "regenMemeBtn",
       time: this.cooldown * 1000,
       max: 3,
       dispose: true,
@@ -98,7 +105,7 @@ module.exports = {
       await response.deferUpdate();
 
       const embed = await getRandomEmbed(choice);
-      await interaction.editReply({
+      await sentMsg.edit({
         embeds: [embed],
         components: [buttonRow],
       });
@@ -106,7 +113,7 @@ module.exports = {
 
     collector.on("end", () => {
       buttonRow.components.forEach((button) => button.setDisabled(true));
-      return interaction.editReply({
+      return sentMsg.edit({
         components: [buttonRow],
       });
     });

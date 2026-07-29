@@ -303,6 +303,7 @@ async function setStatus(settings, status) {
 }
 
 async function setChannel(settings, channel) {
+  if (!channel) return "Invalid channel. Please provide a valid channel";
   if (!channel.canSendEmbeds()) {
     return (
       "Ugh! I cannot send greeting to that channel? I need the `Write Messages` and `Embed Links` permissions in " +
@@ -327,6 +328,7 @@ async function setThumbnail(settings, status) {
 }
 
 async function setColor(settings, color) {
+  if (!color || !isHex(color)) return "Invalid color. Value must be a valid hex color";
   settings.farewell.embed.color = color;
   await settings.save();
   return "Configuration saved! Farewell message updated";
@@ -339,7 +341,17 @@ async function setFooter(settings, content) {
 }
 
 async function setImage(settings, url) {
+  if (!isValidHttpUrl(url)) return "Invalid image url. Please provide a valid http(s) url";
   settings.farewell.embed.image = url;
   await settings.save();
   return "Configuration saved! Farewell message updated";
+}
+
+function isValidHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol);
+  } catch {
+    return false;
+  }
 }

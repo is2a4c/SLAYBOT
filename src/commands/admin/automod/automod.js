@@ -166,12 +166,13 @@ module.exports = {
       }
       response = await setStrikes(settings, strikes);
     } else if (input === "action") {
-      const action = args[1].toUpperCase();
+      const action = args[1]?.toUpperCase();
       if (!action || !["TIMEOUT", "KICK", "BAN"].includes(action))
         return message.safeReply("Not a valid action. Action can be `Timeout`/`Kick`/`Ban`");
       response = await setAction(settings, message.guild, action);
     } else if (input === "debug") {
-      const status = args[1].toLowerCase();
+      const status = args[1]?.toLowerCase();
+      if (!status) return message.safeReply("Invalid status. Value must be `on/off`");
       if (!["on", "off"].includes(status)) return message.safeReply("Invalid status. Value must be `on/off`");
       response = await setDebug(settings, status);
     }
@@ -230,7 +231,7 @@ async function getStatus(settings, guild) {
   const antiAttachmentsEnabled = getAntiAttachmentsEnabled(automod);
 
   const logChannel = settings.modlog_channel
-    ? guild.channels.cache.get(settings.modlog_channel).toString()
+    ? guild.channels.cache.get(settings.modlog_channel)?.toString() || "Not Configured"
     : "Not Configured";
 
   // String Builder
@@ -283,6 +284,8 @@ function getAntiAttachmentsEnabled(automod) {
 }
 
 async function setStrikes(settings, strikes) {
+  strikes = Number.parseInt(strikes, 10);
+  if (!Number.isInteger(strikes) || strikes < 1) return "Strikes must be a valid number greater than 0";
   settings.automod.strikes = strikes;
   await settings.save();
   return `Configuration saved! Maximum strikes is set to ${strikes}`;

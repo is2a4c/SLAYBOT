@@ -158,7 +158,8 @@ module.exports = {
     const channel = options.getChannel("channel");
     const amount = options.getInteger("amount") || 99;
 
-    if (amount > 100) return interaction.followUp("The max amount of messages that I can delete is 99");
+    if (amount < 1) return interaction.followUp("Amount must be greater than 0");
+    if (amount > 99) return interaction.followUp("The max amount of messages that I can delete is 99");
 
     let response;
     switch (sub) {

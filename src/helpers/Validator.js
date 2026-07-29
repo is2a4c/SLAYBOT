@@ -19,6 +19,10 @@ module.exports = class Validator {
       error("env: MONGO_CONNECTION cannot be empty");
       process.exit(1);
     }
+    if (config.SLAYNODE?.enabled && (!process.env.SLAYNODE_MASTER_KEY || process.env.SLAYNODE_MASTER_KEY.length < 32)) {
+      error("env: SLAYNODE_MASTER_KEY must contain at least 32 characters when SlayNode is enabled");
+      process.exit(1);
+    }
 
     // Validate Dashboard Config
     if (config.DASHBOARD.enabled) {

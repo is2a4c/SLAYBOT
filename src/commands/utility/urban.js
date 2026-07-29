@@ -51,19 +51,18 @@ async function urban(word) {
 
   const data = json.list[0];
   const embed = new EmbedBuilder()
-    .setTitle(data.word)
-    .setURL(data.permalink)
+    .setTitle(truncate(data.word || word, 256))
     .setColor(EMBED_COLORS.BOT_EMBED)
-    .setDescription(`**Definition**\`\`\`css\n${data.definition}\`\`\``)
+    .setDescription(`**Definition**\`\`\`css\n${truncate(data.definition || "NA", 3900)}\`\`\``)
     .addFields(
       {
         name: "Author",
-        value: data.author,
+        value: truncate(data.author || "NA", 1024),
         inline: true,
       },
       {
         name: "ID",
-        value: data.defid.toString(),
+        value: String(data.defid || "NA"),
         inline: true,
       },
       {
@@ -73,11 +72,18 @@ async function urban(word) {
       },
       {
         name: "Example",
-        value: data.example,
+        value: truncate(data.example || "NA", 1024),
         inline: false,
       }
     )
     .setFooter({ text: `Created ${moment(data.written_on).fromNow()}` });
 
+  if (data.permalink) embed.setURL(data.permalink);
+
   return { embeds: [embed] };
+}
+
+function truncate(content, maxLength) {
+  if (content.length <= maxLength) return content;
+  return `${content.slice(0, maxLength - 3)}...`;
 }

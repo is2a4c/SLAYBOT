@@ -120,7 +120,7 @@ async function closeTicket(channel, closedBy, reason) {
     // send embed to log channel
     if (config.ticket.log_channel) {
       const logChannel = channel.guild.channels.cache.get(config.ticket.log_channel);
-      logChannel.safeSend({ embeds: [embed], components });
+      if (logChannel) logChannel.safeSend({ embeds: [embed], components });
     }
 
     // send embed to user
@@ -175,7 +175,8 @@ async function handleTicketOpen(interaction) {
 
   // limit check
   const existing = getTicketChannels(guild).size;
-  if (existing > settings.ticket.limit) return interaction.followUp("There are too many open tickets. Try again later");
+  if (existing >= settings.ticket.limit)
+    return interaction.followUp("There are too many open tickets. Try again later");
 
   // check categories
   let catName = null;
@@ -184,7 +185,9 @@ async function handleTicketOpen(interaction) {
   const categories = settings.ticket.categories;
   if (categories.length > 0) {
     const options = [];
-    settings.ticket.categories.forEach((cat) => options.push({ label: cat.name, value: cat.name }));
+    settings.ticket.categories
+      .slice(0, 25)
+      .forEach((cat) => options.push({ label: cat.name.slice(0, 100), value: cat.name.slice(0, 100) }));
     const menuRow = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId("ticket-menu")
@@ -192,10 +195,11 @@ async function handleTicketOpen(interaction) {
         .addOptions(options)
     );
 
-    await interaction.followUp({ content: "Please choose a ticket category", components: [menuRow] });
-    const res = await interaction.channel
+    const prompt = await interaction.editReply({ content: "Please choose a ticket category", components: [menuRow] });
+    const res = await prompt
       .awaitMessageComponent({
         componentType: ComponentType.StringSelect,
+        filter: (i) => i.customId === "ticket-menu" && i.user.id === user.id && i.message.id === prompt.id,
         time: 60 * 1000,
       })
       .catch((err) => {
@@ -203,6 +207,7 @@ async function handleTicketOpen(interaction) {
       });
 
     if (!res) return interaction.editReply({ content: "Timed out. Try again", components: [] });
+    await res.deferUpdate();
     await interaction.editReply({ content: "Processing", components: [] });
     catName = res.values[0];
     selectedCategory = categories.find((cat) => cat.name === catName);

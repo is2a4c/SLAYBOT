@@ -29,5 +29,6 @@ module.exports = {
     User: require("./schemas/User"),
     Suggestions: require("./schemas/Suggestions").model,
     BlockedServer: require("./schemas/BlockedServer"),
+    SlayNode: require("./schemas/slaynode"),
   },
 };

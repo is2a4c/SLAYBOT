@@ -157,8 +157,9 @@ async function search({ member, guild, channel }, query) {
       break;
 
     case "SEARCH_RESULT": {
-      let max = guild.client.config.MUSIC.MAX_SEARCH_RESULTS;
-      if (res.tracks.length < max) max = res.tracks.length;
+      let max = Number.parseInt(guild.client.config.MUSIC.MAX_SEARCH_RESULTS, 10);
+      if (!Number.isInteger(max) || max < 1) max = 10;
+      max = Math.min(max, 25, res.tracks.length);
 
       const results = res.tracks.slice(0, max);
       const options = results.map((result, index) => ({
@@ -186,15 +187,15 @@ async function search({ member, guild, channel }, query) {
 
       try {
         const response = await channel.awaitMessageComponent({
-          filter: (reactor) => reactor.message.id === sentMsg.id && reactor.user.id === member.id,
-          idle: 30 * 1000,
+          filter: (reactor) =>
+            reactor.customId === "search-results" && reactor.message.id === sentMsg.id && reactor.user.id === member.id,
+          time: 30 * 1000,
           componentType: ComponentType.StringSelect,
         });
 
-        await sentMsg.delete();
-        if (!response) return "🚫 You took too long to select the songs";
+        await response.deferUpdate();
+        await sentMsg.delete().catch(() => {});
 
-        if (response.customId !== "search-results") return;
         const toAdd = [];
         response.values.forEach((v) => toAdd.push(results[v]));
 
@@ -209,8 +210,9 @@ async function search({ member, guild, channel }, query) {
             .setFooter({ text: `Requested By: ${member.user.username}` });
         }
       } catch (err) {
-        console.log(err);
-        await sentMsg.delete();
+        await sentMsg.delete().catch(() => {});
+        if (err?.message?.includes("time")) return "🚫 You took too long to select the songs";
+        guild.client.logger.error("Search selection", toError(err));
         return "🚫 Failed to register your response";
       }
     }

@@ -47,7 +47,8 @@ async function getInviter({ guild }, user, settings) {
   const inviteData = (await getMember(guild.id, user.id)).invite_data;
   if (!inviteData || !inviteData.inviter) return `Cannot track how \`${user.username}\` joined`;
 
-  const inviter = await guild.client.users.fetch(inviteData.inviter, false, true);
+  const isVanityInvite = inviteData.inviter === "VANITY";
+  const inviter = isVanityInvite ? null : await guild.client.users.fetch(inviteData.inviter).catch(() => null);
   const inviterData = (await getMember(guild.id, inviteData.inviter)).invite_data;
 
   const embed = new EmbedBuilder()
@@ -55,7 +56,7 @@ async function getInviter({ guild }, user, settings) {
     .setAuthor({ name: `Invite data for ${user.username}` })
     .setDescription(
       stripIndent`
-      Inviter: \`${inviter?.username || "Deleted User"}\`
+      Inviter: \`${isVanityInvite ? "Vanity URL" : inviter?.username || "Deleted User"}\`
       Inviter ID: \`${inviteData.inviter}\`
       Invite Code: \`${inviteData.code}\`
       Inviter Invites: \`${getEffectiveInvites(inviterData)}\`

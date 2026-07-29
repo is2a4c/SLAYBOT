@@ -44,7 +44,7 @@ module.exports = {
 async function volume({ client, guildId }, volume) {
   const player = client.musicManager.getPlayer(guildId);
 
-  if (!volume) return `> The player volume is \`${player.volume}\`.`;
+  if (volume === null || volume === undefined || volume === "") return `> The player volume is \`${player.volume}\`.`;
   if (volume < 1 || volume > 100) return "you need to give me a volume between 1 and 100.";
 
   await player.setVolume(volume);
