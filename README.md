@@ -34,7 +34,7 @@
   </p>
 </div>
 
-> **v3 — это единая платформа для сервера:** обычные и slash-команды, глубокая AutoMod-защита, локальный анализ изображений с OCR и SlayNode для безопасного распределённого вычисления.
+> **v3 — это единая платформа для сервера:** обычные и slash-команды, глубокая AutoMod-защита, Smart Invites, локальный анализ изображений с OCR и SlayNode для безопасного распределённого вычисления.
 
 <div align="center">
   <a href="#quick-start">Быстрый старт</a>
@@ -194,14 +194,14 @@ npm run slaynode:enroll
 
 ## <a id="commands"></a>🎮 Карта команд
 
-В репозитории **133 command modules** в 16 категориях. Полный список и актуальные параметры — в документации; ниже — удобная карта возможностей v3.
+В репозитории **137 command modules** в 16 категориях. Полный список и актуальные параметры — в документации; ниже — удобная карта возможностей v3.
 
 | Пространство           | Что внутри                                                                                                        | Документация                                                                      |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | 🛡️ **Admin & AutoMod** | anti spam, image spam, ghost ping, mass mention, whitelist, actions, modlog, auto-delete, roles, welcome/farewell | [Admin](docs/commands/admin.md)                                                   |
 | 🔨 **Moderation**      | warn, timeout, kick, ban, purge по фильтрам, voice moderation, nicknames                                          | [Moderation](docs/commands/moderation.md)                                         |
 | 🛰️ **SlayNode**        | enrollment, privacy policy, node health, limits, credits, tiers, rotation и audit log                             | [Architecture](docs/slaynode/architecture.md)                                     |
-| 🎫 **Server workflow** | тикеты, предложения, reaction roles, счётчики, giveaways, invite tracking                                         | [Giveaways](docs/commands/giveaways.md) · [Invites](docs/commands/invites.md)     |
+| 🎫 **Server workflow** | тикеты, предложения, reaction roles, giveaways, invite tracking и постоянные Smart Invites                        | [Giveaways](docs/commands/giveaways.md) · [Invites](docs/commands/invites.md) · [Smart Invites](docs/smart-invites.md) |
 | 📈 **Community**       | XP, rank, leaderboard, reputation, экономика, daily и gamble                                                      | [Stats](docs/commands/stats.md) · [Economy](docs/commands/economy.md)             |
 | 🎵 **Media**           | play, queue, search, seek, filters, Spotify support и Lavalink                                                    | [Music](docs/commands/music.md)                                                   |
 | 🖼️ **Creative**        | filters, overlays и генераторы изображений                                                                        | [Image](docs/commands/image.md)                                                   |
@@ -260,6 +260,9 @@ npm run slaynode:enroll
 - [ ] Секреты доступны только в environment или vault, а не в репозитории.
 - [ ] MongoDB защищён сетевой политикой и резервным копированием.
 - [ ] Для SlayNode control plane настроен HTTPS reverse proxy.
+- [ ] Для Smart Invites проверены DNS, выпущенный TLS-сертификат, reverse proxy и закрытый от внешней сети локальный port.
+- [ ] `SMART_INVITES.baseURL` использует канонический HTTPS URL; Privacy/Terms и abuse contact доступны.
+- [ ] MongoDB backup включает `smart_invites` и `smart_invite_controls`, а Discord-бот имеет права в выбранных каналах.
 - [ ] У worker-ов есть CPU/RAM limits и отдельные credentials.
 - [ ] Перед релизом проходят <code>npm test</code>, <code>npm run lint</code> и <code>npm run runtime:check</code>.
 - [ ] Порог image spam и automod action протестированы на правилах вашего сообщества.

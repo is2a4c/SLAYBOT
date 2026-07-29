@@ -35,6 +35,14 @@ module.exports = async (client) => {
   // Load reaction roles to cache
   await cacheReactionRoles(client);
 
+  if (client.config.SMART_INVITES.enabled) {
+    try {
+      await require("@src/services/smart-invites/runtime").start(client);
+    } catch (error) {
+      client.logger.error("Failed to start Smart Invites", error);
+    }
+  }
+
   for (const guild of client.guilds.cache.values()) {
     const settings = await getSettings(guild);
 

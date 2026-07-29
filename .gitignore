@@ -2,6 +2,7 @@
 node_modules/
 logs/*
 config.js
+!src/services/smart-invites/config.js
 *.code-workspace
 .vscode
 docker-compose.yml

@@ -1,5 +1,5 @@
 ---
-description: 10 commands
+description: invite tracking and Smart Invites
 ---
 
 # 📨 Invites
@@ -16,3 +16,10 @@ description: 10 commands
 | **!addinvites \<member> \<amount>**    | **/addinvites**        | add invites to a member                                     |
 | **!resetinvites \<member>**            | **/resetinvites**      | clear previously added invites                              |
 | **!invitesimport \[member]**           | **/invitesimport**     | add existing guild invites to users                         |
+| —                                      | **/smart-invite**      | create and manage stable public Discord invite pages        |
+
+`/smart-invite` содержит подкоманды `create`, `list`, `info`, `refresh`,
+`set-channel`, `set-description`, `remove-description`, `rename` и `delete`.
+Изменения требуют `Manage Server`; выбранный канал должен разрешать боту
+`View Channel` и `Create Instant Invite`. Полная эксплуатационная документация:
+[Smart Invites](../smart-invites.md).

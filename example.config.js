@@ -45,6 +45,33 @@ module.exports = {
     ],
   },
 
+  // Stable public Discord invite pages. Requires MongoDB and a reverse proxy
+  // terminating HTTPS in production.
+  SMART_INVITES: {
+    enabled: false,
+    baseURL: "https://slaybot.televibe.host",
+    pathPrefix: "",
+    host: "127.0.0.1",
+    port: 8081,
+    maxPerGuild: 5,
+    validationTtlMs: 300000,
+    healthCheckIntervalMs: 900000,
+    regenerationLeaseMs: 15000,
+    deletedSlugRetentionMs: 2592000000,
+    aliasRetentionMs: 2592000000,
+    backgroundChecks: true,
+    redirectMode: "preview",
+    officialGuildId: "",
+    officialSlug: "slaybot",
+    reservedSlugs: [],
+    blockedGuildIds: [],
+    trustProxy: true,
+    commandCooldownSeconds: 5,
+    publicRateLimitWindowMs: 60000,
+    publicRateLimitMax: 120,
+    backgroundConcurrency: 3,
+  },
+
   // Prefix Commands Configuration
   PREFIX_COMMANDS: {
     enabled: true,

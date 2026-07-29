@@ -96,6 +96,11 @@ pm2 save
 pm2 startup
 ```
 
+Если включены Smart Invites, до рестарта отдельно настройте DNS и фактически
+выпустите TLS-сертификат, затем проксируйте публичный HTTPS domain на
+`SMART_INVITES.host:port`. Готовые Nginx/Caddy examples, backup checklist и
+smoke test находятся в [docs/smart-invites.md](docs/smart-invites.md).
+
 ### Quick Deploy
 ```bash
 ./deploy.sh

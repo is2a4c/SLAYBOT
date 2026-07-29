@@ -5,6 +5,7 @@ const {
   formHandler,
   statsHandler,
   suggestionHandler,
+  smartInvitesHandler,
   ticketHandler,
 } = require("@src/handlers");
 const { InteractionType } = require("discord.js");
@@ -34,6 +35,8 @@ module.exports = async (client, interaction) => {
 
   // Buttons
   else if (interaction.isButton()) {
+    if (await smartInvitesHandler.handleButton(interaction)) return;
+
     // form buttons carry the form id: FORM_FILL:<formId>
     if (interaction.customId.startsWith(`${formHandler.BUTTON_PREFIX}:`)) {
       return formHandler.handleFormButton(interaction);

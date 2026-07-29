@@ -157,6 +157,30 @@ const DEFAULT_CONFIG = {
       { name: "Bronze", score: 0 },
     ],
   },
+  SMART_INVITES: {
+    enabled: false,
+    baseURL: "https://slaybot.televibe.host",
+    pathPrefix: "",
+    host: "127.0.0.1",
+    port: 8081,
+    maxPerGuild: 5,
+    validationTtlMs: 300000,
+    healthCheckIntervalMs: 900000,
+    regenerationLeaseMs: 15000,
+    deletedSlugRetentionMs: 2592000000,
+    aliasRetentionMs: 2592000000,
+    backgroundChecks: true,
+    redirectMode: "preview",
+    officialGuildId: "",
+    officialSlug: "slaybot",
+    reservedSlugs: [],
+    blockedGuildIds: [],
+    trustProxy: true,
+    commandCooldownSeconds: 5,
+    publicRateLimitWindowMs: 60000,
+    publicRateLimitMax: 120,
+    backgroundConcurrency: 3,
+  },
 };
 
 const COLOR_DEFAULTS = {
@@ -252,8 +276,24 @@ function applyBrandTheme(config) {
   }
 }
 
+function applySmartInviteEnvironment(config) {
+  const smartInvites = config.SMART_INVITES;
+  if (!smartInvites) return;
+
+  if (process.env.SMART_INVITES_ENABLED !== undefined) {
+    smartInvites.enabled = process.env.SMART_INVITES_ENABLED === "true";
+  }
+  if (process.env.SMART_INVITES_BASE_URL) {
+    smartInvites.baseURL = process.env.SMART_INVITES_BASE_URL;
+  }
+  if (process.env.SMART_INVITES_OFFICIAL_GUILD_ID) {
+    smartInvites.officialGuildId = process.env.SMART_INVITES_OFFICIAL_GUILD_ID;
+  }
+}
+
 function applyConfigDefaults(config = require("@root/config")) {
   mergeMissing(config, DEFAULT_CONFIG);
+  applySmartInviteEnvironment(config);
   normalizeColors(config);
   applyBrandTheme(config);
   return config;
@@ -262,5 +302,6 @@ function applyConfigDefaults(config = require("@root/config")) {
 module.exports = {
   DEFAULT_CONFIG,
   BRAND_ACCENT,
+  applySmartInviteEnvironment,
   applyConfigDefaults,
 };

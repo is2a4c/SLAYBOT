@@ -24,11 +24,21 @@ const ROOTS = [
   "PREFIX_COMMANDS",
   "PRESENCE",
   "STATS",
+  "SMART_INVITES",
   "SUGGESTIONS",
   "TICKET",
 ];
 
-const SOURCE_DIRS = ["src/commands", "src/contexts", "src/events", "src/handlers", "src/helpers", "src/structures"];
+const SOURCE_DIRS = [
+  "src/commands",
+  "src/contexts",
+  "src/events",
+  "src/handlers",
+  "src/helpers",
+  "src/services",
+  "src/structures",
+  "src/web",
+];
 
 function recursiveReadDir(dir) {
   const files = [];
