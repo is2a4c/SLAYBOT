@@ -1,0 +1,24 @@
+services:
+  slaynode:
+    build:
+      context: .
+      dockerfile: Dockerfile.slaynode
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+      - /app/.cache:size=2g,uid=1001,gid=1001
+    environment:
+      SLAYNODE_CONTROL_URL: ${SLAYNODE_CONTROL_URL:?required}
+      SLAYNODE_ID: ${SLAYNODE_ID:?required}
+      SLAYNODE_SECRET: ${SLAYNODE_SECRET:?required}
+      SLAYNODE_PARALLELISM: ${SLAYNODE_PARALLELISM:-1}
+      SLAYNODE_RAM_MB: ${SLAYNODE_RAM_MB:-1024}
+      SLAYNODE_JOB_TIMEOUT_MS: ${SLAYNODE_JOB_TIMEOUT_MS:-120000}
+    cpus: ${SLAYNODE_CPU_LIMIT:-1.0}
+    mem_limit: ${SLAYNODE_MEMORY_LIMIT:-1536m}
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

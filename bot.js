@@ -37,6 +37,22 @@ process.on("unhandledRejection", (err) => client.logger.error(`Unhandled excepti
     await initializeMongoose();
   }
 
+  await require("@src/slaynode/control/runtime").start(client);
+
   await client.login(process.env.BOT_TOKEN);
 })();
+
+async function shutdown(signal) {
+  client.logger.log(`Received ${signal}, shutting down`);
+  await require("@src/slaynode/control/runtime")
+    .stop()
+    .catch(() => {});
+  client.destroy();
+  await require("mongoose")
+    .disconnect()
+    .catch(() => {});
+  process.exit(0);
+}
+process.once("SIGTERM", () => shutdown("SIGTERM"));
+process.once("SIGINT", () => shutdown("SIGINT"));
 // deploy final test Fri Apr  3 17:41:35 MSK 2026
