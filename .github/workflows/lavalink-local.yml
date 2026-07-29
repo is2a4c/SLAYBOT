@@ -1,0 +1,76 @@
+name: Local Lavalink
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Install, inspect, or roll back the isolated Lavalink stack
+        required: true
+        default: status
+        type: choice
+        options:
+          - status
+          - install
+          - rollback
+
+concurrency:
+  group: lavalink-local
+  cancel-in-progress: false
+
+jobs:
+  infrastructure:
+    name: Lavalink infrastructure
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    env:
+      HYSTERIA_AUTH: ${{ secrets.HYSTERIA_AUTH }}
+      LAVALINK_LOCAL_PASSWORD: ${{ secrets.LAVALINK_LOCAL_PASSWORD }}
+    steps:
+      - name: Apply on the local bot server
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          HYSTERIA_AUTH: ${{ env.HYSTERIA_AUTH }}
+          LAVALINK_LOCAL_PASSWORD: ${{ env.LAVALINK_LOCAL_PASSWORD }}
+          HYSTERIA_SERVER: vpn.televibe.host
+          HYSTERIA_PORT: "18443"
+          HYSTERIA_SNI: vpn.televibe.host
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: root
+          password: ${{ secrets.SERVER_ROOT_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script_stop: true
+          command_timeout: 15m
+          envs: HYSTERIA_AUTH,LAVALINK_LOCAL_PASSWORD,HYSTERIA_SERVER,HYSTERIA_PORT,HYSTERIA_SNI
+          script: |
+            set -e
+            cd /opt/slaybot
+            bash ops/lavalink/install.sh "${{ inputs.action }}"
+
+  reconnect-bot:
+    name: Reconnect SLAYBOT
+    if: ${{ inputs.action == 'install' }}
+    needs: infrastructure
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Reload and verify the bot
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+            cd /opt/slaybot
+            pm2 reload slaybot --update-env
+            sleep 12
+            pm2 describe slaybot | grep -E "status.*online"
+            curl -fsS --max-time 5 http://127.0.0.1:2333/version
+            tail -n 100 "$HOME/.pm2/logs/slaybot-out.log" |
+              grep -F 'Node "local-lavalink" connected' |
+              tail -1

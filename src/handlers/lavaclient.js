@@ -3,6 +3,7 @@ const { Cluster } = require("lavaclient");
 const prettyMs = require("pretty-ms");
 const { load: loadSpotify, SpotifyItemType } = require("@lavaclient/spotify");
 const { Queue, LoopType, load: loadQueue } = require("@lavaclient/queue");
+const { getLavalinkNodes } = require("@helpers/LavalinkNodes");
 
 const LAVALINK_V4_MAY_START_NEXT = {
   finished: true,
@@ -42,7 +43,7 @@ module.exports = (client) => {
   });
 
   const lavaclient = new Cluster({
-    nodes: normalizeNodes(client.config.MUSIC.LAVALINK_NODES, client),
+    nodes: normalizeNodes(getLavalinkNodes(client.config.MUSIC.LAVALINK_NODES), client),
     discord: {
       userId: client.user.id,
       sendGatewayCommand: (id, payload) => client.guilds.cache.get(id)?.shard?.send(payload),
