@@ -188,4 +188,8 @@ jobs:
             sleep 10
             pm2 describe slaybot | grep -F "$DEPLOY_DIR/bot.js"
             pm2 describe slaybot | grep -E "status.*online"
+            health="$(curl --fail --silent --show-error --max-time 10 http://127.0.0.1:8081/health)"
+            printf '%s\n' "$health" | grep -F '"service":"slaybot-smart-invites"'
+            printf '%s\n' "$health" | grep -F '"status":"ok"'
             echo "slaybot is online from $DEPLOY_DIR/bot.js"
+            echo "Smart Invites backend is healthy on 127.0.0.1:8081"
