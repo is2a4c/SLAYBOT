@@ -1,7 +1,7 @@
 <%- include("../partials/head", { title, guild }) %>
 <h1>Automod</h1>
 
-<form class="panel" method="post" action="/g/<%= guild.id %>/automod">
+<form class="panel" method="post" action="<%= basePath %>/g/<%= guild.id %>/automod">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
 
   <div class="field">

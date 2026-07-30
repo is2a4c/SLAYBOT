@@ -1,7 +1,7 @@
 <%- include("../partials/head", { title, guild }) %>
 <h1>ModLog</h1>
 
-<form class="panel" method="get" action="/g/<%= guild.id %>/modlog">
+<form class="panel" method="get" action="<%= basePath %>/g/<%= guild.id %>/modlog">
   <div class="field">
     <label for="type">Тип</label>
     <select id="type" name="type">
@@ -30,7 +30,7 @@
         <tr>
           <td><%= new Date(e.created_at).toLocaleString("ru-RU") %></td>
           <td><%= e.type %></td>
-          <td><a href="/g/<%= guild.id %>/members/<%= e.member_id %>"><%= e.member_id %></a></td>
+          <td><a href="<%= basePath %>/g/<%= guild.id %>/members/<%= e.member_id %>"><%= e.member_id %></a></td>
           <td><%= e.admin?.tag || e.admin?.id %></td>
           <td><%= e.reason || "—" %></td>
         </tr>

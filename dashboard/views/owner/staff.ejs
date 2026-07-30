@@ -17,7 +17,7 @@
         <td><%= a.addedBy %></td>
         <td><%= new Date(a.added_at).toLocaleDateString("ru-RU") %></td>
         <td>
-          <form method="post" action="/owner/staff/<%= a._id %>/remove">
+          <form method="post" action="<%= basePath %>/owner/staff/<%= a._id %>/remove">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
             <button type="submit" class="btn danger">Удалить</button>
           </form>
@@ -29,7 +29,7 @@
 
 <div class="panel">
   <h2 style="margin-top:0">Добавить сотрудника</h2>
-  <form method="post" action="/owner/staff">
+  <form method="post" action="<%= basePath %>/owner/staff">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
     <div class="field">
       <label for="discordId">Discord ID</label>

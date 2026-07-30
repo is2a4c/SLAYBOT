@@ -34,6 +34,20 @@ test("sanitizeRedirectPath only allows relative paths under known prefixes", () 
   assert.equal(sanitizeRedirectPath(null), "/");
 });
 
+test("sanitizeRedirectPath is basePath-aware when the app is mounted under a path prefix", () => {
+  assert.equal(
+    sanitizeRedirectPath("/dashboard/g/123456789012345678", "/dashboard"),
+    "/dashboard/g/123456789012345678"
+  );
+  assert.equal(sanitizeRedirectPath("/dashboard/owner/staff", "/dashboard"), "/dashboard/owner/staff");
+  assert.equal(sanitizeRedirectPath("/dashboard", "/dashboard"), "/dashboard/");
+  assert.equal(sanitizeRedirectPath("/dashboard/", "/dashboard"), "/dashboard/");
+  // A path that matches an allowed suffix but escaped the mount (e.g. left over
+  // from a differently-mounted deployment, or a crafted value) must not be trusted.
+  assert.equal(sanitizeRedirectPath("/g/123456789012345678", "/dashboard"), "/dashboard/");
+  assert.equal(sanitizeRedirectPath("//evil.com", "/dashboard"), "/dashboard/");
+});
+
 test("createState/consumeState round-trips once, rejects a wrong token, and is single-use", () => {
   // A wrong token against a valid, unexpired state must fail - and the state is
   // still consumed (cleared) so it can't be brute-forced across requests.

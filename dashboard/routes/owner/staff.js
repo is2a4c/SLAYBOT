@@ -22,7 +22,9 @@ router.post("/", requireCsrf, requirePermission("staff.manage"), async (req, res
   const role = String(req.body.role || "");
 
   if (!SNOWFLAKE.test(discordId) || !STAFF_ROLES.includes(role)) {
-    return res.redirect(`/owner/staff?error=${encodeURIComponent("Укажите корректный Discord ID и роль.")}`);
+    return res.redirect(
+      `${res.locals.basePath}/owner/staff?error=${encodeURIComponent("Укажите корректный Discord ID и роль.")}`
+    );
   }
 
   await upsertStaffAccount(discordId, role, req.session.user.id);
@@ -35,7 +37,7 @@ router.post("/", requireCsrf, requirePermission("staff.manage"), async (req, res
     after: { role },
   });
 
-  res.redirect("/owner/staff");
+  res.redirect(`${res.locals.basePath}/owner/staff`);
 });
 
 router.post("/:discordId/remove", requireCsrf, requirePermission("staff.manage"), async (req, res) => {
@@ -47,7 +49,7 @@ router.post("/:discordId/remove", requireCsrf, requirePermission("staff.manage")
     targetType: "staff_account",
     targetId: req.params.discordId,
   });
-  res.redirect("/owner/staff");
+  res.redirect(`${res.locals.basePath}/owner/staff`);
 });
 
 module.exports = router;

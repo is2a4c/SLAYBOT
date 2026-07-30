@@ -15,7 +15,7 @@
           </div>
         </div>
         <% if (g.botPresent) { %>
-          <a class="btn" href="/g/<%= g.id %>">Открыть</a>
+          <a class="btn" href="<%= basePath %>/g/<%= g.id %>">Открыть</a>
         <% } else { %>
           <a class="btn secondary" href="<%= g.inviteUrl %>" target="_blank" rel="noopener">Пригласить</a>
         <% } %>
@@ -25,6 +25,6 @@
 <% } %>
 
 <% if (isOwnerUser) { %>
-  <p><a href="/owner">→ Owner Control Center</a></p>
+  <p><a href="<%= basePath %>/owner">→ Owner Control Center</a></p>
 <% } %>
 <%- include("partials/foot") %>

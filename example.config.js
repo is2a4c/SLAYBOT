@@ -19,11 +19,17 @@ module.exports = {
     MEMBERS: 50,
   },
 
-  // Dashboard Configuration
+  // Dashboard Configuration. The app always serves itself under the /dashboard
+  // path (see dashboard/app.js) so it can share a domain/reverse proxy with
+  // other services (e.g. Smart Invites) without colliding at the root - set
+  // baseURL to the full public URL INCLUDING that path, e.g.
+  // "https://your-domain.example/dashboard". failureURL only needs to be a
+  // truthy string (kept for backwards-compatible validation); OAuth failures
+  // just redirect back to the dashboard root.
   DASHBOARD: {
     enabled: false,
-    baseURL: "http://localhost:8080",
-    failureURL: "http://localhost:8080/failure",
+    baseURL: "http://localhost:8080/dashboard",
+    failureURL: "http://localhost:8080/dashboard",
     port: 8080,
   },
 

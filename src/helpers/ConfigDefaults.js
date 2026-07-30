@@ -17,8 +17,8 @@ const DEFAULT_CONFIG = {
   },
   DASHBOARD: {
     enabled: false,
-    baseURL: "http://localhost:8080",
-    failureURL: "http://localhost:8080/failure",
+    baseURL: "http://localhost:8080/dashboard",
+    failureURL: "http://localhost:8080/dashboard",
     port: 8080,
   },
   PREFIX_COMMANDS: {

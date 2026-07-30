@@ -4,29 +4,29 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title><%= typeof title !== "undefined" ? title + " — SLAYBOT" : "SLAYBOT" %></title>
-  <link rel="stylesheet" href="/style.css" />
-  <script src="/dashboard.js" defer></script>
+  <link rel="stylesheet" href="<%= basePath %>/style.css" />
+  <script src="<%= basePath %>/dashboard.js" defer></script>
 </head>
 <body>
   <header class="topbar">
-    <a href="/" class="brand">SLAYBOT</a>
+    <a href="<%= basePath %>/" class="brand">SLAYBOT</a>
     <nav>
       <% if (typeof guild !== "undefined" && guild) { %>
-        <a href="/g/<%= guild.id %>">Обзор</a>
-        <a href="/g/<%= guild.id %>/config">Настройки</a>
-        <a href="/g/<%= guild.id %>/automod">Automod</a>
-        <a href="/g/<%= guild.id %>/modlog">ModLog</a>
-        <a href="/g/<%= guild.id %>/smart-invites">Smart Invites</a>
-        <a href="/g/<%= guild.id %>/diagnostics">Диагностика</a>
-        <a href="/g/<%= guild.id %>/audit">Audit Log</a>
-        <a href="/">← Мои серверы</a>
+        <a href="<%= basePath %>/g/<%= guild.id %>">Обзор</a>
+        <a href="<%= basePath %>/g/<%= guild.id %>/config">Настройки</a>
+        <a href="<%= basePath %>/g/<%= guild.id %>/automod">Automod</a>
+        <a href="<%= basePath %>/g/<%= guild.id %>/modlog">ModLog</a>
+        <a href="<%= basePath %>/g/<%= guild.id %>/smart-invites">Smart Invites</a>
+        <a href="<%= basePath %>/g/<%= guild.id %>/diagnostics">Диагностика</a>
+        <a href="<%= basePath %>/g/<%= guild.id %>/audit">Audit Log</a>
+        <a href="<%= basePath %>/">← Мои серверы</a>
       <% } %>
       <% if (locals.isOwnerUser) { %>
-        <a href="/owner">Owner</a>
+        <a href="<%= basePath %>/owner">Owner</a>
       <% } %>
     </nav>
     <% if (locals.sessionUser) { %>
-      <form method="post" action="/auth/logout" class="logout-form">
+      <form method="post" action="<%= basePath %>/auth/logout" class="logout-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
         <span class="username"><%= sessionUser.username %></span>
         <button type="submit" class="link-button">Выйти</button>

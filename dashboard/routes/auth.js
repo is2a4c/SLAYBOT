@@ -8,8 +8,8 @@ router.get("/login", (req, res) => {
   if (!req.client.user?.id) {
     return res.status(503).render("error", { title: "Бот не готов", message: "Бот ещё подключается к Discord." });
   }
-  const redirectTo = typeof req.query.redirect === "string" ? req.query.redirect : "/";
-  const state = createState(req, redirectTo);
+  const redirectTo = typeof req.query.redirect === "string" ? req.query.redirect : `${res.locals.basePath}/`;
+  const state = createState(req, redirectTo, res.locals.basePath);
   const config = req.client.config.DASHBOARD;
 
   res.redirect(
@@ -28,7 +28,7 @@ router.get("/callback", async (req, res) => {
 
   if (!code || redirectTo === null) {
     req.client.logger.debug("Dashboard OAuth callback rejected: missing code or invalid/expired state");
-    return res.redirect(config.failureURL);
+    return res.redirect(`${res.locals.basePath}/`);
   }
 
   try {
@@ -62,25 +62,26 @@ router.get("/callback", async (req, res) => {
     req.session.regenerate((regenerateErr) => {
       if (regenerateErr) {
         req.client.logger.error("dashboard session regenerate failed", regenerateErr);
-        return res.redirect(config.failureURL);
+        return res.redirect(`${res.locals.basePath}/`);
       }
       req.session.user = sessionUser;
       req.session.save((saveErr) => {
         if (saveErr) {
           req.client.logger.error("dashboard session save failed", saveErr);
-          return res.redirect(config.failureURL);
+          return res.redirect(`${res.locals.basePath}/`);
         }
         res.redirect(redirectTo);
       });
     });
   } catch (ex) {
     req.client.logger.error("dashboard oauth callback failed", ex);
-    res.redirect(config.failureURL);
+    res.redirect(`${res.locals.basePath}/`);
   }
 });
 
 router.post("/logout", requireCsrf, (req, res) => {
-  req.session.destroy(() => res.redirect("/"));
+  const basePath = res.locals.basePath;
+  req.session.destroy(() => res.redirect(`${basePath}/`));
 });
 
 module.exports = router;

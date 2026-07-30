@@ -4,8 +4,8 @@ const { resolveEffectivePermissions } = require("@src/services/dashboard/permiss
 
 function requireAuth(req, res, next) {
   if (req.session?.user?.id) return next();
-  const redirect = encodeURIComponent(req.originalUrl || "/");
-  return res.redirect(`/auth/login?redirect=${redirect}`);
+  const redirect = encodeURIComponent(req.originalUrl || `${res.locals.basePath}/`);
+  return res.redirect(`${res.locals.basePath}/auth/login?redirect=${redirect}`);
 }
 
 function requireOwner(req, res, next) {

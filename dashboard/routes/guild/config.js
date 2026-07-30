@@ -60,7 +60,7 @@ router.post("/", requireCsrf, async (req, res) => {
     reason: "Dashboard: базовая конфигурация",
   });
 
-  res.redirect(`/g/${guild.id}/config`);
+  res.redirect(`${res.locals.basePath}/g/${guild.id}/config`);
 });
 
 module.exports = router;

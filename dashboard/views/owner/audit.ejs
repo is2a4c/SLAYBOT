@@ -13,7 +13,7 @@
           <td><%= new Date(e.created_at).toLocaleString("ru-RU") %></td>
           <td><%= e.action %></td>
           <td><%= e.actorTag %> (<%= e.actorId %>)</td>
-          <td><%- e.guildId ? `<a href="/g/${e.guildId}/audit">${e.guildId}</a>` : "—" %></td>
+          <td><%- e.guildId ? `<a href="${basePath}/g/${e.guildId}/audit">${e.guildId}</a>` : "—" %></td>
           <td><%= e.targetType || "—" %><% if (e.targetId) { %> · <%= e.targetId %><% } %></td>
           <td><%= e.reason || "—" %></td>
         </tr>

@@ -18,11 +18,11 @@
           <td><%= r.clickCount %></td>
           <td><%= r.joinButtonClickCount %></td>
           <td class="btn-row">
-            <form method="post" action="/g/<%= guild.id %>/smart-invites/<%= r.slug %>/refresh">
+            <form method="post" action="<%= basePath %>/g/<%= guild.id %>/smart-invites/<%= r.slug %>/refresh">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
               <button type="submit" class="btn secondary">Обновить</button>
             </form>
-            <form method="post" action="/g/<%= guild.id %>/smart-invites/<%= r.slug %>/delete">
+            <form method="post" action="<%= basePath %>/g/<%= guild.id %>/smart-invites/<%= r.slug %>/delete">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
               <button type="submit" class="btn danger">Удалить</button>
             </form>
@@ -35,7 +35,7 @@
 
 <div class="panel">
   <h2 style="margin-top:0">Создать Smart Invite</h2>
-  <form method="post" action="/g/<%= guild.id %>/smart-invites">
+  <form method="post" action="<%= basePath %>/g/<%= guild.id %>/smart-invites">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
     <div class="field">
       <label for="slug">Slug</label>

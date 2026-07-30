@@ -64,7 +64,7 @@ router.post("/:userId/actions", requireCsrf, loadTarget, async (req, res) => {
   const reason = String(req.body.reason || "")
     .trim()
     .slice(0, 480);
-  const backTo = `/g/${guild.id}/members/${userId}`;
+  const backTo = `${res.locals.basePath}/g/${guild.id}/members/${userId}`;
 
   if (reason.length < 3) {
     return res.redirect(`${backTo}?error=${encodeURIComponent("Укажите причину (минимум 3 символа).")}`);

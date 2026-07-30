@@ -38,7 +38,7 @@ router.get("/", async (req, res) => {
 
 router.post("/", requireCsrf, async (req, res) => {
   const { guild } = req;
-  const backTo = `/g/${guild.id}/smart-invites`;
+  const backTo = `${res.locals.basePath}/g/${guild.id}/smart-invites`;
   try {
     const service = getService(req.client);
     service.assertEnabled();
@@ -68,7 +68,7 @@ router.post("/", requireCsrf, async (req, res) => {
 
 router.post("/:slug/refresh", requireCsrf, async (req, res) => {
   const { guild } = req;
-  const backTo = `/g/${guild.id}/smart-invites`;
+  const backTo = `${res.locals.basePath}/g/${guild.id}/smart-invites`;
   try {
     const service = getService(req.client);
     service.assertEnabled();
@@ -91,7 +91,7 @@ router.post("/:slug/refresh", requireCsrf, async (req, res) => {
 
 router.post("/:slug/delete", requireCsrf, async (req, res) => {
   const { guild } = req;
-  const backTo = `/g/${guild.id}/smart-invites`;
+  const backTo = `${res.locals.basePath}/g/${guild.id}/smart-invites`;
   try {
     const service = getService(req.client);
     service.assertEnabled();

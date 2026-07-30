@@ -1,7 +1,7 @@
 <%- include("../partials/head", { title, guild }) %>
 <h1>Базовые настройки</h1>
 
-<form class="panel" method="post" action="/g/<%= guild.id %>/config">
+<form class="panel" method="post" action="<%= basePath %>/g/<%= guild.id %>/config">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
 
   <div class="field">

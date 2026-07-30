@@ -62,7 +62,7 @@ router.post("/", requireCsrf, async (req, res) => {
     reason: "Dashboard: настройки Automod",
   });
 
-  res.redirect(`/g/${guild.id}/automod`);
+  res.redirect(`${res.locals.basePath}/g/${guild.id}/automod`);
 });
 
 module.exports = router;
