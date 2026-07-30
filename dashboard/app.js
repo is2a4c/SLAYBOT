@@ -9,14 +9,28 @@ const { ensureCsrfToken } = require("./auth/csrf");
 
 const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // short-lived on purpose, see plan doc security notes
 
-// The whole app is mounted under this path, not at the web server root, because
-// it shares a public domain/port with another service (Smart Invites) behind an
-// external reverse proxy the user manages on a separate VM - that proxy forwards
-// this exact path prefix straight through (no rewrite), so every internal
-// redirect/link must include it too. res.locals.basePath (set once below, right
-// as requests enter the mount) is what routes/views use for that - never
-// req.baseUrl directly, since that changes at every nested router mount point.
-const MOUNT_PATH = "/dashboard";
+/**
+ * The dashboard shares a public domain/port with another service (Smart
+ * Invites) behind an external reverse proxy the user manages on a separate
+ * VM. That proxy strips its path prefix before forwarding (e.g. a request the
+ * browser sent to /dashboard/g/123 arrives here as plain /g/123) - so Express
+ * mounts everything at the process root, matching what actually arrives.
+ * The browser never sees that stripping though: every link/redirect this app
+ * generates still needs the public prefix, taken from the path portion of
+ * config.DASHBOARD.baseURL, so the next click still goes through the proxy
+ * correctly. That's res.locals.basePath below - a fixed value from config,
+ * deliberately not req.baseUrl (which would reflect the already-stripped,
+ * root-mounted path instead).
+ * @param {string} baseURL
+ */
+function publicBasePath(baseURL) {
+  try {
+    return new URL(baseURL).pathname.replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+}
+module.exports.publicBasePath = publicBasePath;
 
 /**
  * Boots the SLAYBOT dashboard as an Express app running inside the bot's own
@@ -28,6 +42,7 @@ const MOUNT_PATH = "/dashboard";
 module.exports.launch = async function launch(client) {
   const connection = await initializeMongoose();
   const config = client.config.DASHBOARD;
+  const basePath = publicBasePath(config.baseURL);
   const app = express();
   const dashboardRouter = express.Router();
 
@@ -36,8 +51,8 @@ module.exports.launch = async function launch(client) {
   app.set("view engine", "ejs");
   app.set("views", path.join(__dirname, "views"));
 
-  dashboardRouter.use((req, res, next) => {
-    res.locals.basePath = req.baseUrl;
+  dashboardRouter.use((_req, res, next) => {
+    res.locals.basePath = basePath;
     next();
   });
   dashboardRouter.use(express.static(path.join(__dirname, "public")));
@@ -59,7 +74,7 @@ module.exports.launch = async function launch(client) {
         autoRemoveInterval: 10,
       }),
       cookie: {
-        path: MOUNT_PATH,
+        path: basePath || "/",
         httpOnly: true,
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
@@ -94,10 +109,10 @@ module.exports.launch = async function launch(client) {
     res.status(500).render("error", { title: "Внутренняя ошибка", message: "Что-то пошло не так. Попробуйте позже." });
   });
 
-  app.use(MOUNT_PATH, dashboardRouter);
+  app.use(dashboardRouter);
 
   app.listen(config.port, () => {
-    client.logger.success(`Dashboard is listening on port ${config.port} under ${MOUNT_PATH}`);
+    client.logger.success(`Dashboard is listening on port ${config.port} (public path: ${basePath || "/"})`);
   });
 
   return app;

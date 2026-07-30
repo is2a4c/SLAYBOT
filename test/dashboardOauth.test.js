@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 
 const { buildAuthorizeURL, exchangeCode, fetchDiscordUser, fetchDiscordGuilds } = require("../dashboard/auth/oauth");
 const { createState, consumeState, sanitizeRedirectPath } = require("../dashboard/auth/state");
+const { publicBasePath } = require("../dashboard/app");
 
 function fakeSession() {
   return {};
@@ -46,6 +47,14 @@ test("sanitizeRedirectPath is basePath-aware when the app is mounted under a pat
   // from a differently-mounted deployment, or a crafted value) must not be trusted.
   assert.equal(sanitizeRedirectPath("/g/123456789012345678", "/dashboard"), "/dashboard/");
   assert.equal(sanitizeRedirectPath("//evil.com", "/dashboard"), "/dashboard/");
+});
+
+test("publicBasePath extracts the path portion of the configured baseURL, dropping any trailing slash", () => {
+  assert.equal(publicBasePath("https://slaybot.televibe.host/dashboard"), "/dashboard");
+  assert.equal(publicBasePath("https://slaybot.televibe.host/dashboard/"), "/dashboard");
+  assert.equal(publicBasePath("http://localhost:8080"), "");
+  assert.equal(publicBasePath("http://localhost:8080/"), "");
+  assert.equal(publicBasePath("not a url"), "");
 });
 
 test("createState/consumeState round-trips once, rejects a wrong token, and is single-use", () => {
