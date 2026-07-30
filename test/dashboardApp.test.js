@@ -86,3 +86,11 @@ test("an unknown path renders the 404 page instead of throwing", async () => {
   assert.equal(res.statusCode, 404);
   assert.match(res.body, /Не найдено/);
 });
+
+// Safari enforces form-action against the OAuth redirect target itself (not
+// just actual <form> submissions, more aggressively than the spec), so
+// discord.com must be explicitly allowed or the login button 404s there.
+test("CSP form-action allows discord.com so the OAuth redirect isn't blocked in Safari", async () => {
+  const res = await get("/");
+  assert.match(res.headers["content-security-policy"], /form-action[^;]*\bhttps:\/\/discord\.com\b/);
+});
