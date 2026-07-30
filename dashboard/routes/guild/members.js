@@ -20,13 +20,17 @@ async function loadTarget(req, res, next) {
   const { guild } = req;
   const userId = req.params.userId;
   if (!/^\d{17,20}$/.test(userId)) {
-    return res.status(404).render("error", { title: "Не найдено", message: "Некорректный ID пользователя." });
+    return res
+      .status(404)
+      .render("error", { title: res.locals.t("errors.notFoundTitle"), message: res.locals.t("errors.invalidUserId") });
   }
 
   const member = guild.members.cache.get(userId) || (await guild.members.fetch(userId).catch(() => null));
   const user = member?.user || (await req.client.users.fetch(userId).catch(() => null));
   if (!user) {
-    return res.status(404).render("error", { title: "Не найдено", message: "Discord-пользователь не найден." });
+    return res
+      .status(404)
+      .render("error", { title: res.locals.t("errors.notFoundTitle"), message: res.locals.t("errors.userNotFound") });
   }
 
   req.targetMember = member;

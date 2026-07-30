@@ -25,7 +25,7 @@ router.get("/", requirePermission("guilds.view"), async (req, res) => {
   guilds.sort((a, b) => b.memberCount - a.memberCount);
 
   res.render("owner/index", {
-    title: "Owner Control Center",
+    title: res.locals.t("owner.title"),
     periodDays,
     summary: globalSummary,
     guildCount: client.guilds.cache.size,

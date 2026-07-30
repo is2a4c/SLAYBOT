@@ -5,7 +5,7 @@ const { requirePermission } = require("../../auth/middleware");
 
 router.get("/", requirePermission("audit.view"), async (req, res) => {
   const entries = await listAuditLog({ limit: 300 });
-  res.render("owner/audit", { title: "Глобальный Audit Log", entries });
+  res.render("owner/audit", { title: res.locals.t("audit.globalTitle"), entries });
 });
 
 module.exports = router;

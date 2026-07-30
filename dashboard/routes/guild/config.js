@@ -19,7 +19,7 @@ router.get("/", async (req, res) => {
   const { guild } = req;
   const settings = await getSettings(guild);
   res.render("guild/config", {
-    title: `Настройки — ${guild.name}`,
+    title: `${res.locals.t("config.title")} — ${guild.name}`,
     guild,
     settings,
     textChannels: textChannels(guild),
@@ -57,7 +57,7 @@ router.post("/", requireCsrf, async (req, res) => {
     id: req.session.user.id,
     tag: req.session.user.username,
     action: "guild_config_update",
-    reason: "Dashboard: базовая конфигурация",
+    reason: "Dashboard: base configuration",
   });
 
   res.redirect(`${res.locals.basePath}/g/${guild.id}/config`);

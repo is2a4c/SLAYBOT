@@ -1,34 +1,34 @@
 <%- include("../partials/head", { title }) %>
-<h1>Owner Control Center</h1>
+<h1><%= t("owner.title") %></h1>
 
 <div class="btn-row" style="margin-bottom:16px">
-  <a class="btn secondary" href="?period=1">24ч</a>
-  <a class="btn secondary" href="?period=7">7 дней</a>
-  <a class="btn secondary" href="?period=30">30 дней</a>
-  <a class="btn secondary" href="<%= basePath %>/owner/staff">Staff-роли</a>
-  <a class="btn secondary" href="<%= basePath %>/owner/audit">Audit Log</a>
+  <a class="btn secondary" href="?period=1"><%= t("owner.period24h") %></a>
+  <a class="btn secondary" href="?period=7"><%= t("owner.period7d") %></a>
+  <a class="btn secondary" href="?period=30"><%= t("owner.period30d") %></a>
+  <a class="btn secondary" href="<%= basePath %>/owner/staff"><%= t("owner.staffRoles") %></a>
+  <a class="btn secondary" href="<%= basePath %>/owner/audit"><%= t("nav.audit") %></a>
 </div>
 
 <div class="cards">
-  <div class="card"><div class="label">Серверов</div><div class="value"><%= guildCount %></div></div>
-  <div class="card"><div class="label">Команд</div><div class="value"><%= summary.counters.commands %></div></div>
-  <div class="card"><div class="label">Automod</div><div class="value"><%= summary.counters.automod_actions %></div></div>
-  <div class="card"><div class="label">Ошибки</div><div class="value"><%= summary.counters.client_errors %></div></div>
-  <div class="card"><div class="label">Активные пользователи</div><div class="value"><%= summary.activeUsers ?? "—" %></div></div>
-  <div class="card"><div class="label">Ср. время команды</div><div class="value"><%= summary.commandLatency.averageMs %> мс</div></div>
+  <div class="card"><div class="label"><%= t("owner.guilds") %></div><div class="value"><%= guildCount %></div></div>
+  <div class="card"><div class="label"><%= t("owner.commands") %></div><div class="value"><%= summary.counters.commands %></div></div>
+  <div class="card"><div class="label"><%= t("owner.automod") %></div><div class="value"><%= summary.counters.automod_actions %></div></div>
+  <div class="card"><div class="label"><%= t("owner.errors") %></div><div class="value"><%= summary.counters.client_errors %></div></div>
+  <div class="card"><div class="label"><%= t("owner.activeUsers") %></div><div class="value"><%= summary.activeUsers ?? t("common.none") %></div></div>
+  <div class="card"><div class="label"><%= t("owner.commandLatency") %></div><div class="value"><%= summary.commandLatency.averageMs %> ms</div></div>
 </div>
 
-<h2>Серверы (<%= periodDays %> дн.)</h2>
+<h2><%= t("owner.guildsHeading", { days: periodDays }) %></h2>
 <table>
-  <thead><tr><th>Сервер</th><th>Участники</th><th>Владелец</th><th>Добавлен</th><th>ModLog настроен</th></tr></thead>
+  <thead><tr><th><%= t("common.server") %></th><th><%= t("common.members") %></th><th><%= t("owner.guildOwner") %></th><th><%= t("owner.joinedAt") %></th><th><%= t("owner.modlogConfigured") %></th></tr></thead>
   <tbody>
     <% guilds.forEach((g) => { %>
       <tr>
         <td><a href="<%= basePath %>/g/<%= g.id %>"><%= g.name %></a></td>
         <td><%= g.memberCount %></td>
-        <td><%= g.ownerId || "—" %></td>
-        <td><%= g.joinedAt ? new Date(g.joinedAt).toLocaleDateString("ru-RU") : "—" %></td>
-        <td><span class="badge <%= g.modlogConfigured ? 'pass' : 'warn' %>"><%= g.modlogConfigured ? "да" : "нет" %></span></td>
+        <td><%= g.ownerId || t("common.none") %></td>
+        <td><%= g.joinedAt ? formatDate(g.joinedAt) : t("common.none") %></td>
+        <td><span class="badge <%= g.modlogConfigured ? 'pass' : 'warn' %>"><%= g.modlogConfigured ? t("common.yes") : t("common.no") %></span></td>
       </tr>
     <% }) %>
   </tbody>

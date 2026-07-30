@@ -1,21 +1,21 @@
 <%- include("../partials/head", { title }) %>
-<h1>Глобальный Audit Log</h1>
-<p class="hint">Все действия staff/владельцев во всей панели. Записи нельзя изменить или удалить.</p>
+<h1><%= t("audit.globalTitle") %></h1>
+<p class="hint"><%= t("audit.globalHint") %></p>
 
 <% if (entries.length === 0) { %>
-  <div class="panel empty">Записей нет.</div>
+  <div class="panel empty"><%= t("common.noEntries") %></div>
 <% } else { %>
   <table>
-    <thead><tr><th>Время</th><th>Действие</th><th>Кто</th><th>Сервер</th><th>Цель</th><th>Причина</th></tr></thead>
+    <thead><tr><th><%= t("common.time") %></th><th><%= t("common.action") %></th><th><%= t("common.who") %></th><th><%= t("common.server") %></th><th><%= t("common.target") %></th><th><%= t("common.reason") %></th></tr></thead>
     <tbody>
       <% entries.forEach((e) => { %>
         <tr>
-          <td><%= new Date(e.created_at).toLocaleString("ru-RU") %></td>
+          <td><%= formatDate(e.created_at) %></td>
           <td><%= e.action %></td>
           <td><%= e.actorTag %> (<%= e.actorId %>)</td>
-          <td><%- e.guildId ? `<a href="${basePath}/g/${e.guildId}/audit">${e.guildId}</a>` : "—" %></td>
-          <td><%= e.targetType || "—" %><% if (e.targetId) { %> · <%= e.targetId %><% } %></td>
-          <td><%= e.reason || "—" %></td>
+          <td><%- e.guildId ? `<a href="${basePath}/g/${e.guildId}/audit">${e.guildId}</a>` : t("common.none") %></td>
+          <td><%= e.targetType || t("common.none") %><% if (e.targetId) { %> · <%= e.targetId %><% } %></td>
+          <td><%= e.reason || t("common.none") %></td>
         </tr>
       <% }) %>
     </tbody>

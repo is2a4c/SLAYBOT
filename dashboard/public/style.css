@@ -362,3 +362,22 @@ textarea {
   font-size: 13px;
 }
 
+/* Language switcher */
+.lang-switch {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+.lang-switch a {
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.lang-switch a.active {
+  border-color: var(--accent);
+  color: var(--text);
+}

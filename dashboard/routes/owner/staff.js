@@ -10,7 +10,7 @@ const SNOWFLAKE = /^\d{17,20}$/;
 router.get("/", requirePermission("staff.manage"), async (req, res) => {
   const accounts = await listStaffAccounts();
   res.render("owner/staff", {
-    title: "Staff-роли",
+    title: res.locals.t("owner.staffRoles"),
     accounts,
     roles: STAFF_ROLES,
     error: typeof req.query.error === "string" ? req.query.error : null,

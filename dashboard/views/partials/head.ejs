@@ -12,25 +12,28 @@
     <a href="<%= basePath %>/" class="brand">SLAYBOT</a>
     <nav>
       <% if (typeof guild !== "undefined" && guild) { %>
-        <a href="<%= basePath %>/g/<%= guild.id %>">Обзор</a>
-        <a href="<%= basePath %>/g/<%= guild.id %>/config">Настройки</a>
-        <a href="<%= basePath %>/g/<%= guild.id %>/automod">Automod</a>
-        <a href="<%= basePath %>/g/<%= guild.id %>/modlog">ModLog</a>
-        <a href="<%= basePath %>/g/<%= guild.id %>/smart-invites">Smart Invites</a>
-        <a href="<%= basePath %>/g/<%= guild.id %>/diagnostics">Диагностика</a>
-        <a href="<%= basePath %>/g/<%= guild.id %>/audit">Audit Log</a>
-        <a href="<%= basePath %>/">← Мои серверы</a>
+        <a href="<%= basePath %>/g/<%= guild.id %>"><%= t("nav.overview") %></a>
+        <a href="<%= basePath %>/g/<%= guild.id %>/config"><%= t("nav.config") %></a>
+        <a href="<%= basePath %>/g/<%= guild.id %>/automod"><%= t("nav.automod") %></a>
+        <a href="<%= basePath %>/g/<%= guild.id %>/modlog"><%= t("nav.modlog") %></a>
+        <a href="<%= basePath %>/g/<%= guild.id %>/smart-invites"><%= t("nav.smartInvites") %></a>
+        <a href="<%= basePath %>/g/<%= guild.id %>/diagnostics"><%= t("nav.diagnostics") %></a>
+        <a href="<%= basePath %>/g/<%= guild.id %>/audit"><%= t("nav.audit") %></a>
+        <a href="<%= basePath %>/"><%= t("nav.myServers") %></a>
       <% } %>
       <% if (locals.isOwnerUser) { %>
-        <a href="<%= basePath %>/owner">Owner</a>
+        <a href="<%= basePath %>/owner"><%= t("nav.owner") %></a>
       <% } %>
     </nav>
     <% if (locals.sessionUser) { %>
       <form method="post" action="<%= basePath %>/auth/logout" class="logout-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
         <span class="username"><%= sessionUser.username %></span>
-        <button type="submit" class="link-button">Выйти</button>
+        <button type="submit" class="link-button"><%= t("common.logout") %></button>
       </form>
     <% } %>
+    <span class="lang-switch" aria-label="<%= t("common.language") %>">
+      <% locales.forEach((entry) => { %><a href="?lang=<%= entry.code %>" class="<%= entry.active ? "active" : "" %>"><%= entry.code.toUpperCase() %></a><% }) %>
+    </span>
   </header>
   <main class="content">

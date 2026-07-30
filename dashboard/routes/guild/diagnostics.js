@@ -14,7 +14,7 @@ router.get("/", async (req, res) => {
   const result = runDiagnostics(guild, settings, { smartInvites });
 
   res.render("guild/diagnostics", {
-    title: `Диагностика — ${guild.name}`,
+    title: `${res.locals.t("diagnostics.title")} — ${guild.name}`,
     guild,
     result,
   });

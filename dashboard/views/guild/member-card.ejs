@@ -1,73 +1,73 @@
 <%- include("../partials/head", { title, guild }) %>
 <h1><%= user.username %></h1>
-<p class="hint">ID: <%= user.id %> <% if (isBanned) { %><span class="badge fail">Забанен</span><% } %></p>
+<p class="hint">ID: <%= user.id %> <% if (isBanned) { %><span class="badge fail"><%= t("member.banned") %></span><% } %></p>
 
 <% if (error) { %><div class="error-banner"><%= error %></div><% } %>
 
 <div class="cards">
-  <div class="card"><div class="label">Предупреждения</div><div class="value"><%= memberDb.warnings %></div></div>
-  <div class="card"><div class="label">Strikes</div><div class="value"><%= memberDb.strikes %></div></div>
-  <div class="card"><div class="label">На сервере</div><div class="value"><%= member ? "да" : "нет" %></div></div>
+  <div class="card"><div class="label"><%= t("member.warnings") %></div><div class="value"><%= memberDb.warnings %></div></div>
+  <div class="card"><div class="label"><%= t("member.strikes") %></div><div class="value"><%= memberDb.strikes %></div></div>
+  <div class="card"><div class="label"><%= t("member.inGuild") %></div><div class="value"><%= member ? t("common.yes") : t("common.no") %></div></div>
   <% if (member) { %>
-    <div class="card"><div class="label">Вступил</div><div class="value" style="font-size:14px"><%= member.joinedAt ? new Date(member.joinedAt).toLocaleDateString("ru-RU") : "—" %></div></div>
+    <div class="card"><div class="label"><%= t("member.joined") %></div><div class="value" style="font-size:14px"><%= member.joinedAt ? formatDate(member.joinedAt) : t("common.none") %></div></div>
   <% } %>
 </div>
 
 <% if (member) { %>
   <div class="panel">
-    <strong>Роли:</strong>
-    <%= member.roles.cache.filter((r) => r.id !== guild.id).map((r) => r.name).join(", ") || "—" %>
+    <strong><%= t("member.rolesLabel") %></strong>
+    <%= member.roles.cache.filter((r) => r.id !== guild.id).map((r) => r.name).join(", ") || t("common.none") %>
   </div>
 <% } %>
 
 <div class="panel">
-  <h2 style="margin-top:0">Действия модерации</h2>
+  <h2 style="margin-top:0"><%= t("member.moderationHeading") %></h2>
   <form method="post" action="<%= basePath %>/g/<%= guild.id %>/members/<%= user.id %>/actions">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
     <div class="field">
-      <label for="action">Действие</label>
+      <label for="action"><%= t("common.action") %></label>
       <select id="action" name="action">
         <% if (member) { %>
-          <option value="warn">Предупредить</option>
+          <option value="warn"><%= t("member.warn") %></option>
           <option value="timeout">Timeout</option>
           <option value="kick">Kick</option>
         <% } %>
         <% if (isBanned) { %>
-          <option value="unban">Снять бан</option>
+          <option value="unban"><%= t("member.unban") %></option>
         <% } else { %>
           <option value="ban">Ban</option>
         <% } %>
       </select>
     </div>
     <div class="field">
-      <label for="durationMinutes">Длительность timeout</label>
+      <label for="durationMinutes"><%= t("member.timeoutDuration") %></label>
       <select id="durationMinutes" name="durationMinutes">
         <% Object.entries(timeoutOptions).forEach(([value, minutes]) => { %>
-          <option value="<%= value %>"><%= minutes >= 1440 ? Math.round(minutes / 1440) + " дн." : minutes + " мин." %></option>
+          <option value="<%= value %>"><%= minutes >= 1440 ? t("member.days", { count: Math.round(minutes / 1440) }) : t("member.minutes", { count: minutes }) %></option>
         <% }) %>
       </select>
     </div>
     <div class="field">
-      <label for="reason">Причина (обязательно)</label>
+      <label for="reason"><%= t("member.reasonRequired") %></label>
       <textarea id="reason" name="reason" rows="2" maxlength="480" required></textarea>
     </div>
-    <button type="submit" class="btn danger">Применить</button>
+    <button type="submit" class="btn danger"><%= t("common.apply") %></button>
   </form>
 </div>
 
-<h2>История ModLog</h2>
+<h2><%= t("member.modlogHistory") %></h2>
 <% if (modLogs.length === 0) { %>
-  <div class="panel empty">Записей нет.</div>
+  <div class="panel empty"><%= t("common.noEntries") %></div>
 <% } else { %>
   <table>
-    <thead><tr><th>Время</th><th>Тип</th><th>Модератор</th><th>Причина</th></tr></thead>
+    <thead><tr><th><%= t("common.time") %></th><th><%= t("common.type") %></th><th><%= t("common.moderator") %></th><th><%= t("common.reason") %></th></tr></thead>
     <tbody>
       <% modLogs.forEach((e) => { %>
         <tr>
-          <td><%= new Date(e.created_at).toLocaleString("ru-RU") %></td>
+          <td><%= formatDate(e.created_at) %></td>
           <td><%= e.type %></td>
           <td><%= e.admin?.tag || e.admin?.id %></td>
-          <td><%= e.reason || "—" %></td>
+          <td><%= e.reason || t("common.none") %></td>
         </tr>
       <% }) %>
     </tbody>

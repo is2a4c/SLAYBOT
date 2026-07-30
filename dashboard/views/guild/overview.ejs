@@ -1,10 +1,10 @@
 <%- include("../partials/head", { title, guild }) %>
 <h1><%= guild.name %></h1>
-<p class="hint">ID: <%= guild.id %> · Участников: <%= guild.memberCount %></p>
+<p class="hint"><%= t("overview.idAndMembers", { id: guild.id, count: guild.memberCount }) %></p>
 
 <% if (attention.length > 0) { %>
   <div class="attention">
-    <h2>Требует внимания</h2>
+    <h2><%= t("overview.attention") %></h2>
     <ul>
       <% attention.forEach((item) => { %><li><%= item %></li><% }) %>
     </ul>
@@ -12,17 +12,17 @@
 <% } %>
 
 <div class="cards">
-  <div class="card"><div class="label">Участники</div><div class="value"><%= counters.members %></div></div>
-  <div class="card"><div class="label">Сообщения / 24ч</div><div class="value"><%= counters.messages24h %></div></div>
-  <div class="card"><div class="label">Automod / 24ч</div><div class="value"><%= counters.automodActions24h %></div></div>
-  <div class="card"><div class="label">Открытые тикеты</div><div class="value"><%= counters.openTickets %></div></div>
-  <div class="card"><div class="label">Активные Smart Invites</div><div class="value"><%= counters.activeSmartInvites %></div></div>
-  <div class="card"><div class="label">Ошибки / 24ч</div><div class="value"><%= counters.errors24h %></div></div>
+  <div class="card"><div class="label"><%= t("overview.members") %></div><div class="value"><%= counters.members %></div></div>
+  <div class="card"><div class="label"><%= t("overview.messages24h") %></div><div class="value"><%= counters.messages24h %></div></div>
+  <div class="card"><div class="label"><%= t("overview.automod24h") %></div><div class="value"><%= counters.automodActions24h %></div></div>
+  <div class="card"><div class="label"><%= t("overview.openTickets") %></div><div class="value"><%= counters.openTickets %></div></div>
+  <div class="card"><div class="label"><%= t("overview.activeSmartInvites") %></div><div class="value"><%= counters.activeSmartInvites %></div></div>
+  <div class="card"><div class="label"><%= t("overview.errors24h") %></div><div class="value"><%= counters.errors24h %></div></div>
 </div>
 
 <div class="btn-row">
-  <a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/config">Настройки</a>
+  <a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/config"><%= t("nav.config") %></a>
   <a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/automod">Automod</a>
-  <a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/diagnostics">Диагностика</a>
+  <a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/diagnostics"><%= t("nav.diagnostics") %></a>
 </div>
 <%- include("../partials/foot") %>

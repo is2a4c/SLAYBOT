@@ -3,44 +3,44 @@
 
 <form class="panel" method="get" action="<%= basePath %>/g/<%= guild.id %>/modlog">
   <div class="field">
-    <label for="type">Тип</label>
+    <label for="type"><%= t("common.type") %></label>
     <select id="type" name="type">
-      <option value="">Все</option>
+      <option value=""><%= t("common.all") %></option>
       <% validTypes.forEach((t) => { %>
         <option value="<%= t %>" <%= filterType === t ? "selected" : "" %>><%= t %></option>
       <% }) %>
     </select>
   </div>
   <div class="field">
-    <label for="memberId">ID участника</label>
+    <label for="memberId"><%= t("modlog.memberId") %></label>
     <input type="text" id="memberId" name="memberId" value="<%= filterMemberId || '' %>" />
   </div>
-  <button type="submit" class="btn secondary">Фильтровать</button>
+  <button type="submit" class="btn secondary"><%= t("common.filter") %></button>
 </form>
 
 <% if (entries.length === 0) { %>
-  <div class="panel empty">Записей не найдено.</div>
+  <div class="panel empty"><%= t("common.notFound") %></div>
 <% } else { %>
   <table>
     <thead>
-      <tr><th>Время</th><th>Тип</th><th>Участник</th><th>Модератор</th><th>Причина</th></tr>
+      <tr><th><%= t("common.time") %></th><th><%= t("common.type") %></th><th><%= t("common.member") %></th><th><%= t("common.moderator") %></th><th><%= t("common.reason") %></th></tr>
     </thead>
     <tbody>
       <% entries.forEach((e) => { %>
         <tr>
-          <td><%= new Date(e.created_at).toLocaleString("ru-RU") %></td>
+          <td><%= formatDate(e.created_at) %></td>
           <td><%= e.type %></td>
           <td><a href="<%= basePath %>/g/<%= guild.id %>/members/<%= e.member_id %>"><%= e.member_id %></a></td>
           <td><%= e.admin?.tag || e.admin?.id %></td>
-          <td><%= e.reason || "—" %></td>
+          <td><%= e.reason || t("common.none") %></td>
         </tr>
       <% }) %>
     </tbody>
   </table>
   <div class="pagination">
-    <% if (page > 1) { %><a class="btn secondary" href="?page=<%= page - 1 %>&type=<%= filterType || '' %>&memberId=<%= filterMemberId || '' %>">← Назад</a><% } %>
-    <span>Стр. <%= page %> / <%= totalPages %></span>
-    <% if (page < totalPages) { %><a class="btn secondary" href="?page=<%= page + 1 %>&type=<%= filterType || '' %>&memberId=<%= filterMemberId || '' %>">Вперёд →</a><% } %>
+    <% if (page > 1) { %><a class="btn secondary" href="?page=<%= page - 1 %>&type=<%= filterType || '' %>&memberId=<%= filterMemberId || '' %>"><%= t("common.back") %></a><% } %>
+    <span><%= t("common.page", { page, total: totalPages }) %></span>
+    <% if (page < totalPages) { %><a class="btn secondary" href="?page=<%= page + 1 %>&type=<%= filterType || '' %>&memberId=<%= filterMemberId || '' %>"><%= t("common.next") %></a><% } %>
   </div>
 <% } %>
 <%- include("../partials/foot") %>

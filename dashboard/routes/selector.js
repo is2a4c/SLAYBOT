@@ -30,7 +30,7 @@ router.get("/", requireAuth, (req, res) => {
     })
     .filter((g) => g.manageable);
 
-  res.render("selector", { title: "Мои серверы", guilds, isOwnerUser });
+  res.render("selector", { title: res.locals.t("selector.title"), guilds, isOwnerUser });
 });
 
 module.exports = router;

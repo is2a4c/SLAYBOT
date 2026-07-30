@@ -1,25 +1,25 @@
 <%- include("../partials/head", { title }) %>
-<h1>Staff-роли</h1>
-<p class="hint">Владелец SLAYBOT (config.OWNER_IDS) всегда имеет полный доступ. Здесь выдаются права остальным сотрудникам.</p>
+<h1><%= t("owner.staffRoles") %></h1>
+<p class="hint"><%= t("owner.staffHint") %></p>
 
 <% if (error) { %><div class="error-banner"><%= error %></div><% } %>
 
 <table>
-  <thead><tr><th>Discord ID</th><th>Роль</th><th>Добавил</th><th>Добавлен</th><th></th></tr></thead>
+  <thead><tr><th><%= t("owner.discordId") %></th><th><%= t("common.role") %></th><th><%= t("owner.addedBy") %></th><th><%= t("owner.joinedAt") %></th><th></th></tr></thead>
   <tbody>
     <% if (accounts.length === 0) { %>
-      <tr><td colspan="5" class="empty">Staff-аккаунтов пока нет.</td></tr>
+      <tr><td colspan="5" class="empty"><%= t("owner.staffEmpty") %></td></tr>
     <% } %>
     <% accounts.forEach((a) => { %>
       <tr>
         <td><%= a._id %></td>
         <td><%= a.role %></td>
         <td><%= a.addedBy %></td>
-        <td><%= new Date(a.added_at).toLocaleDateString("ru-RU") %></td>
+        <td><%= formatDate(a.added_at) %></td>
         <td>
           <form method="post" action="<%= basePath %>/owner/staff/<%= a._id %>/remove">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-            <button type="submit" class="btn danger">Удалить</button>
+            <button type="submit" class="btn danger"><%= t("common.delete") %></button>
           </form>
         </td>
       </tr>
@@ -28,20 +28,20 @@
 </table>
 
 <div class="panel">
-  <h2 style="margin-top:0">Добавить сотрудника</h2>
+  <h2 style="margin-top:0"><%= t("owner.addStaffHeading") %></h2>
   <form method="post" action="<%= basePath %>/owner/staff">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
     <div class="field">
-      <label for="discordId">Discord ID</label>
+      <label for="discordId"><%= t("owner.discordId") %></label>
       <input type="text" id="discordId" name="discordId" required />
     </div>
     <div class="field">
-      <label for="role">Роль</label>
+      <label for="role"><%= t("common.role") %></label>
       <select id="role" name="role">
         <% roles.forEach((r) => { %><option value="<%= r %>"><%= r %></option><% }) %>
       </select>
     </div>
-    <button type="submit" class="btn">Добавить</button>
+    <button type="submit" class="btn"><%= t("common.add") %></button>
   </form>
 </div>
 <%- include("../partials/foot") %>

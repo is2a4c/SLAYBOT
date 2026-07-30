@@ -2,13 +2,13 @@
 <h1>Smart Invites</h1>
 
 <% if (error) { %><div class="error-banner"><%= error %></div><% } %>
-<% if (!enabled) { %><div class="error-banner">Smart Invites отключены в конфигурации бота.</div><% } %>
+<% if (!enabled) { %><div class="error-banner"><%= t("smartInvites.disabled") %></div><% } %>
 
 <% if (records.length === 0) { %>
-  <div class="panel empty">На этом сервере ещё нет Smart Invites.</div>
+  <div class="panel empty"><%= t("smartInvites.empty") %></div>
 <% } else { %>
   <table>
-    <thead><tr><th>Slug</th><th>Канал</th><th>Статус</th><th>Переходы</th><th>Вступления</th><th></th></tr></thead>
+    <thead><tr><th><%= t("smartInvites.slug") %></th><th><%= t("common.channel") %></th><th><%= t("common.status") %></th><th><%= t("smartInvites.clicks") %></th><th><%= t("smartInvites.joins") %></th><th></th></tr></thead>
     <tbody>
       <% records.forEach((r) => { %>
         <tr>
@@ -20,11 +20,11 @@
           <td class="btn-row">
             <form method="post" action="<%= basePath %>/g/<%= guild.id %>/smart-invites/<%= r.slug %>/refresh">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-              <button type="submit" class="btn secondary">Обновить</button>
+              <button type="submit" class="btn secondary"><%= t("common.refresh") %></button>
             </form>
             <form method="post" action="<%= basePath %>/g/<%= guild.id %>/smart-invites/<%= r.slug %>/delete">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-              <button type="submit" class="btn danger">Удалить</button>
+              <button type="submit" class="btn danger"><%= t("common.delete") %></button>
             </form>
           </td>
         </tr>
@@ -34,24 +34,24 @@
 <% } %>
 
 <div class="panel">
-  <h2 style="margin-top:0">Создать Smart Invite</h2>
+  <h2 style="margin-top:0"><%= t("smartInvites.createHeading") %></h2>
   <form method="post" action="<%= basePath %>/g/<%= guild.id %>/smart-invites">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
     <div class="field">
-      <label for="slug">Slug</label>
+      <label for="slug"><%= t("smartInvites.slug") %></label>
       <input type="text" id="slug" name="slug" required />
     </div>
     <div class="field">
-      <label for="channelId">Канал</label>
+      <label for="channelId"><%= t("common.channel") %></label>
       <select id="channelId" name="channelId" required>
         <% textChannels.forEach((c) => { %><option value="<%= c.id %>">#<%= c.name %></option><% }) %>
       </select>
     </div>
     <div class="field">
-      <label for="description">Описание (до 200 символов)</label>
+      <label for="description"><%= t("smartInvites.description") %></label>
       <input type="text" id="description" name="description" maxlength="200" />
     </div>
-    <button type="submit" class="btn">Создать</button>
+    <button type="submit" class="btn"><%= t("common.create") %></button>
   </form>
 </div>
 <%- include("../partials/foot") %>

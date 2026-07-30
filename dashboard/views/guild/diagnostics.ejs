@@ -1,11 +1,11 @@
 <%- include("../partials/head", { title, guild }) %>
-<h1>Диагностика</h1>
+<h1><%= t("diagnostics.title") %></h1>
 
 <div class="cards">
-  <div class="card"><div class="label">Всего проверок</div><div class="value"><%= result.summary.total %></div></div>
-  <div class="card"><div class="label">Успешно</div><div class="value"><%= result.summary.passed %></div></div>
-  <div class="card"><div class="label">Предупреждения</div><div class="value"><%= result.summary.warned %></div></div>
-  <div class="card"><div class="label">Ошибки</div><div class="value"><%= result.summary.failed %></div></div>
+  <div class="card"><div class="label"><%= t("diagnostics.total") %></div><div class="value"><%= result.summary.total %></div></div>
+  <div class="card"><div class="label"><%= t("diagnostics.passed") %></div><div class="value"><%= result.summary.passed %></div></div>
+  <div class="card"><div class="label"><%= t("diagnostics.warned") %></div><div class="value"><%= result.summary.warned %></div></div>
+  <div class="card"><div class="label"><%= t("diagnostics.failed") %></div><div class="value"><%= result.summary.failed %></div></div>
 </div>
 
 <div class="list-card">

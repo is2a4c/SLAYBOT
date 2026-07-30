@@ -6,7 +6,10 @@ const { requireCsrf } = require("../auth/csrf");
 
 router.get("/login", (req, res) => {
   if (!req.client.user?.id) {
-    return res.status(503).render("error", { title: "Бот не готов", message: "Бот ещё подключается к Discord." });
+    return res.status(503).render("error", {
+      title: res.locals.t("errors.botNotReadyTitle"),
+      message: res.locals.t("errors.botNotReadyMessage"),
+    });
   }
   const redirectTo = typeof req.query.redirect === "string" ? req.query.redirect : `${res.locals.basePath}/`;
   const state = createState(req, redirectTo, res.locals.basePath);

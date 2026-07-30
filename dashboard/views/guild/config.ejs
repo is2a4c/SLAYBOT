@@ -1,18 +1,18 @@
 <%- include("../partials/head", { title, guild }) %>
-<h1>Базовые настройки</h1>
+<h1><%= t("config.title") %></h1>
 
 <form class="panel" method="post" action="<%= basePath %>/g/<%= guild.id %>/config">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
 
   <div class="field">
-    <label for="prefix">Префикс команд</label>
+    <label for="prefix"><%= t("config.prefix") %></label>
     <input type="text" id="prefix" name="prefix" maxlength="5" value="<%= settings.prefix %>" />
   </div>
 
   <div class="field">
-    <label for="modlog_channel">Канал журнала модерации</label>
+    <label for="modlog_channel"><%= t("config.modlogChannel") %></label>
     <select id="modlog_channel" name="modlog_channel">
-      <option value="">— не выбран —</option>
+      <option value=""><%= t("common.notSelected") %></option>
       <% textChannels.forEach((c) => { %>
         <option value="<%= c.id %>" <%= settings.modlog_channel === c.id ? "selected" : "" %>>#<%= c.name %></option>
       <% }) %>
@@ -21,69 +21,69 @@
 
   <div class="checkbox-field field">
     <input type="checkbox" id="stats_enabled" name="stats_enabled" <%= settings.stats?.enabled ? "checked" : "" %> />
-    <label for="stats_enabled">Включить систему уровней (XP)</label>
+    <label for="stats_enabled"><%= t("config.statsEnabled") %></label>
   </div>
 
-  <h2>Приветствие</h2>
+  <h2><%= t("config.greetingHeading") %></h2>
   <div class="checkbox-field field">
     <input type="checkbox" id="welcome_enabled" name="welcome_enabled" <%= settings.welcome?.enabled ? "checked" : "" %> />
-    <label for="welcome_enabled">Включить приветствия</label>
+    <label for="welcome_enabled"><%= t("config.welcomeEnabled") %></label>
   </div>
   <div class="field">
-    <label for="welcome_channel">Канал приветствий</label>
+    <label for="welcome_channel"><%= t("config.welcomeChannel") %></label>
     <select id="welcome_channel" name="welcome_channel">
-      <option value="">— не выбран —</option>
+      <option value=""><%= t("common.notSelected") %></option>
       <% textChannels.forEach((c) => { %>
         <option value="<%= c.id %>" <%= settings.welcome?.channel === c.id ? "selected" : "" %>>#<%= c.name %></option>
       <% }) %>
     </select>
   </div>
   <div class="field">
-    <label for="welcome_content">Текст приветствия</label>
+    <label for="welcome_content"><%= t("config.welcomeContent") %></label>
     <textarea id="welcome_content" name="welcome_content" rows="2" maxlength="1000"><%= settings.welcome?.content || "" %></textarea>
   </div>
 
-  <h2>Прощание</h2>
+  <h2><%= t("config.farewellHeading") %></h2>
   <div class="checkbox-field field">
     <input type="checkbox" id="farewell_enabled" name="farewell_enabled" <%= settings.farewell?.enabled ? "checked" : "" %> />
-    <label for="farewell_enabled">Включить прощания</label>
+    <label for="farewell_enabled"><%= t("config.farewellEnabled") %></label>
   </div>
   <div class="field">
-    <label for="farewell_channel">Канал прощаний</label>
+    <label for="farewell_channel"><%= t("config.farewellChannel") %></label>
     <select id="farewell_channel" name="farewell_channel">
-      <option value="">— не выбран —</option>
+      <option value=""><%= t("common.notSelected") %></option>
       <% textChannels.forEach((c) => { %>
         <option value="<%= c.id %>" <%= settings.farewell?.channel === c.id ? "selected" : "" %>>#<%= c.name %></option>
       <% }) %>
     </select>
   </div>
   <div class="field">
-    <label for="farewell_content">Текст прощания</label>
+    <label for="farewell_content"><%= t("config.farewellContent") %></label>
     <textarea id="farewell_content" name="farewell_content" rows="2" maxlength="1000"><%= settings.farewell?.content || "" %></textarea>
   </div>
 
-  <h2>Предложения</h2>
+  <h2><%= t("config.suggestionsHeading") %></h2>
   <div class="checkbox-field field">
     <input type="checkbox" id="suggestions_enabled" name="suggestions_enabled" <%= settings.suggestions?.enabled ? "checked" : "" %> />
-    <label for="suggestions_enabled">Включить предложения</label>
+    <label for="suggestions_enabled"><%= t("config.suggestionsEnabled") %></label>
   </div>
   <div class="field">
-    <label for="suggestions_channel_id">Канал предложений</label>
+    <label for="suggestions_channel_id"><%= t("config.suggestionsChannel") %></label>
     <select id="suggestions_channel_id" name="suggestions_channel_id">
-      <option value="">— не выбран —</option>
+      <option value=""><%= t("common.notSelected") %></option>
       <% textChannels.forEach((c) => { %>
         <option value="<%= c.id %>" <%= settings.suggestions?.channel_id === c.id ? "selected" : "" %>>#<%= c.name %></option>
       <% }) %>
     </select>
   </div>
 
-  <h2>Авто-роли</h2>
+  <h2><%= t("config.autoroleHeading") %></h2>
   <div class="field">
-    <label for="autorole">ID ролей через запятую</label>
+    <label for="autorole"><%= t("config.autoroleIds") %></label>
     <input type="text" id="autorole" name="autorole" value="<%= (settings.autorole || []).join(', ') %>" />
-    <div class="hint">Доступные роли: <%= roles.map((r) => `${r.name} (${r.id})`).join(', ') || '—' %></div>
+    <div class="hint"><%= t("config.availableRoles", { roles: roles.map((r) => `${r.name} (${r.id})`).join(", ") || t("common.none") }) %></div>
   </div>
 
-  <button type="submit" class="btn">Сохранить</button>
+  <button type="submit" class="btn"><%= t("common.save") %></button>
 </form>
 <%- include("../partials/foot") %>

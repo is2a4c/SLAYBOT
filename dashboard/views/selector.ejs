@@ -1,8 +1,8 @@
 <%- include("partials/head", { title }) %>
-<h1>Мои серверы</h1>
+<h1><%= t("selector.title") %></h1>
 
 <% if (guilds.length === 0) { %>
-  <div class="panel empty">У вас нет серверов с правом Manage Server, где также состоит SLAYBOT.</div>
+  <div class="panel empty"><%= t("selector.empty") %></div>
 <% } else { %>
   <div class="list-card">
     <% guilds.forEach((g) => { %>
@@ -11,13 +11,13 @@
           <img src="<%= g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=64` : "" %>" alt="" />
           <div>
             <div class="name"><%= g.name %></div>
-            <div class="meta"><%= g.botPresent ? "SLAYBOT на сервере" : "SLAYBOT ещё не приглашён" %></div>
+            <div class="meta"><%= g.botPresent ? t("selector.botPresent") : t("selector.botMissing") %></div>
           </div>
         </div>
         <% if (g.botPresent) { %>
-          <a class="btn" href="<%= basePath %>/g/<%= g.id %>">Открыть</a>
+          <a class="btn" href="<%= basePath %>/g/<%= g.id %>"><%= t("common.open") %></a>
         <% } else { %>
-          <a class="btn secondary" href="<%= g.inviteUrl %>" target="_blank" rel="noopener">Пригласить</a>
+          <a class="btn secondary" href="<%= g.inviteUrl %>" target="_blank" rel="noopener"><%= t("common.invite") %></a>
         <% } %>
       </div>
     <% }) %>
@@ -25,6 +25,6 @@
 <% } %>
 
 <% if (isOwnerUser) { %>
-  <p><a href="<%= basePath %>/owner">→ Owner Control Center</a></p>
+  <p><a href="<%= basePath %>/owner"><%= t("selector.ownerLink") %></a></p>
 <% } %>
 <%- include("partials/foot") %>
