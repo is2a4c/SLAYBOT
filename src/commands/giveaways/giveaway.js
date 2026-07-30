@@ -78,6 +78,58 @@ module.exports = {
             channelTypes: [ChannelType.GuildText],
             required: true,
           },
+          {
+            name: "min_level",
+            description: "minimum XP level required to enter",
+            type: ApplicationCommandOptionType.Integer,
+            required: false,
+            minValue: 1,
+            maxValue: 500,
+          },
+          {
+            name: "min_invites",
+            description: "minimum invites required to enter",
+            type: ApplicationCommandOptionType.Integer,
+            required: false,
+            minValue: 1,
+            maxValue: 1000,
+          },
+          {
+            name: "min_account_age",
+            description: "minimum Discord account age in days",
+            type: ApplicationCommandOptionType.Integer,
+            required: false,
+            minValue: 1,
+            maxValue: 3650,
+          },
+          {
+            name: "min_server_days",
+            description: "minimum days on this server",
+            type: ApplicationCommandOptionType.Integer,
+            required: false,
+            minValue: 1,
+            maxValue: 3650,
+          },
+          {
+            name: "blocked_role",
+            description: "role that may never enter",
+            type: ApplicationCommandOptionType.Role,
+            required: false,
+          },
+          {
+            name: "bonus_role",
+            description: "role that gets extra entries",
+            type: ApplicationCommandOptionType.Role,
+            required: false,
+          },
+          {
+            name: "bonus_entries",
+            description: "how many entries the bonus role gets (default 2)",
+            type: ApplicationCommandOptionType.Integer,
+            required: false,
+            minValue: 2,
+            maxValue: 10,
+          },
         ],
       },
       {
@@ -232,8 +284,22 @@ module.exports = {
     //
     if (sub === "start") {
       const channel = interaction.options.getChannel("channel");
+      const bonusRole = interaction.options.getRole("bonus_role");
+      const requirements = {
+        minLevel: interaction.options.getInteger("min_level") || 0,
+        minInvites: interaction.options.getInteger("min_invites") || 0,
+        minAccountAgeDays: interaction.options.getInteger("min_account_age") || 0,
+        minServerDays: interaction.options.getInteger("min_server_days") || 0,
+        blockedRoles: interaction.options.getRole("blocked_role")
+          ? [interaction.options.getRole("blocked_role").id]
+          : [],
+        bonus: bonusRole
+          ? { roleId: bonusRole.id, entries: interaction.options.getInteger("bonus_entries") || 2 }
+          : null,
+      };
+
       await interaction.followUp("Starting Giveaway system...");
-      return await runModalSetup(interaction, channel);
+      return await runModalSetup(interaction, channel, requirements);
     }
 
     //
@@ -289,8 +355,9 @@ module.exports = {
 /**
  * @param {import('discord.js').Message|import('discord.js').CommandInteraction} args0
  * @param {import('discord.js').GuildTextBasedChannel} targetCh
+ * @param {object} [requirements] entry requirements collected from the slash options
  */
-async function runModalSetup({ member, channel, guild }, targetCh) {
+async function runModalSetup({ member, channel, guild }, targetCh, requirements = {}) {
   const SETUP_PERMS = ["ViewChannel", "SendMessages", "EmbedLinks"];
 
   // validate channel perms
@@ -415,7 +482,7 @@ async function runModalSetup({ member, channel, guild }, targetCh) {
     }
   }
 
-  const response = await start(member, targetCh, duration, prize, winners, host, allowedRoles);
+  const response = await start(member, targetCh, duration, prize, winners, host, allowedRoles, requirements);
   await modal.editReply(response);
 }
 

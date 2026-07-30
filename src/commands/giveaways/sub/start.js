@@ -1,4 +1,37 @@
 const { ChannelType } = require("discord.js");
+const {
+  calculateBonusEntries,
+  describeRequirements,
+  evaluateEligibility,
+  needsMemberData,
+  normalizeRequirements,
+} = require("@helpers/GiveawayRequirements");
+
+/**
+ * Effective invites of a member, mirroring the invite tracker's own formula.
+ * @param {object} inviteData
+ */
+const effectiveInvites = (inviteData = {}) =>
+  inviteData.tracked + inviteData.added - inviteData.fake - inviteData.left || 0;
+
+/**
+ * Look up the numbers that requirements can depend on. Only called when the
+ * giveaway actually uses a level or invite requirement.
+ * @param {import('discord.js').GuildMember} member
+ */
+async function loadMemberFacts(member) {
+  const [{ getMemberStats }, { getMember }] = [require("@schemas/MemberStats"), require("@schemas/Member")];
+
+  const [stats, memberDb] = await Promise.all([
+    getMemberStats(member.guild.id, member.id).catch(() => null),
+    getMember(member.guild.id, member.id).catch(() => null),
+  ]);
+
+  return {
+    level: stats?.level || 0,
+    invites: effectiveInvites(memberDb?.invite_data),
+  };
+}
 
 /**
  * @param {import('discord.js').GuildMember} member
@@ -8,8 +41,18 @@ const { ChannelType } = require("discord.js");
  * @param {number} winners
  * @param {import('discord.js').User} [host]
  * @param {string[]} [allowedRoles]
+ * @param {object} [requirements] extra entry requirements, see @helpers/GiveawayRequirements
  */
-module.exports = async (member, giveawayChannel, duration, prize, winners, host, allowedRoles = []) => {
+module.exports = async (
+  member,
+  giveawayChannel,
+  duration,
+  prize,
+  winners,
+  host,
+  allowedRoles = [],
+  requirements = {}
+) => {
   try {
     if (!host) host = member.user;
     if (!member.permissions.has("ManageMessages")) {
@@ -19,6 +62,9 @@ module.exports = async (member, giveawayChannel, duration, prize, winners, host,
     if (giveawayChannel.type !== ChannelType.GuildText) {
       return "You can only start giveaways in text channels.";
     }
+
+    const rules = normalizeRequirements({ ...requirements, allowedRoles });
+    const requirementLines = describeRequirements(rules);
 
     /**
      * @type {import("discord-giveaways").GiveawayStartOptions}
@@ -32,18 +78,53 @@ module.exports = async (member, giveawayChannel, duration, prize, winners, host,
       messages: {
         giveaway: "🎉 **GIVEAWAY** 🎉",
         giveawayEnded: "🎉 **GIVEAWAY ENDED** 🎉",
-        inviteToParticipate: "React with 🎁 to enter",
+        inviteToParticipate: requirementLines.length
+          ? `React with 🎁 to enter\n\n**Requirements**\n${requirementLines.map((line) => `• ${line}`).join("\n")}`
+          : "React with 🎁 to enter",
         dropMessage: "Be the first to react with 🎁 to win!",
         hostedBy: `\nHosted by: ${host.username}`,
       },
     };
 
-    if (allowedRoles.length > 0) {
-      options.exemptMembers = (member) => !member.roles.cache.find((role) => allowedRoles.includes(role.id));
+    const requiresLookup = needsMemberData(rules);
+
+    // discord-giveaways awaits this, so the database read is safe here.
+    options.exemptMembers = async (entrant) => {
+      try {
+        const facts = requiresLookup ? await loadMemberFacts(entrant) : {};
+        const { eligible } = evaluateEligibility({
+          requirements: rules,
+          member: {
+            roleIds: entrant.roles.cache.map((role) => role.id),
+            level: facts.level,
+            invites: facts.invites,
+            accountCreatedAt: entrant.user.createdTimestamp,
+            joinedAt: entrant.joinedTimestamp,
+          },
+        });
+        return !eligible;
+      } catch (error) {
+        entrant.client.logger?.error("Giveaway requirement check", error);
+        // A failed lookup must not silently disqualify someone.
+        return false;
+      }
+    };
+
+    if (rules.bonus) {
+      options.bonusEntries = [
+        {
+          bonus: (entrant) =>
+            calculateBonusEntries({ requirements: rules, roleIds: entrant.roles.cache.map((role) => role.id) }),
+          cumulative: false,
+        },
+      ];
     }
 
     await member.client.giveawaysManager.start(giveawayChannel, options);
-    return `Giveaway started in ${giveawayChannel}`;
+
+    return requirementLines.length
+      ? `Giveaway started in ${giveawayChannel} with ${requirementLines.length} requirement(s).`
+      : `Giveaway started in ${giveawayChannel}`;
   } catch (error) {
     member.client.logger.error("Giveaway Start", error);
     return `An error occurred while starting the giveaway: ${error.message}`;
