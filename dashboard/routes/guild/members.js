@@ -7,7 +7,7 @@ const { logAudit } = require("@src/services/dashboard/auditLog");
 const { requireCsrf } = require("../../auth/csrf");
 
 const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000; // Discord's own cap
-const TIMEOUT_OPTIONS_MIN = { "10": 10, "60": 60, "360": 360, "1440": 1440, "10080": 10080 };
+const TIMEOUT_OPTIONS_MIN = { 10: 10, 60: 60, 360: 360, 1440: 1440, 10080: 10080 };
 
 const ERROR_MESSAGES = {
   MEMBER_PERM: "Вы не можете модерировать этого участника (его роль выше или равна вашей).",
@@ -61,7 +61,9 @@ router.post("/:userId/actions", requireCsrf, loadTarget, async (req, res) => {
   const { guild } = req;
   const userId = req.params.userId;
   const action = String(req.body.action || "");
-  const reason = String(req.body.reason || "").trim().slice(0, 480);
+  const reason = String(req.body.reason || "")
+    .trim()
+    .slice(0, 480);
   const backTo = `/g/${guild.id}/members/${userId}`;
 
   if (reason.length < 3) {

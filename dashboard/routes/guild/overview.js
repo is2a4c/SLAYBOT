@@ -20,7 +20,8 @@ router.get("/", async (req, res) => {
   const attention = [];
   if (!settings.modlog_channel) attention.push("Не настроен канал журнала модерации.");
   if (!guild.members.me.permissions.has("ManageMessages")) attention.push("У бота отсутствует право Manage Messages.");
-  if (!guild.members.me.permissions.has("ModerateMembers")) attention.push("У бота отсутствует право Moderate Members.");
+  if (!guild.members.me.permissions.has("ModerateMembers"))
+    attention.push("У бота отсутствует право Moderate Members.");
   if (settings.ticket?.log_channel && !guild.channels.cache.has(settings.ticket.log_channel)) {
     attention.push("Канал логов тикетов больше не существует.");
   }

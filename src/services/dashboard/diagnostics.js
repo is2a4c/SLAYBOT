@@ -80,7 +80,11 @@ function runDiagnostics(guild, settings, extra = {}) {
   const missingWebhookChannels = (settings.automod?.wh_channels || []).filter((id) => !guild.channels.cache.has(id));
   if (missingWebhookChannels.length > 0) {
     checks.push(
-      check("automod_webhook_channels", "warn", `${missingWebhookChannels.length} канал(ов) для Automod webhook больше не существуют.`)
+      check(
+        "automod_webhook_channels",
+        "warn",
+        `${missingWebhookChannels.length} канал(ов) для Automod webhook больше не существуют.`
+      )
     );
   }
 
