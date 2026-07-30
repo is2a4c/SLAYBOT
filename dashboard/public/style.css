@@ -310,3 +310,55 @@ textarea {
   color: var(--text-dim);
   font-size: 12px;
 }
+
+/* Public status page */
+.status-banner {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  background: var(--bg-card);
+}
+.status-banner.status-operational {
+  border-color: var(--ok);
+}
+.status-banner.status-degraded {
+  border-color: var(--warn);
+}
+.status-banner.status-outage {
+  border-color: var(--fail);
+}
+.status-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+.status-table th,
+.status-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 14px;
+}
+.status-table .status-operational {
+  color: var(--ok);
+}
+.status-table .status-degraded {
+  color: var(--warn);
+}
+.status-table .status-outage {
+  color: var(--fail);
+}
+.status-metrics {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+.muted {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+

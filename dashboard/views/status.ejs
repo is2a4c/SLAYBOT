@@ -1,0 +1,50 @@
+<%- include("partials/head", { title }) %>
+<h1><%= t("status.heading") %></h1>
+
+<p class="status-banner status-<%= report.status %>">
+  <strong><%= t(`status.${report.status}`) %></strong>
+  · <%= t("status.banner", { uptime: report.uptime.human, generatedAt: formatDate(report.generatedAt) }) %>
+</p>
+
+<h2><%= t("status.componentsHeading") %></h2>
+<table class="status-table">
+  <thead>
+    <tr><th><%= t("status.component") %></th><th><%= t("status.state") %></th><th><%= t("status.details") %></th></tr>
+  </thead>
+  <tbody>
+    <% report.components.forEach((component) => { %>
+      <tr>
+        <td><%= t(`status.component${component.id.charAt(0).toUpperCase()}${component.id.slice(1)}`) %></td>
+        <td class="status-<%= component.status %>"><%= t(`status.${component.status}`) %></td>
+        <td><%= component.detail %></td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<h2><%= t("status.metricsHeading") %></h2>
+<ul class="status-metrics">
+  <li><%= t("status.guilds") %>: <strong><%= report.metrics.guilds %></strong></li>
+  <li><%= t("status.channels") %>: <strong><%= report.metrics.channels %></strong></li>
+  <li><%= t("status.commands") %>: <strong><%= report.metrics.commands %></strong></li>
+  <li><%= t("status.shards") %>: <strong><%= report.metrics.shards %></strong></li>
+  <li><%= t("status.gatewayPing") %>: <strong><%= report.metrics.gatewayPingMs %> ms</strong></li>
+  <li><%= t("status.memory") %>: <strong><%= report.metrics.memoryMb %> MB</strong></li>
+</ul>
+
+<% if (report.shards.length > 1) { %>
+  <h2><%= t("status.shardsHeading") %></h2>
+  <table class="status-table">
+    <thead><tr><th>#</th><th><%= t("status.latency") %></th><th><%= t("status.state") %></th></tr></thead>
+    <tbody>
+      <% report.shards.forEach((shard) => { %>
+        <tr><td><%= shard.id %></td><td><%= shard.ping %> ms</td><td><%= shard.status %></td></tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
+
+<p class="muted">
+  <%- t("status.machineFormat", { link: `<a href="${basePath}/status/status.json">status.json</a>` }) %>
+</p>
+<%- include("partials/foot") %>
