@@ -11,36 +11,90 @@ const {
   EmbedBuilder,
 } = require("discord.js");
 const { isValidColor, isHex } = require("@helpers/Utils");
+const { EMBED_COLORS } = require("@root/config");
+const { MAX_FOOTER, MAX_NAME, resolveBranding, sanitizeBranding } = require("@helpers/Branding");
 
 /**
  * @type {import("@structures/Command")}
  */
 module.exports = {
   name: "embed",
-  description: "send embed message",
+  description: "send custom embeds and set this server's bot branding",
   category: "ADMIN",
   userPermissions: ["ManageMessages"],
   command: {
     enabled: true,
-    usage: "<#channel>",
+    usage: "<#channel> | branding",
     minArgsCount: 1,
     aliases: ["say"],
+    subcommands: [
+      { trigger: "<#channel>", description: "build and send an embed interactively" },
+      { trigger: "branding", description: "show this server's branding" },
+    ],
   },
   slashCommand: {
     enabled: true,
     ephemeral: true,
     options: [
       {
-        name: "channel",
-        description: "channel to send embed",
-        type: ApplicationCommandOptionType.Channel,
-        channelTypes: [ChannelType.GuildText],
-        required: true,
+        name: "send",
+        description: "build and send an embed interactively",
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: "channel",
+            description: "channel to send embed",
+            type: ApplicationCommandOptionType.Channel,
+            channelTypes: [ChannelType.GuildText],
+            required: true,
+          },
+        ],
+      },
+      {
+        name: "branding",
+        description: "make the bot's embeds look like your server (Manage Server)",
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: "name",
+            description: `name shown in embed footers (max ${MAX_NAME} chars)`,
+            type: ApplicationCommandOptionType.String,
+            required: false,
+          },
+          {
+            name: "color",
+            description: "accent colour as a hex value, e.g. #A855F7",
+            type: ApplicationCommandOptionType.String,
+            required: false,
+          },
+          {
+            name: "footer",
+            description: `footer text for the bot's embeds (max ${MAX_FOOTER} chars)`,
+            type: ApplicationCommandOptionType.String,
+            required: false,
+          },
+          {
+            name: "icon",
+            description: "https URL of the footer icon",
+            type: ApplicationCommandOptionType.String,
+            required: false,
+          },
+          {
+            name: "reset",
+            description: "clear the branding and go back to the bot defaults",
+            type: ApplicationCommandOptionType.Boolean,
+            required: false,
+          },
+        ],
       },
     ],
   },
 
-  async messageRun(message, args) {
+  async messageRun(message, args, data) {
+    if (args[0]?.toLowerCase() === "branding") {
+      return message.safeReply({ embeds: [brandingEmbed(message.client, data.settings)] });
+    }
+
     const channel = message.mentions.channels.first() || message.guild.channels.cache.get(args[0]);
     if (!channel) return message.reply("Please provide a valid channel");
     if (channel.type !== ChannelType.GuildText) return message.reply("Please provide a valid channel");
@@ -51,7 +105,16 @@ module.exports = {
     await embedSetup(channel, message.member);
   },
 
-  async interactionRun(interaction) {
+  async interactionRun(interaction, data) {
+    const sub = interaction.options.getSubcommand();
+
+    if (sub === "branding") {
+      if (!interaction.member.permissions.has("ManageGuild")) {
+        return interaction.followUp("You need the `Manage Server` permission to change branding");
+      }
+      return interaction.followUp(await runBranding(interaction, data.settings));
+    }
+
     const channel = interaction.options.getChannel("channel");
     if (!channel.canSendEmbeds()) {
       return interaction.followUp("I don't have permission to send embeds in that channel");
@@ -60,6 +123,62 @@ module.exports = {
     await embedSetup(channel, interaction.member);
   },
 };
+
+/**
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction
+ * @param {object} settings
+ */
+async function runBranding(interaction, settings) {
+  if (interaction.options.getBoolean("reset")) {
+    settings.branding = { name: null, color: null, footer: null, iconURL: null };
+    await settings.save();
+    return "Branding cleared. The bot uses its own defaults again.";
+  }
+
+  const { branding, errors } = sanitizeBranding({
+    name: interaction.options.getString("name"),
+    color: interaction.options.getString("color"),
+    footer: interaction.options.getString("footer"),
+    iconURL: interaction.options.getString("icon"),
+  });
+
+  if (errors.length) return errors.join("\n");
+  if (Object.keys(branding).length === 0) {
+    return { embeds: [brandingEmbed(interaction.client, settings)] };
+  }
+
+  Object.assign(settings.branding, branding);
+  await settings.save();
+
+  const applied = Object.entries(branding).map(([key, value]) => `${key}: ${value ?? "cleared"}`);
+  return `Branding updated (${applied.join(", ")}). It applies to the panels and announcements the bot posts.`;
+}
+
+/**
+ * @param {import('discord.js').Client} client
+ * @param {object} settings
+ */
+function brandingEmbed(client, settings) {
+  const branding = resolveBranding(settings, client);
+  const own = settings?.branding || {};
+
+  const embed = new EmbedBuilder()
+    .setColor(branding.color || EMBED_COLORS.BOT_EMBED)
+    .setAuthor({ name: `Branding · ${branding.name}` })
+    .setDescription(
+      [
+        `**Name:** ${own.name || `${branding.name} (bot default)`}`,
+        `**Accent colour:** ${own.color || `${branding.color} (bot default)`}`,
+        `**Footer:** ${own.footer || "not set"}`,
+        `**Footer icon:** ${own.iconURL || "bot avatar"}`,
+        "",
+        "Set it with `/embed branding` and clear it with `/embed branding reset:true`.",
+      ].join("\n")
+    );
+
+  if (branding.iconURL) embed.setThumbnail(branding.iconURL);
+  return embed;
+}
 
 /**
  * @param {import('discord.js').GuildTextBasedChannel} channel
