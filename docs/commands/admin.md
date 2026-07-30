@@ -9,10 +9,14 @@ These commands can only be used by members who have **MANAGE_SERVER** permission
 - **Description**: Set bot prefix
 - **Usage**: `!setprefix <newPrefix>`
 
-### Embed
+### Embed & branding
 
-- **Description**: Send an embed message
-- **Usage**: `!embed <#channel>`
+- **Description**: send a custom embed, or set how the bot's embeds look on this server
+- **Usage**: `!embed <#channel>`, `!embed branding`
+- **Slash**: `/embed send channel:`, `/embed branding [name] [color] [footer] [icon] [reset]`
+
+Branding requires **Manage Server** and is documented in
+[Engagement & Community](../engagement.md#server-branding).
 
 ### Automoderation
 
@@ -252,6 +256,65 @@ _Enabling this feature will allow members to simply react to any message with a 
 
 - **Usage**: `!removerr <#channel> <messageId>`
 - **Description**: remove configured reaction for the specified message
+
+### Role Automation
+
+Everything that hands out roles automatically lives under `/roles`.
+
+**Self role panels** — buttons or a dropdown members click themselves.
+
+| Command                                                     | Description                                            |
+| ----------------------------------------------------------- | ------------------------------------------------------ |
+| **/roles self create name: channel: style:**                | post a new panel (`style` is `buttons` or `dropdown`)  |
+| **/roles self add panel: role: label: emoji: description:** | add a role to the panel (up to 25)                     |
+| **/roles self remove panel: role:**                         | take a role off the panel                              |
+| **/roles self config panel: ...**                           | limits, unique mode, required role, title, description |
+| **/roles self list** / **!roles self list**                 | list every panel of the server                         |
+| **/roles self delete panel:**                               | delete the panel and its message                       |
+
+`config` options: `max_roles` (0 = no limit), `unique` (one role at a time, for
+colour roles), `allow_remove` (set to false for an opt-in-only panel),
+`required_role` (gate the panel behind a role), plus `title`, `description` and
+`placeholder`. Panels are referenced by their name or by their message id.
+
+**Temporary roles** — roles that expire on their own. The deadline is stored in
+the database, so a restart or downtime does not lose it.
+
+| Command                                           | Description                           |
+| ------------------------------------------------- | ------------------------------------- |
+| **/roles temp add user: role: duration: reason:** | grant a role for `2h`, `30m`, `7d`, … |
+| **/roles temp remove user: role:**                | remove it immediately                 |
+| **/roles temp list [user:]**                      | list the roles that have not expired  |
+
+Granting the same role again reschedules the existing expiry instead of stacking
+a second one. Durations run from 10 seconds to one year.
+
+**Voice roles** — a role while the member sits in a voice channel.
+
+| Command                               | Description                                 |
+| ------------------------------------- | ------------------------------------------- |
+| **/roles voice set role: [channel:]** | leave `channel` empty for any voice channel |
+| **/roles voice unset [channel:]**     | stop handing the role out                   |
+| **/roles voice list**                 | show the configuration                      |
+
+**Role restore** — give roles back when a member rejoins.
+
+| Command                                                               | Description                           |
+| --------------------------------------------------------------------- | ------------------------------------- |
+| **/roles restore config status: retention_days: include_privileged:** | turn it on or off and tune it         |
+| **/roles restore status**                                             | show the current configuration        |
+| **/roles restore check user:**                                        | show the snapshot stored for a member |
+| **/roles restore purge**                                              | delete every snapshot of this server  |
+
+Snapshots are taken when a member leaves and kept for `retention_days` (90 by
+default, maximum 365). Roles carrying moderation permissions are **not** restored
+unless `include_privileged` is set, and roles above the bot are always skipped.
+
+### Starboard, sticky messages, verification, modmail, feeds, events, backups, webhooks
+
+These live under their own commands and are documented in
+[Engagement & Community](../engagement.md): `/starboard`, `/sticky`,
+`/verification`, `/modmail`, `/feeds`, `/event`, `/backup`, `/webhook`.
 
 ### Ticketing
 

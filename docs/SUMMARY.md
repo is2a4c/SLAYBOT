@@ -16,6 +16,7 @@
   - [🧑 Social](commands/social.md)
   - [📈 Stats](commands/stats.md)
   - [🛠 Utility](commands/utility.md)
+- [✨ Engagement](engagement.md)
 - [🗒 Contexts](contexts.md)
 - [🔗 Smart Invites](smart-invites.md)
 
