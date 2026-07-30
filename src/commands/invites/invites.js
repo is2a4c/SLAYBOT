@@ -15,8 +15,9 @@ module.exports = {
     enabled: true,
     usage: "[@member|id]",
   },
+  // The slash surface lives at /invites count.
   slashCommand: {
-    enabled: true,
+    enabled: false,
     options: [
       {
         name: "user",
@@ -70,3 +71,5 @@ async function getInvites({ guild }, user, settings) {
 
   return { embeds: [embed] };
 }
+
+module.exports.getInvites = getInvites;

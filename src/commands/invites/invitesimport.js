@@ -14,8 +14,9 @@ module.exports = {
     enabled: true,
     usage: "[@member]",
   },
+  // The slash surface lives at /invites import.
   slashCommand: {
-    enabled: true,
+    enabled: false,
     options: [
       {
         name: "user",
@@ -66,3 +67,5 @@ async function importInvites({ guild }, user) {
 
   return `Done! Previous invites added to ${user ? user.username : "all members"}`;
 }
+
+module.exports.importInvites = importInvites;

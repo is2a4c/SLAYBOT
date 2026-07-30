@@ -17,8 +17,9 @@ module.exports = {
     aliases: ["clearinvites"],
     minArgsCount: 1,
   },
+  // The slash surface lives at /invites reset.
   slashCommand: {
-    enabled: true,
+    enabled: false,
     options: [
       {
         name: "user",
@@ -50,3 +51,5 @@ async function clearInvites({ guild }, user) {
   checkInviteRewards(guild, memberDb, false);
   return `Done! Invites cleared for \`${user.username}\``;
 }
+
+module.exports.clearInvites = clearInvites;

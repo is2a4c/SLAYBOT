@@ -18,8 +18,9 @@ module.exports = {
     usage: "<#channel> <messageId> <emoji @role, emoji @role ...>",
     minArgsCount: 3,
   },
+  // The slash surface lives at /roles reaction set.
   slashCommand: {
-    enabled: true,
+    enabled: false,
     ephemeral: true,
     options: [
       {

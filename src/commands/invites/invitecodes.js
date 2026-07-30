@@ -13,8 +13,9 @@ module.exports = {
     enabled: true,
     usage: "[@member|id]",
   },
+  // The slash surface lives at /invites codes.
   slashCommand: {
-    enabled: true,
+    enabled: false,
     options: [
       {
         name: "user",
@@ -55,3 +56,5 @@ async function getInviteCodes({ guild }, user) {
 
   return { embeds: [embed] };
 }
+
+module.exports.getInviteCodes = getInviteCodes;

@@ -17,8 +17,9 @@ module.exports = {
     usage: "<#channel> <messageId>",
     minArgsCount: 2,
   },
+  // The slash surface lives at /roles reaction remove.
   slashCommand: {
-    enabled: true,
+    enabled: false,
     ephemeral: true,
     options: [
       {
@@ -77,3 +78,5 @@ async function removeRR(guild, channel, messageId) {
 
   return "Done! Configuration updated";
 }
+
+module.exports.removeRR = removeRR;

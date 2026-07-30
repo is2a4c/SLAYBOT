@@ -17,8 +17,9 @@ module.exports = {
     usage: "<@member|id> <invites>",
     minArgsCount: 2,
   },
+  // The slash surface lives at /invites add.
   slashCommand: {
-    enabled: true,
+    enabled: false,
     options: [
       {
         name: "user",
@@ -71,3 +72,5 @@ async function addInvites({ guild }, user, amount) {
   checkInviteRewards(guild, memberDb, true);
   return { embeds: [embed] };
 }
+
+module.exports.addInvites = addInvites;

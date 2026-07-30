@@ -12,8 +12,9 @@ module.exports = {
   command: {
     enabled: true,
   },
+  // The slash surface lives at /invites ranks.
   slashCommand: {
-    enabled: true,
+    enabled: false,
   },
 
   async messageRun(message, args, data) {
@@ -46,3 +47,5 @@ async function getInviteRanks({ guild }, settings) {
     .setDescription(str);
   return { embeds: [embed] };
 }
+
+module.exports.getInviteRanks = getInviteRanks;

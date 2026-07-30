@@ -17,8 +17,9 @@ module.exports = {
     usage: "<#channel> <messageId> <emote> <role>",
     minArgsCount: 4,
   },
+  // The slash surface lives at /roles reaction add - Discord caps an app at 100 slash commands.
   slashCommand: {
-    enabled: true,
+    enabled: false,
     ephemeral: true,
     options: [
       {
@@ -119,3 +120,5 @@ async function addRR(guild, channel, messageId, reaction, role) {
   await addReactionRole(guild.id, channel.id, targetMessage.id, emoji, role.id);
   return (reply += "Done! Configuration saved");
 }
+
+module.exports.addRR = addRR;

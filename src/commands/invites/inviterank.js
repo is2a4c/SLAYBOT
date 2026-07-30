@@ -23,8 +23,9 @@ module.exports = {
       },
     ],
   },
+  // The slash surface lives at /invites rank-add and /invites rank-remove.
   slashCommand: {
-    enabled: true,
+    enabled: false,
     ephemeral: true,
     options: [
       {
@@ -168,3 +169,6 @@ async function removeInviteRank({ guild }, role, settings) {
   await settings.save();
   return "Success! Configuration saved.";
 }
+
+module.exports.addInviteRank = addInviteRank;
+module.exports.removeInviteRank = removeInviteRank;

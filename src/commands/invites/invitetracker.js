@@ -15,8 +15,9 @@ module.exports = {
     usage: "<ON|OFF>",
     minArgsCount: 1,
   },
+  // The slash surface lives at /invites tracker.
   slashCommand: {
-    enabled: true,
+    enabled: false,
     options: [
       {
         name: "status",
@@ -79,3 +80,5 @@ async function setStatus({ guild }, input, settings) {
 
   return `Configuration saved! Invite tracking is now ${status ? "enabled" : "disabled"}`;
 }
+
+module.exports.setStatus = setStatus;

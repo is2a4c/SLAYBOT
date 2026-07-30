@@ -16,8 +16,9 @@ module.exports = {
     enabled: true,
     usage: "[@member|id]",
   },
+  // The slash surface lives at /invites inviter.
   slashCommand: {
-    enabled: true,
+    enabled: false,
     options: [
       {
         name: "user",
@@ -65,3 +66,5 @@ async function getInviter({ guild }, user, settings) {
 
   return { embeds: [embed] };
 }
+
+module.exports.getInviter = getInviter;
