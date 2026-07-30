@@ -1,0 +1,57 @@
+<%- include("../partials/head", { title, guild }) %>
+<h1>Smart Invites</h1>
+
+<% if (error) { %><div class="error-banner"><%= error %></div><% } %>
+<% if (!enabled) { %><div class="error-banner">Smart Invites отключены в конфигурации бота.</div><% } %>
+
+<% if (records.length === 0) { %>
+  <div class="panel empty">На этом сервере ещё нет Smart Invites.</div>
+<% } else { %>
+  <table>
+    <thead><tr><th>Slug</th><th>Канал</th><th>Статус</th><th>Переходы</th><th>Вступления</th><th></th></tr></thead>
+    <tbody>
+      <% records.forEach((r) => { %>
+        <tr>
+          <td><a href="<%= r.publicUrl %>" target="_blank" rel="noopener"><%= r.slug %></a></td>
+          <td>#<%= (guild.channels.cache.get(r.channelId) || {}).name || r.channelId %></td>
+          <td><%= r.status %></td>
+          <td><%= r.clickCount %></td>
+          <td><%= r.joinButtonClickCount %></td>
+          <td class="btn-row">
+            <form method="post" action="/g/<%= guild.id %>/smart-invites/<%= r.slug %>/refresh">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+              <button type="submit" class="btn secondary">Обновить</button>
+            </form>
+            <form method="post" action="/g/<%= guild.id %>/smart-invites/<%= r.slug %>/delete">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+              <button type="submit" class="btn danger">Удалить</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>
+
+<div class="panel">
+  <h2 style="margin-top:0">Создать Smart Invite</h2>
+  <form method="post" action="/g/<%= guild.id %>/smart-invites">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <div class="field">
+      <label for="slug">Slug</label>
+      <input type="text" id="slug" name="slug" required />
+    </div>
+    <div class="field">
+      <label for="channelId">Канал</label>
+      <select id="channelId" name="channelId" required>
+        <% textChannels.forEach((c) => { %><option value="<%= c.id %>">#<%= c.name %></option><% }) %>
+      </select>
+    </div>
+    <div class="field">
+      <label for="description">Описание (до 200 символов)</label>
+      <input type="text" id="description" name="description" maxlength="200" />
+    </div>
+    <button type="submit" class="btn">Создать</button>
+  </form>
+</div>
+<%- include("../partials/foot") %>

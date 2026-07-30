@@ -1,0 +1,36 @@
+<%- include("../partials/head", { title }) %>
+<h1>Owner Control Center</h1>
+
+<div class="btn-row" style="margin-bottom:16px">
+  <a class="btn secondary" href="?period=1">24ч</a>
+  <a class="btn secondary" href="?period=7">7 дней</a>
+  <a class="btn secondary" href="?period=30">30 дней</a>
+  <a class="btn secondary" href="/owner/staff">Staff-роли</a>
+  <a class="btn secondary" href="/owner/audit">Audit Log</a>
+</div>
+
+<div class="cards">
+  <div class="card"><div class="label">Серверов</div><div class="value"><%= guildCount %></div></div>
+  <div class="card"><div class="label">Команд</div><div class="value"><%= summary.counters.commands %></div></div>
+  <div class="card"><div class="label">Automod</div><div class="value"><%= summary.counters.automod_actions %></div></div>
+  <div class="card"><div class="label">Ошибки</div><div class="value"><%= summary.counters.client_errors %></div></div>
+  <div class="card"><div class="label">Активные пользователи</div><div class="value"><%= summary.activeUsers ?? "—" %></div></div>
+  <div class="card"><div class="label">Ср. время команды</div><div class="value"><%= summary.commandLatency.averageMs %> мс</div></div>
+</div>
+
+<h2>Серверы (<%= periodDays %> дн.)</h2>
+<table>
+  <thead><tr><th>Сервер</th><th>Участники</th><th>Владелец</th><th>Добавлен</th><th>ModLog настроен</th></tr></thead>
+  <tbody>
+    <% guilds.forEach((g) => { %>
+      <tr>
+        <td><a href="/g/<%= g.id %>"><%= g.name %></a></td>
+        <td><%= g.memberCount %></td>
+        <td><%= g.ownerId || "—" %></td>
+        <td><%= g.joinedAt ? new Date(g.joinedAt).toLocaleDateString("ru-RU") : "—" %></td>
+        <td><span class="badge <%= g.modlogConfigured ? 'pass' : 'warn' %>"><%= g.modlogConfigured ? "да" : "нет" %></span></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<%- include("../partials/foot") %>

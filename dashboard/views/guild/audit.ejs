@@ -1,0 +1,23 @@
+<%- include("../partials/head", { title, guild }) %>
+<h1>Audit Log</h1>
+<p class="hint">Журнал действий staff/владельцев в панели этого сервера. Записи нельзя изменить или удалить.</p>
+
+<% if (entries.length === 0) { %>
+  <div class="panel empty">Записей нет.</div>
+<% } else { %>
+  <table>
+    <thead><tr><th>Время</th><th>Действие</th><th>Кто</th><th>Цель</th><th>Причина</th></tr></thead>
+    <tbody>
+      <% entries.forEach((e) => { %>
+        <tr>
+          <td><%= new Date(e.created_at).toLocaleString("ru-RU") %></td>
+          <td><%= e.action %></td>
+          <td><%= e.actorTag %> (<%= e.actorId %>)</td>
+          <td><%= e.targetType || "—" %><% if (e.targetId) { %> · <%= e.targetId %><% } %></td>
+          <td><%= e.reason || "—" %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>
+<%- include("../partials/foot") %>

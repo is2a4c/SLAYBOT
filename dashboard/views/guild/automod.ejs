@@ -1,0 +1,81 @@
+<%- include("../partials/head", { title, guild }) %>
+<h1>Automod</h1>
+
+<form class="panel" method="post" action="/g/<%= guild.id %>/automod">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+
+  <div class="field">
+    <label for="action">Действие при превышении strikes</label>
+    <select id="action" name="action">
+      <% validActions.forEach((a) => { %>
+        <option value="<%= a %>" <%= settings.automod.action === a ? "selected" : "" %>><%= a %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="field">
+    <label for="strikes">Лимит strikes</label>
+    <input type="number" id="strikes" name="strikes" min="1" max="100" value="<%= settings.automod.strikes %>" />
+  </div>
+
+  <h2>Правила</h2>
+  <div class="checkbox-field field">
+    <input type="checkbox" id="anti_links" name="anti_links" <%= settings.automod.anti_links ? "checked" : "" %> />
+    <label for="anti_links">Anti-links</label>
+  </div>
+  <div class="checkbox-field field">
+    <input type="checkbox" id="anti_invites" name="anti_invites" <%= settings.automod.anti_invites ? "checked" : "" %> />
+    <label for="anti_invites">Anti-invites</label>
+  </div>
+  <div class="checkbox-field field">
+    <input type="checkbox" id="anti_attachments" name="anti_attachments" <%= settings.automod.anti_attachments ? "checked" : "" %> />
+    <label for="anti_attachments">Anti-attachments</label>
+  </div>
+  <div class="checkbox-field field">
+    <input type="checkbox" id="anti_spam" name="anti_spam" <%= settings.automod.anti_spam ? "checked" : "" %> />
+    <label for="anti_spam">Anti-spam</label>
+  </div>
+  <div class="checkbox-field field">
+    <input type="checkbox" id="anti_ghostping" name="anti_ghostping" <%= settings.automod.anti_ghostping ? "checked" : "" %> />
+    <label for="anti_ghostping">Anti-ghostping</label>
+  </div>
+  <div class="checkbox-field field">
+    <input type="checkbox" id="anti_image_spam" name="anti_image_spam" <%= settings.automod.anti_image_spam ? "checked" : "" %> />
+    <label for="anti_image_spam">Image Spam Guard</label>
+  </div>
+  <div class="field">
+    <label for="image_spam_threshold">Порог Image Spam Guard (50-100)</label>
+    <input type="number" id="image_spam_threshold" name="image_spam_threshold" min="50" max="100" value="<%= settings.automod.image_spam_threshold %>" />
+  </div>
+
+  <h2>Лимиты</h2>
+  <div class="field">
+    <label for="anti_massmention">Anti-massmention (0 = выкл)</label>
+    <input type="number" id="anti_massmention" name="anti_massmention" min="0" max="50" value="<%= settings.automod.anti_massmention || 0 %>" />
+  </div>
+  <div class="field">
+    <label for="max_lines">Макс. строк в сообщении (0 = выкл)</label>
+    <input type="number" id="max_lines" name="max_lines" min="0" max="50" value="<%= settings.automod.max_lines || 0 %>" />
+  </div>
+  <div class="field">
+    <label for="max_mentions">Макс. упоминаний</label>
+    <input type="number" id="max_mentions" name="max_mentions" min="1" max="50" value="<%= settings.automod.max_mentions %>" />
+  </div>
+  <div class="field">
+    <label for="max_role_mentions">Макс. упоминаний ролей</label>
+    <input type="number" id="max_role_mentions" name="max_role_mentions" min="0" max="20" value="<%= settings.automod.max_role_mentions %>" />
+  </div>
+
+  <h2>Whitelist</h2>
+  <div class="field">
+    <label for="spam_whitelist_roles">Роли (ID через запятую)</label>
+    <input type="text" id="spam_whitelist_roles" name="spam_whitelist_roles" value="<%= (settings.automod.spam_whitelist_roles || []).join(', ') %>" />
+    <div class="hint">Доступные роли: <%= roles.map((r) => `${r.name} (${r.id})`).join(', ') || '—' %></div>
+  </div>
+  <div class="field">
+    <label for="spam_whitelist_users">Пользователи (ID через запятую)</label>
+    <input type="text" id="spam_whitelist_users" name="spam_whitelist_users" value="<%= (settings.automod.spam_whitelist_users || []).join(', ') %>" />
+  </div>
+
+  <button type="submit" class="btn">Сохранить</button>
+</form>
+<%- include("../partials/foot") %>

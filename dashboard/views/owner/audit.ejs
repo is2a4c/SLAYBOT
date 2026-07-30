@@ -1,0 +1,24 @@
+<%- include("../partials/head", { title }) %>
+<h1>Глобальный Audit Log</h1>
+<p class="hint">Все действия staff/владельцев во всей панели. Записи нельзя изменить или удалить.</p>
+
+<% if (entries.length === 0) { %>
+  <div class="panel empty">Записей нет.</div>
+<% } else { %>
+  <table>
+    <thead><tr><th>Время</th><th>Действие</th><th>Кто</th><th>Сервер</th><th>Цель</th><th>Причина</th></tr></thead>
+    <tbody>
+      <% entries.forEach((e) => { %>
+        <tr>
+          <td><%= new Date(e.created_at).toLocaleString("ru-RU") %></td>
+          <td><%= e.action %></td>
+          <td><%= e.actorTag %> (<%= e.actorId %>)</td>
+          <td><%- e.guildId ? `<a href="/g/${e.guildId}/audit">${e.guildId}</a>` : "—" %></td>
+          <td><%= e.targetType || "—" %><% if (e.targetId) { %> · <%= e.targetId %><% } %></td>
+          <td><%= e.reason || "—" %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>
+<%- include("../partials/foot") %>

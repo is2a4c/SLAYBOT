@@ -1,0 +1,19 @@
+<%- include("../partials/head", { title, guild }) %>
+<h1>Диагностика</h1>
+
+<div class="cards">
+  <div class="card"><div class="label">Всего проверок</div><div class="value"><%= result.summary.total %></div></div>
+  <div class="card"><div class="label">Успешно</div><div class="value"><%= result.summary.passed %></div></div>
+  <div class="card"><div class="label">Предупреждения</div><div class="value"><%= result.summary.warned %></div></div>
+  <div class="card"><div class="label">Ошибки</div><div class="value"><%= result.summary.failed %></div></div>
+</div>
+
+<div class="list-card">
+  <% result.checks.forEach((c) => { %>
+    <div class="list-row">
+      <span><%= c.message %></span>
+      <span class="badge <%= c.status %>"><%= c.status %></span>
+    </div>
+  <% }) %>
+</div>
+<%- include("../partials/foot") %>

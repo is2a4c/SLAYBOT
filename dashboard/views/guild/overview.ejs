@@ -1,0 +1,28 @@
+<%- include("../partials/head", { title, guild }) %>
+<h1><%= guild.name %></h1>
+<p class="hint">ID: <%= guild.id %> · Участников: <%= guild.memberCount %></p>
+
+<% if (attention.length > 0) { %>
+  <div class="attention">
+    <h2>Требует внимания</h2>
+    <ul>
+      <% attention.forEach((item) => { %><li><%= item %></li><% }) %>
+    </ul>
+  </div>
+<% } %>
+
+<div class="cards">
+  <div class="card"><div class="label">Участники</div><div class="value"><%= counters.members %></div></div>
+  <div class="card"><div class="label">Сообщения / 24ч</div><div class="value"><%= counters.messages24h %></div></div>
+  <div class="card"><div class="label">Automod / 24ч</div><div class="value"><%= counters.automodActions24h %></div></div>
+  <div class="card"><div class="label">Открытые тикеты</div><div class="value"><%= counters.openTickets %></div></div>
+  <div class="card"><div class="label">Активные Smart Invites</div><div class="value"><%= counters.activeSmartInvites %></div></div>
+  <div class="card"><div class="label">Ошибки / 24ч</div><div class="value"><%= counters.errors24h %></div></div>
+</div>
+
+<div class="btn-row">
+  <a class="btn secondary" href="/g/<%= guild.id %>/config">Настройки</a>
+  <a class="btn secondary" href="/g/<%= guild.id %>/automod">Automod</a>
+  <a class="btn secondary" href="/g/<%= guild.id %>/diagnostics">Диагностика</a>
+</div>
+<%- include("../partials/foot") %>

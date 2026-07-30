@@ -16,7 +16,7 @@
   },
   "ignorePatterns": [
     "node_modules/",
-    "dashboard/",
+    "dashboard/public/",
     "config.js"
   ]
 }

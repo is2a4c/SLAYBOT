@@ -32,5 +32,7 @@ module.exports = {
     SlayNode: require("./schemas/slaynode"),
     SmartInvite: require("./schemas/SmartInvite"),
     SmartInviteControl: require("./schemas/SmartInviteControl"),
+    DashboardAuditLog: require("./schemas/DashboardAuditLog"),
+    StaffAccount: require("./schemas/StaffAccount").model,
   },
 };

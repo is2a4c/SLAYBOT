@@ -9,9 +9,6 @@ docker-compose.yml
 .replit
 replit.nix
 
-# Dashboard (not maintained yet)
-dashboard/
-
 # Build artifacts
 dist/
 build/
