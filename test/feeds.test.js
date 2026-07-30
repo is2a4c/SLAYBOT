@@ -1,0 +1,143 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+require("module-alias/register");
+
+const { FeedError, normalizeTarget, parseFeed } = require("../src/services/feeds/providers");
+const { buildAnnouncement, decideAnnouncement } = require("../src/services/feeds/FeedWatcher");
+
+/* ------------------------------------------------------------------- targets */
+
+test("twitch targets accept a url or a bare login", () => {
+  assert.equal(normalizeTarget("TWITCH", "https://twitch.tv/Ninja"), "ninja");
+  assert.equal(normalizeTarget("TWITCH", "Ninja"), "ninja");
+  assert.throws(() => normalizeTarget("TWITCH", "a b"), FeedError);
+});
+
+test("youtube targets require the channel id", () => {
+  assert.equal(
+    normalizeTarget("YOUTUBE", "https://youtube.com/channel/UC_x5XG1OV2P6uZZ5FSM9Ttw"),
+    "UC_x5XG1OV2P6uZZ5FSM9Ttw"
+  );
+  assert.throws(() => normalizeTarget("YOUTUBE", "@handle"), /channel id/);
+});
+
+test("github targets normalise to owner/repo", () => {
+  assert.equal(normalizeTarget("GITHUB", "https://github.com/discordjs/discord.js"), "discordjs/discord.js");
+  assert.equal(normalizeTarget("GITHUB", "discordjs/discord.js.git"), "discordjs/discord.js");
+  assert.throws(() => normalizeTarget("GITHUB", "discordjs"), /owner\/repo/);
+});
+
+test("rss targets must be http urls", () => {
+  assert.equal(normalizeTarget("RSS", "https://example.com/feed.xml"), "https://example.com/feed.xml");
+  assert.throws(() => normalizeTarget("RSS", "ftp://example.com/feed"), /http and https/);
+  assert.throws(() => normalizeTarget("RSS", "not a url"), /valid feed URL/);
+  assert.throws(() => normalizeTarget("RSS", ""), /Provide what should be watched/);
+});
+
+/* --------------------------------------------------------------------- parser */
+
+test("RSS 2.0 items are parsed with guid, title and link", () => {
+  const xml = `<?xml version="1.0"?><rss version="2.0"><channel>
+    <title>Blog</title>
+    <item>
+      <guid>post-2</guid>
+      <title><![CDATA[Second &amp; newest]]></title>
+      <link>https://example.com/2</link>
+      <pubDate>Wed, 29 Jul 2026 10:00:00 GMT</pubDate>
+    </item>
+    <item><guid>post-1</guid><title>First</title><link>https://example.com/1</link></item>
+  </channel></rss>`;
+
+  const { title, items } = parseFeed(xml);
+
+  assert.equal(title, "Blog");
+  assert.equal(items.length, 2);
+  assert.equal(items[0].id, "post-2");
+  assert.equal(items[0].title, "Second & newest");
+  assert.equal(items[0].link, "https://example.com/2");
+  assert.equal(items[0].publishedAt.toISOString(), "2026-07-29T10:00:00.000Z");
+});
+
+test("Atom entries take the link from the href attribute", () => {
+  const xml = `<feed xmlns="http://www.w3.org/2005/Atom">
+    <title>Channel</title>
+    <entry>
+      <id>yt:video:abc123</id>
+      <title>New video</title>
+      <link rel="alternate" href="https://www.youtube.com/watch?v=abc123"/>
+      <published>2026-07-30T08:00:00+00:00</published>
+      <author><name>Creator</name></author>
+    </entry>
+  </feed>`;
+
+  const { items } = parseFeed(xml);
+
+  assert.equal(items[0].id, "yt:video:abc123");
+  assert.equal(items[0].link, "https://www.youtube.com/watch?v=abc123");
+  assert.equal(items[0].author, "Creator");
+  assert.equal(items[0].publishedAt.toISOString(), "2026-07-30T08:00:00.000Z");
+});
+
+test("an empty or broken document yields no items instead of throwing", () => {
+  assert.deepEqual(parseFeed("").items, []);
+  assert.deepEqual(parseFeed("<html><body>nope</body></html>").items, []);
+});
+
+/* ------------------------------------------------------------- announcements */
+
+test("a brand new feed adopts the current item without announcing it", () => {
+  const item = { id: "video-1" };
+
+  assert.deepEqual(decideAnnouncement({ lastItemId: null, item }), { announce: false, store: "video-1" });
+  assert.deepEqual(decideAnnouncement({ lastItemId: "video-0", item, firstRun: true }), {
+    announce: false,
+    store: "video-1",
+  });
+});
+
+test("only a changed item is announced", () => {
+  assert.deepEqual(decideAnnouncement({ lastItemId: "video-1", item: { id: "video-1" } }), {
+    announce: false,
+    store: "video-1",
+  });
+  assert.deepEqual(decideAnnouncement({ lastItemId: "video-1", item: { id: "video-2" } }), {
+    announce: true,
+    store: "video-2",
+  });
+});
+
+test("nothing published keeps the stored item untouched", () => {
+  assert.deepEqual(decideAnnouncement({ lastItemId: "stream-9", item: null }), { announce: false, store: "stream-9" });
+});
+
+test("twitch announcements carry the game, viewers and mention", () => {
+  const payload = buildAnnouncement(
+    { type: "TWITCH", target: "ninja", mention: "<@&123>", message: null },
+    {
+      id: "42",
+      title: "Ranked grind",
+      link: "https://twitch.tv/ninja",
+      publishedAt: new Date("2026-07-30T12:00:00.000Z"),
+      extra: { author: "Ninja", game: "Fortnite", viewers: 1234, thumbnail: "https://cdn/thumb.jpg" },
+    }
+  );
+
+  assert.match(payload.content, /<@&123>/);
+  assert.match(payload.content, /Ninja is live/);
+  const embed = payload.embeds[0].data;
+  assert.equal(embed.title, "Ranked grind");
+  assert.equal(embed.url, "https://twitch.tv/ninja");
+  assert.match(embed.description, /Fortnite/);
+  assert.match(embed.description, /1234/);
+  assert.equal(embed.image.url, "https://cdn/thumb.jpg");
+});
+
+test("a custom message replaces the default announcement text", () => {
+  const payload = buildAnnouncement(
+    { type: "YOUTUBE", target: "UC123", mention: null, message: "New upload, go watch it" },
+    { id: "v1", title: "Video", link: "https://youtu.be/v1", publishedAt: null, extra: { author: "Creator" } }
+  );
+
+  assert.equal(payload.content, "New upload, go watch it");
+  assert.equal(payload.embeds[0].data.author.name, "YouTube · Creator");
+});
