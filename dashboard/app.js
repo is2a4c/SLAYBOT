@@ -74,7 +74,15 @@ module.exports.launch = async function launch(client) {
         autoRemoveInterval: 10,
       }),
       cookie: {
-        path: basePath || "/",
+        // Deliberately "/", not basePath: express-session only attaches
+        // req.session when the incoming request path is compatible with
+        // cookie.path (a real, verified requirement - not just a browser-side
+        // nicety). Since the app is mounted at the process root (see above),
+        // every request it actually sees is root-relative, so the cookie path
+        // must be too. The trade-off is the browser also sends this cookie to
+        // sibling services on the same domain (e.g. Smart Invites) - harmless
+        // since they never read req.session.
+        path: "/",
         httpOnly: true,
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
@@ -111,9 +119,9 @@ module.exports.launch = async function launch(client) {
 
   app.use(dashboardRouter);
 
-  app.listen(config.port, () => {
+  const server = app.listen(config.port, () => {
     client.logger.success(`Dashboard is listening on port ${config.port} (public path: ${basePath || "/"})`);
   });
 
-  return app;
+  return { app, server };
 };
