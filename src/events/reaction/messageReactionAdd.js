@@ -1,4 +1,4 @@
-const { translationHandler, reactionRoleHandler } = require("@src/handlers");
+const { translationHandler, reactionRoleHandler, starboardHandler } = require("@src/handlers");
 const { getSettings } = require("@schemas/Guild");
 const { isValidEmoji } = require("country-emoji-languages");
 
@@ -21,6 +21,14 @@ module.exports = async (client, reaction, user) => {
 
   // Reaction Roles
   reactionRoleHandler.handleReactionAdd(reaction, user);
+
+  // Starboard
+  if (message.guild) {
+    const settings = await getSettings(message.guild);
+    starboardHandler
+      .syncStarboard(reaction, settings)
+      .catch((ex) => client.logger.error("starboard: reaction add", ex));
+  }
 
   // Handle Reaction Emojis
   if (!emoji.id) {

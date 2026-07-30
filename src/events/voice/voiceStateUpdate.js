@@ -1,4 +1,6 @@
 const { trackVoiceStats } = require("@handlers/stats");
+const { voiceRoleHandler } = require("@src/handlers");
+const { getSettings } = require("@schemas/Guild");
 
 /**
  * @param {import('@src/structures').BotClient} client
@@ -8,6 +10,14 @@ const { trackVoiceStats } = require("@handlers/stats");
 module.exports = async (client, oldState, newState) => {
   // Track voice stats
   trackVoiceStats(oldState, newState).catch((ex) => client.logger.error("trackVoiceStats", ex));
+
+  // Voice roles - only when the channel actually changed
+  if (oldState.channelId !== newState.channelId) {
+    const guild = newState.guild || oldState.guild;
+    getSettings(guild)
+      .then((settings) => voiceRoleHandler.handleVoiceStateUpdate(oldState, newState, settings))
+      .catch((ex) => client.logger.error("voiceRoles", ex));
+  }
 
   // Lavalink
   if (client.config.MUSIC.enabled && client.musicManager) {

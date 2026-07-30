@@ -1,11 +1,20 @@
 const { EmbedBuilder } = require("discord.js");
 const { getSettings } = require("@schemas/Guild");
+const { starboardHandler } = require("@src/handlers");
 
 /**
  * @param {import('@src/structures').BotClient} client
  * @param {import('discord.js').Message|import('discord.js').PartialMessage} message
  */
 module.exports = async (client, message) => {
+  // Starboard bookkeeping runs even for partials and bot messages: the deleted
+  // message may itself be a starboard mirror.
+  if (message.guild) {
+    await starboardHandler
+      .handleMessageDelete(message)
+      .catch((ex) => client.logger.error("starboard: message delete", ex));
+  }
+
   if (message.partial) return;
   if (message.author.bot || !message.guild) return;
 

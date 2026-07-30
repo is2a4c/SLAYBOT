@@ -43,6 +43,16 @@ const DEFAULT_CONFIG = {
     XP_COOLDOWN: 60,
     DEFAULT_LVL_UP_MSG: "{member}, You leveled up to **{level}**! 🎉",
   },
+  FEEDS: {
+    enabled: true,
+    pollIntervalMs: 300000,
+  },
+  SCHEDULER: {
+    enabled: true,
+    pollIntervalMs: 15000,
+    batchSize: 25,
+    leaseMs: 60000,
+  },
   SUGGESTIONS: {
     enabled: true,
     EMOJI: {

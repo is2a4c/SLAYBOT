@@ -1,4 +1,4 @@
-const { commandHandler, automodHandler, statsHandler } = require("@src/handlers");
+const { commandHandler, automodHandler, statsHandler, stickyHandler, modmailHandler } = require("@src/handlers");
 const { PREFIX_COMMANDS } = require("@root/config");
 const { getSettings } = require("@schemas/Guild");
 
@@ -7,7 +7,13 @@ const { getSettings } = require("@schemas/Guild");
  * @param {import('discord.js').Message} message
  */
 module.exports = async (client, message) => {
-  if (!message.guild || message.author.bot) return;
+  if (message.author.bot) return;
+
+  // Direct messages are modmail, not commands
+  if (!message.guild) {
+    return modmailHandler.handleDirectMessage(message).catch((ex) => client.logger.error("modmail: DM", ex));
+  }
+
   const settings = await getSettings(message.guild);
   const messageContent = message.content || "";
 
@@ -39,6 +45,14 @@ module.exports = async (client, message) => {
 
     // Don't reward command-like noise such as unknown prefix invocations.
     if (startsWithPrefix) skipXp = true;
+  }
+
+  // sticky messages - keep the pinned-style message at the bottom of the channel
+  stickyHandler.handleMessage(message, settings).catch((ex) => client.logger.error("stickyMessages", ex));
+
+  // modmail - staff replies typed directly into a modmail thread
+  if (!isCommand && message.channel.isThread()) {
+    modmailHandler.handleStaffMessage(message, settings).catch((ex) => client.logger.error("modmail: staff", ex));
   }
 
   // stats handler

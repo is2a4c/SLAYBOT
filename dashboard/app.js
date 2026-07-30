@@ -6,6 +6,7 @@ const { initializeMongoose } = require("@src/database/mongoose");
 const { createRateLimiter } = require("@src/web/smart-invites/security");
 const { applyDashboardSecurityHeaders } = require("./security");
 const { ensureCsrfToken } = require("./auth/csrf");
+const { localeMiddleware } = require("./i18n");
 
 const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // short-lived on purpose, see plan doc security notes
 
@@ -55,6 +56,8 @@ module.exports.launch = async function launch(client) {
     res.locals.basePath = basePath;
     next();
   });
+  // Language for every rendered page: ?lang= wins, then the cookie, then the browser
+  dashboardRouter.use(localeMiddleware);
   dashboardRouter.use(express.static(path.join(__dirname, "public")));
   dashboardRouter.use(applyDashboardSecurityHeaders);
   dashboardRouter.use(express.urlencoded({ extended: true }));
@@ -104,17 +107,25 @@ module.exports.launch = async function launch(client) {
 
   dashboardRouter.use(createRateLimiter({ windowMs: 60000, max: 120 }));
   dashboardRouter.use("/auth", createRateLimiter({ windowMs: 60000, max: 20 }), require("./routes/auth"));
+  // Public: no session required, carries health only (see routes/status.js)
+  dashboardRouter.use("/status", require("./routes/status"));
   dashboardRouter.use("/", require("./routes/selector"));
   dashboardRouter.use("/g/:guildId", require("./routes/guild"));
   dashboardRouter.use("/owner", require("./routes/owner"));
 
   dashboardRouter.use((_req, res) => {
-    res.status(404).render("error", { title: "Не найдено", message: "Такой страницы не существует." });
+    res.status(404).render("error", {
+      title: res.locals.t("errors.notFoundTitle"),
+      message: res.locals.t("errors.notFoundMessage"),
+    });
   });
   // eslint-disable-next-line no-unused-vars
   dashboardRouter.use((err, req, res, _next) => {
     client.logger.error("Dashboard route error", err);
-    res.status(500).render("error", { title: "Внутренняя ошибка", message: "Что-то пошло не так. Попробуйте позже." });
+    res.status(500).render("error", {
+      title: res.locals.t("errors.internalTitle"),
+      message: res.locals.t("errors.internalMessage"),
+    });
   });
 
   app.use(dashboardRouter);

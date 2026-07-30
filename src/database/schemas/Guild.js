@@ -127,6 +127,81 @@ const Schema = new mongoose.Schema({
     type: [String],
     default: [],
   },
+  restore_roles: {
+    enabled: { type: Boolean, default: false },
+    retention_days: { type: Number, default: 90, min: 1, max: 365 },
+    // Roles carrying moderation power are not handed back automatically.
+    include_privileged: { type: Boolean, default: false },
+  },
+  voice_roles: {
+    enabled: { type: Boolean, default: false },
+    // Given while the member sits in any voice channel.
+    default_role: String,
+    channels: [
+      {
+        _id: false,
+        channel_id: String,
+        role_id: String,
+      },
+    ],
+  },
+  branding: {
+    // Lets a server give the bot its own look without a separate application.
+    name: { type: String, default: null, maxlength: 60 },
+    color: { type: String, default: null },
+    footer: { type: String, default: null, maxlength: 120 },
+    iconURL: { type: String, default: null },
+  },
+  modmail: {
+    enabled: { type: Boolean, default: false },
+    // Private threads are created under this text channel.
+    channel_id: String,
+    staff_roles: { type: [String], default: [] },
+    // Hide the responding staff member's name from the member.
+    anonymous: { type: Boolean, default: false },
+    // Forward every staff message in the thread; a leading dot keeps it internal.
+    mirror_replies: { type: Boolean, default: true },
+  },
+  verification: {
+    enabled: { type: Boolean, default: false },
+    // BUTTON grants the role on click; CAPTCHA asks for a code from an image first.
+    mode: { type: String, enum: ["BUTTON", "CAPTCHA"], default: "BUTTON" },
+    channel_id: String,
+    message_id: String,
+    role_id: String,
+    // Usually an "Unverified" role that gates the rest of the server.
+    remove_role_id: String,
+    log_channel: String,
+    title: { type: String, default: "Verification" },
+    description: { type: String, default: "", maxlength: 1000 },
+    button_label: { type: String, default: "Verify" },
+    color: { type: String, default: null },
+    captcha_length: { type: Number, default: 6, min: 4, max: 8 },
+  },
+  birthdays: {
+    enabled: { type: Boolean, default: false },
+    channel_id: String,
+    message: { type: String, default: "🎉 Happy birthday {member}!", maxlength: 1000 },
+    // Role handed out for the day.
+    role_id: String,
+    color: { type: String, default: null },
+    // Local announcement hour and the guild's offset from UTC.
+    hour: { type: Number, default: 9, min: 0, max: 23 },
+    utc_offset: { type: Number, default: 0, min: -12, max: 14 },
+  },
+  starboard: {
+    enabled: { type: Boolean, default: false },
+    channel_id: String,
+    emoji: { type: String, default: "⭐" },
+    threshold: { type: Number, default: 3, min: 1, max: 100 },
+    // Whether the author's own star counts towards the threshold.
+    self_star: { type: Boolean, default: true },
+    allow_bots: { type: Boolean, default: false },
+    // Remove the mirrored message when the count drops back below the threshold.
+    remove_below: { type: Boolean, default: true },
+    ignored_channels: { type: [String], default: [] },
+    color: { type: String, default: null },
+  },
   suggestions: {
     enabled: Boolean,
     channel_id: String,

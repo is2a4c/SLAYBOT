@@ -29,8 +29,11 @@ module.exports = class BotClient extends Client {
         GatewayIntentBits.GuildPresences,
         GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.GuildVoiceStates,
+        // Modmail reads direct messages sent to the bot
+        GatewayIntentBits.DirectMessages,
       ],
-      partials: [Partials.User, Partials.Message, Partials.Reaction],
+      // Partials.Channel is required to receive direct messages
+      partials: [Partials.User, Partials.Message, Partials.Reaction, Partials.Channel],
       allowedMentions: {
         repliedUser: false,
       },

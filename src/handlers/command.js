@@ -200,8 +200,25 @@ module.exports = {
    */
   getSlashUsage(cmd) {
     let desc = "";
-    if (cmd.slashCommand.options?.find((o) => o.type === ApplicationCommandOptionType.Subcommand)) {
-      const subCmds = cmd.slashCommand.options.filter((opt) => opt.type === ApplicationCommandOptionType.Subcommand);
+    const options = cmd.slashCommand.options || [];
+    const hasSubcommand = options.some((o) => o.type === ApplicationCommandOptionType.Subcommand);
+    const hasGroup = options.some((o) => o.type === ApplicationCommandOptionType.SubcommandGroup);
+
+    if (hasGroup) {
+      options
+        .filter((opt) => opt.type === ApplicationCommandOptionType.SubcommandGroup)
+        .forEach((group) => {
+          (group.options || []).forEach((sub) => {
+            desc += `\`/${cmd.name} ${group.name} ${sub.name}\`\n❯ ${sub.description}\n\n`;
+          });
+        });
+      options
+        .filter((opt) => opt.type === ApplicationCommandOptionType.Subcommand)
+        .forEach((sub) => {
+          desc += `\`/${cmd.name} ${sub.name}\`\n❯ ${sub.description}\n\n`;
+        });
+    } else if (hasSubcommand) {
+      const subCmds = options.filter((opt) => opt.type === ApplicationCommandOptionType.Subcommand);
       subCmds.forEach((sub) => {
         desc += `\`/${cmd.name} ${sub.name}\`\n❯ ${sub.description}\n\n`;
       });

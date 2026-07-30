@@ -71,6 +71,9 @@ module.exports = class Validator {
     if (!config.SUPPORT_SERVER) warn("config.js: SUPPORT_SERVER is not provided");
     if (!process.env.WEATHERSTACK_KEY) warn("env: WEATHERSTACK_KEY is missing. Weather command won't work");
     if (!process.env.STRANGE_API_KEY) warn("env: STRANGE_API_KEY is missing. Image commands won't work");
+    if (config.FEEDS?.enabled !== false && (!process.env.TWITCH_CLIENT_ID || !process.env.TWITCH_CLIENT_SECRET)) {
+      warn("env: TWITCH_CLIENT_ID or TWITCH_CLIENT_SECRET are missing. Twitch alerts won't work");
+    }
   }
 
   /**

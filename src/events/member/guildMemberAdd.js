@@ -1,4 +1,4 @@
-const { inviteHandler, greetingHandler } = require("@src/handlers");
+const { inviteHandler, greetingHandler, memberRoleHandler } = require("@src/handlers");
 const { getSettings } = require("@schemas/Guild");
 
 /**
@@ -10,11 +10,19 @@ module.exports = async (client, member) => {
 
   const { guild } = member;
   const settings = await getSettings(guild);
+  // Restore roles from a previous membership before autorole, so the snapshot wins
+  const restored = await memberRoleHandler
+    .restoreRoles(member, settings)
+    .catch((err) => client.logger.error("restoreRoles", err));
 
   // Autorole
   if (settings.autorole) {
     const role = guild.roles.cache.get(settings.autorole);
     if (role) member.roles.add(role).catch((err) => {});
+  }
+
+  if (restored?.length) {
+    client.logger.debug(`Restored ${restored.length} roles for ${member.id} in ${guild.id}`);
   }
 
   // Check for counter channel

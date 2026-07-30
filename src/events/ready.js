@@ -1,7 +1,11 @@
 const { counterHandler, inviteHandler, presenceHandler } = require("@src/handlers");
 const { cacheReactionRoles } = require("@schemas/ReactionRoles");
+const { cacheSelfRolePanels } = require("@schemas/SelfRolePanel");
+const { cacheStickyMessages } = require("@schemas/StickyMessage");
 const { getSettings } = require("@schemas/Guild");
 const { getActiveBlock } = require("@src/services/blockedServers");
+const { startScheduler } = require("@src/services/scheduler/runtime");
+const { FeedWatcher } = require("@src/services/feeds/FeedWatcher");
 
 /**
  * @param {import('@src/structures').BotClient} client
@@ -35,6 +39,41 @@ module.exports = async (client) => {
 
   // Load reaction roles to cache
   await cacheReactionRoles(client);
+
+  // Load self role panels to cache
+  const panels = await cacheSelfRolePanels(client).catch((error) => {
+    client.logger.error("Failed to cache self role panels", error);
+    return 0;
+  });
+  if (panels) client.logger.log(`Cached ${panels} self role panels`);
+
+  // Load sticky messages to cache
+  const stickies = await cacheStickyMessages(client).catch((error) => {
+    client.logger.error("Failed to cache sticky messages", error);
+    return 0;
+  });
+  if (stickies) client.logger.log(`Cached ${stickies} sticky messages`);
+
+  // Durable timers (temporary roles, reminders, scheduled announcements)
+  if (client.config.SCHEDULER?.enabled !== false) {
+    try {
+      startScheduler(client);
+    } catch (error) {
+      client.logger.error("Failed to start scheduler", error);
+    }
+  }
+
+  // Twitch / YouTube / RSS / GitHub announcements
+  if (client.config.FEEDS?.enabled !== false) {
+    try {
+      client.feedWatcher = new FeedWatcher({
+        client,
+        intervalMs: client.config.FEEDS?.pollIntervalMs,
+      }).start();
+    } catch (error) {
+      client.logger.error("Failed to start feed watcher", error);
+    }
+  }
 
   if (client.config.SMART_INVITES.enabled) {
     try {

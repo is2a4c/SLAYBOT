@@ -1,4 +1,4 @@
-const { inviteHandler, greetingHandler } = require("@src/handlers");
+const { inviteHandler, greetingHandler, memberRoleHandler } = require("@src/handlers");
 const { getSettings } = require("@schemas/Guild");
 
 /**
@@ -11,6 +11,10 @@ module.exports = async (client, member) => {
 
   const { guild } = member;
   const settings = await getSettings(guild);
+  // Snapshot roles first - the member object still carries them here
+  if (!member.partial) {
+    await memberRoleHandler.saveRoles(member, settings).catch((err) => client.logger.error("saveRoles", err));
+  }
 
   // Check for counter channel
   if (settings.counters.find((doc) => ["MEMBERS", "BOTS", "USERS"].includes(doc.counter_type.toUpperCase()))) {

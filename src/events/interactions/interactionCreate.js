@@ -4,7 +4,10 @@ const {
   contextHandler,
   formHandler,
   statsHandler,
+  pollHandler,
   suggestionHandler,
+  selfRoleHandler,
+  verificationHandler,
   smartInvitesHandler,
   ticketHandler,
 } = require("@src/handlers");
@@ -42,6 +45,25 @@ module.exports = async (client, interaction) => {
       return formHandler.handleFormButton(interaction);
     }
 
+    // self role buttons carry the panel message and role: SELFROLE:<messageId>:<roleId>
+    if (interaction.customId.startsWith(`${selfRoleHandler.BUTTON_PREFIX}:`)) {
+      return selfRoleHandler.handleButton(interaction);
+    }
+
+    // poll close button: POLL_CLOSE:<messageId>
+    if (interaction.customId.startsWith(`${pollHandler.CLOSE_PREFIX}:`)) {
+      return pollHandler.handleClose(interaction);
+    }
+
+    if (interaction.customId === verificationHandler.BUTTON_ID) {
+      return verificationHandler.handleVerifyButton(interaction, await getSettings(interaction.guild));
+    }
+
+    // The captcha prompt must open a modal, so it cannot be deferred first.
+    if (interaction.customId === verificationHandler.MODAL_ID) {
+      return verificationHandler.handleCodePrompt(interaction);
+    }
+
     switch (interaction.customId) {
       case "TICKET_CREATE":
         return ticketHandler.handleTicketOpen(interaction);
@@ -60,11 +82,27 @@ module.exports = async (client, interaction) => {
     }
   }
 
+  // Select menus
+  else if (interaction.isStringSelectMenu()) {
+    if (interaction.customId.startsWith(`${selfRoleHandler.SELECT_PREFIX}:`)) {
+      return selfRoleHandler.handleSelect(interaction);
+    }
+
+    // poll voting: POLL_VOTE:<messageId>
+    if (interaction.customId.startsWith(`${pollHandler.VOTE_PREFIX}:`)) {
+      return pollHandler.handleVote(interaction);
+    }
+  }
+
   // Modals
   else if (interaction.type === InteractionType.ModalSubmit) {
     // form modals carry the form id: FORM_MODAL:<formId>
     if (interaction.customId.startsWith(`${formHandler.MODAL_PREFIX}:`)) {
       return formHandler.handleFormModal(interaction);
+    }
+
+    if (interaction.customId === verificationHandler.MODAL_ID) {
+      return verificationHandler.handleCodeSubmit(interaction, await getSettings(interaction.guild));
     }
 
     switch (interaction.customId) {

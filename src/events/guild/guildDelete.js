@@ -1,5 +1,15 @@
 const { EmbedBuilder } = require("discord.js");
 const { getSettings } = require("@schemas/Guild");
+const { deleteGuildTasks } = require("@schemas/ScheduledTask");
+const { deleteGuildPanels } = require("@schemas/SelfRolePanel");
+const { deleteGuildBirthdays } = require("@schemas/Birthday");
+const { deleteGuildPolls } = require("@schemas/Poll");
+const { deleteGuildChallenges } = require("@schemas/VerificationAttempt");
+const { deleteGuildThreads } = require("@schemas/ModmailThread");
+const { deleteGuildFeeds } = require("@schemas/Feed");
+const { deleteGuildBackups } = require("@schemas/GuildBackup");
+const { deleteGuildEntries } = require("@schemas/StarboardEntry");
+const { deleteGuildStickies } = require("@schemas/StickyMessage");
 
 /**
  * @param {import('@src/structures').BotClient} client
@@ -13,6 +23,32 @@ module.exports = async (client, guild) => {
   const settings = await getSettings(guild);
   settings.data.leftAt = new Date();
   await settings.save();
+
+  // Nothing left to fire for a guild the bot is no longer in
+  await Promise.all([
+    deleteGuildTasks(guild.id).catch((error) => client.logger.error(`Failed to clear tasks for ${guild.id}`, error)),
+    deleteGuildPanels(guild.id).catch((error) => client.logger.error(`Failed to clear panels for ${guild.id}`, error)),
+    deleteGuildEntries(guild.id).catch((error) =>
+      client.logger.error(`Failed to clear starboard entries for ${guild.id}`, error)
+    ),
+    deleteGuildStickies(guild.id).catch((error) =>
+      client.logger.error(`Failed to clear sticky messages for ${guild.id}`, error)
+    ),
+    deleteGuildBirthdays(guild.id).catch((error) =>
+      client.logger.error(`Failed to clear birthdays for ${guild.id}`, error)
+    ),
+    deleteGuildPolls(guild.id).catch((error) => client.logger.error(`Failed to clear polls for ${guild.id}`, error)),
+    deleteGuildChallenges(guild.id).catch((error) =>
+      client.logger.error(`Failed to clear verification challenges for ${guild.id}`, error)
+    ),
+    deleteGuildThreads(guild.id).catch((error) =>
+      client.logger.error(`Failed to clear modmail threads for ${guild.id}`, error)
+    ),
+    deleteGuildFeeds(guild.id).catch((error) => client.logger.error(`Failed to clear feeds for ${guild.id}`, error)),
+    deleteGuildBackups(guild.id).catch((error) =>
+      client.logger.error(`Failed to clear backups for ${guild.id}`, error)
+    ),
+  ]);
 
   if (!client.botLogChannelId && !client.joinLeaveWebhook) return;
 
