@@ -10,6 +10,10 @@ module.exports = async (client, member) => {
 
   const { guild } = member;
   const settings = await getSettings(guild);
+  if (!member.user.bot) {
+    client.telemetry?.record("member_joins", { guildId: guild.id, userId: member.id });
+  }
+
   // Restore roles from a previous membership before autorole, so the snapshot wins
   const restored = await memberRoleHandler
     .restoreRoles(member, settings)

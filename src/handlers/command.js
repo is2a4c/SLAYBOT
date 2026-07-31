@@ -13,6 +13,8 @@ module.exports = {
    * @param {object} settings
    */
   handlePrefixCommand: async function (message, cmd, settings) {
+    const startedAt = Date.now();
+    let succeeded = false;
     const prefix = settings.prefix;
     const args = message.content.replace(prefix, "").split(/\s+/);
     const invoke = args.shift().toLowerCase();
@@ -75,10 +77,19 @@ module.exports = {
 
     try {
       await cmd.messageRun(message, args, data);
+      succeeded = true;
     } catch (ex) {
       message.client.logger.error("messageRun", ex);
       message.safeReply("An error occurred while running this command");
     } finally {
+      message.client.telemetry?.recordCommand({
+        guildId: message.guildId,
+        userId: message.author.id,
+        commandName: cmd.name,
+        source: "prefix",
+        success: succeeded,
+        durationMs: Date.now() - startedAt,
+      });
       if (cmd.cooldown > 0) applyCooldown(message.author.id, cmd);
     }
   },
@@ -87,6 +98,8 @@ module.exports = {
    * @param {import('discord.js').ChatInputCommandInteraction} interaction
    */
   handleSlashCommand: async function (interaction) {
+    const startedAt = Date.now();
+    let succeeded = false;
     const cmd = interaction.client.slashCommands.get(interaction.commandName);
     if (!cmd)
       return interaction.reply({ content: "An error has occurred", ephemeral: true }).catch((ex) => {
@@ -160,10 +173,19 @@ module.exports = {
       }
       const settings = await getSettings(interaction.guild);
       await cmd.interactionRun(interaction, { settings });
+      succeeded = true;
     } catch (ex) {
       await respondToInteractionError(interaction, ex);
       interaction.client.logger.error("interactionRun", ex);
     } finally {
+      interaction.client.telemetry?.recordCommand({
+        guildId: interaction.guildId,
+        userId: interaction.user.id,
+        commandName: cmd.name,
+        source: "slash",
+        success: succeeded,
+        durationMs: Date.now() - startedAt,
+      });
       if (cmd.cooldown > 0) applyCooldown(interaction.user.id, cmd);
     }
   },

@@ -8,6 +8,7 @@ const {
 const { SUGGESTIONS } = require("@root/config");
 const { addSuggestion } = require("@schemas/Suggestions");
 const { stripIndent } = require("common-tags");
+const { getAiService } = require("@src/services/ai/AiService");
 
 /**
  * @type {import("@structures/Command")}
@@ -74,6 +75,17 @@ async function suggest(member, suggestion, settings) {
     )
     .setTimestamp();
 
+  const analysis = await analyzeSuggestionSafely(member, suggestion, settings);
+  if (analysis) {
+    embed.addFields(
+      { name: "AI category", value: analysis.category.slice(0, 1024), inline: true },
+      { name: "AI summary", value: analysis.summary.slice(0, 1024), inline: false },
+      { name: "Possible benefits", value: analysis.benefits.slice(0, 1024), inline: false },
+      { name: "Concerns / questions", value: analysis.concerns.slice(0, 1024), inline: false }
+    );
+    embed.setFooter({ text: "AI analysis is advisory • Staff decision required" });
+  }
+
   let buttonsRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("SUGGEST_APPROVE").setLabel("Approve").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId("SUGGEST_REJECT").setLabel("Reject").setStyle(ButtonStyle.Danger),
@@ -97,3 +109,18 @@ async function suggest(member, suggestion, settings) {
     return "Failed to send message to suggestions channel!";
   }
 }
+
+async function analyzeSuggestionSafely(member, suggestion, settings, service = getAiService()) {
+  if (!settings.ai?.enabled || !settings.ai.suggestion_analysis || !service.isConfigured()) return null;
+  try {
+    return await service.analyzeSuggestion({
+      suggestion,
+      guildId: member.guild.id,
+    });
+  } catch (error) {
+    member.client.logger.warn(`AI suggestion analysis failed in ${member.guild.id}: ${error.message}`);
+    return null;
+  }
+}
+
+module.exports.analyzeSuggestionSafely = analyzeSuggestionSafely;

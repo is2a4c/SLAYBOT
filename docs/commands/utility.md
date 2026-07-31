@@ -1,5 +1,5 @@
 ---
-description: 10 commands
+description: 11 commands
 ---
 
 # 🛠 Utility
@@ -13,6 +13,7 @@ description: 10 commands
 | **!proxies \<type>**           | **/proxies**   | fetch various proxies (http, socks4 & socks5) |
 | **!tr \<code> \<content>**     | **/translate** | translate from one language to other          |
 | **!urban \<word>**             | **/urban**     | searches the urban dictionary                 |
+| **!vc**                        | **/vc**        | control panel for your own voice channel      |
 | **!weather \<place>**          | **/weather**   | get weather information                       |
 
 ### Reminders

@@ -16,6 +16,7 @@ const CommandCategory = require("./CommandCategory");
 const lavaclient = require("@handlers/lavaclient");
 const giveawaysHandler = require("@handlers/giveaway");
 const { DiscordTogether } = require("discord-together");
+const { TelemetryService } = require("@src/services/telemetry/TelemetryService");
 
 module.exports = class BotClient extends Client {
   constructor() {
@@ -75,6 +76,14 @@ module.exports = class BotClient extends Client {
 
     // Database
     this.database = schemas;
+
+    // Privacy-preserving operational telemetry
+    this.telemetry = new TelemetryService({
+      config: this.config.TELEMETRY,
+      bucketModel: schemas.TelemetryBucket,
+      actorModel: schemas.TelemetryActor,
+      logger: this.logger,
+    });
 
     // Discord Together
     this.discordTogether = new DiscordTogether(this);

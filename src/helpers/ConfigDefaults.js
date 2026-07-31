@@ -53,6 +53,12 @@ const DEFAULT_CONFIG = {
     batchSize: 25,
     leaseMs: 60000,
   },
+  TELEMETRY: {
+    enabled: true,
+    retentionDays: 400,
+    flushIntervalMs: 15000,
+    maxBufferedEvents: 5000,
+  },
   SUGGESTIONS: {
     enabled: true,
     EMOJI: {

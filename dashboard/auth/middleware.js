@@ -1,6 +1,12 @@
 const { PermissionsBitField } = require("discord.js");
 const { getStaffAccount } = require("@schemas/StaffAccount");
 const { resolveEffectivePermissions } = require("@src/services/dashboard/permissions");
+const { DEFAULT_LOCALE, translate } = require("../i18n");
+
+// The locale middleware normally puts t() on res.locals. Falling back keeps a guard
+// usable from a route mounted before it, and from a unit test, instead of throwing
+// while it is already refusing a request.
+const t = (res, key, vars) => (res.locals?.t ? res.locals.t(key, vars) : translate(DEFAULT_LOCALE, key, vars));
 
 async function loadDashboardActor(req, res, next) {
   const userId = req.session?.user?.id;
@@ -27,16 +33,17 @@ async function loadDashboardActor(req, res, next) {
 
 function requireAuth(req, res, next) {
   if (req.session?.user?.id) return next();
-  const redirect = encodeURIComponent(req.originalUrl || `${res.locals.basePath}/`);
-  return res.redirect(`${res.locals.basePath}/auth/login?redirect=${redirect}`);
+  const basePath = res.locals?.basePath ?? "";
+  const redirect = encodeURIComponent(req.originalUrl || `${basePath}/`);
+  return res.redirect(`${basePath}/auth/login?redirect=${redirect}`);
 }
 
 function requireOwner(req, res, next) {
   requireAuth(req, res, () => {
     if (req.client.config.OWNER_IDS.includes(req.session.user.id)) return next();
     return res.status(403).render("error", {
-      title: res.locals.t("errors.ownerOnlyTitle"),
-      message: res.locals.t("errors.ownerOnlyMessage"),
+      title: t(res, "errors.ownerOnlyTitle"),
+      message: t(res, "errors.ownerOnlyMessage"),
     });
   });
 }
@@ -53,8 +60,8 @@ async function requireGuildAccess(req, res, next) {
     const guild = client.guilds.cache.get(req.params.guildId);
     if (!guild) {
       return res.status(404).render("error", {
-        title: res.locals.t("errors.guildNotFoundTitle"),
-        message: res.locals.t("errors.guildNotFoundMessage"),
+        title: t(res, "errors.guildNotFoundTitle"),
+        message: t(res, "errors.guildNotFoundMessage"),
       });
     }
 
@@ -73,8 +80,8 @@ async function requireGuildAccess(req, res, next) {
       const staffViewer = req.dashboardPermissions?.has("guilds.view");
       if (!guildManager && !staffViewer) {
         return res.status(403).render("error", {
-          title: res.locals.t("errors.accessDeniedTitle"),
-          message: res.locals.t("errors.guildAccessDenied"),
+          title: t(res, "errors.accessDeniedTitle"),
+          message: t(res, "errors.guildAccessDenied"),
         });
       }
       req.guild = guild;
@@ -85,8 +92,8 @@ async function requireGuildAccess(req, res, next) {
     } catch (ex) {
       req.client.logger.error("dashboard requireGuildAccess failed", ex);
       return res.status(500).render("error", {
-        title: res.locals.t("errors.internalTitle"),
-        message: res.locals.t("errors.permissionCheckFailed"),
+        title: t(res, "errors.internalTitle"),
+        message: t(res, "errors.permissionCheckFailed"),
       });
     }
   });
@@ -96,8 +103,8 @@ function requireGuildPermission(permission) {
   return (req, res, next) => {
     if (req.guildManager || req.isOwner || req.dashboardPermissions?.has(permission)) return next();
     return res.status(403).render("error", {
-      title: res.locals.t("errors.insufficientPermissionsTitle"),
-      message: res.locals.t("errors.permissionRequired", { permission }),
+      title: t(res, "errors.insufficientPermissionsTitle"),
+      message: t(res, "errors.permissionRequired", { permission }),
     });
   };
 }
@@ -112,8 +119,8 @@ function requirePermission(permission) {
     requireAuth(req, res, () => {
       if (!req.dashboardPermissions?.has(permission)) {
         return res.status(403).render("error", {
-          title: res.locals.t("errors.insufficientPermissionsTitle"),
-          message: res.locals.t("errors.permissionRequired", { permission }),
+          title: t(res, "errors.insufficientPermissionsTitle"),
+          message: t(res, "errors.permissionRequired", { permission }),
         });
       }
       return next();

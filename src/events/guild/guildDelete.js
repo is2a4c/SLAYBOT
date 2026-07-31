@@ -10,6 +10,7 @@ const { deleteGuildFeeds } = require("@schemas/Feed");
 const { deleteGuildBackups } = require("@schemas/GuildBackup");
 const { deleteGuildEntries } = require("@schemas/StarboardEntry");
 const { deleteGuildStickies } = require("@schemas/StickyMessage");
+const { deleteGuildChannels: deleteGuildTempVoice } = require("@schemas/TempVoiceChannel");
 
 /**
  * @param {import('@src/structures').BotClient} client
@@ -19,6 +20,7 @@ module.exports = async (client, guild) => {
   if (client.smartInvites) await client.smartInvites.handleGuildDeleted(guild.id);
   if (!guild.available) return;
   client.logger.log(`Guild Left: ${guild.name} Members: ${guild.memberCount}`);
+  client.telemetry?.record("guild_leaves", { guildId: guild.id });
 
   const settings = await getSettings(guild);
   settings.data.leftAt = new Date();
@@ -47,6 +49,9 @@ module.exports = async (client, guild) => {
     deleteGuildFeeds(guild.id).catch((error) => client.logger.error(`Failed to clear feeds for ${guild.id}`, error)),
     deleteGuildBackups(guild.id).catch((error) =>
       client.logger.error(`Failed to clear backups for ${guild.id}`, error)
+    ),
+    deleteGuildTempVoice(guild.id).catch((error) =>
+      client.logger.error(`Failed to clear temp voice channels for ${guild.id}`, error)
     ),
   ]);
 

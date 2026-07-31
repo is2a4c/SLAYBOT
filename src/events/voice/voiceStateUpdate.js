@@ -1,5 +1,5 @@
 const { trackVoiceStats } = require("@handlers/stats");
-const { voiceRoleHandler } = require("@src/handlers");
+const { tempVoiceHandler, voiceRoleHandler } = require("@src/handlers");
 const { getSettings } = require("@schemas/Guild");
 
 const musicIdleTimers = new Map();
@@ -10,15 +10,31 @@ const musicIdleTimers = new Map();
  * @param {import('discord.js').VoiceState} newState
  */
 module.exports = async (client, oldState, newState) => {
+  client.telemetry?.recordVoiceState(oldState, newState);
+
   // Track voice stats
   trackVoiceStats(oldState, newState).catch((ex) => client.logger.error("trackVoiceStats", ex));
 
-  // Voice roles - only when the channel actually changed
+  // Voice roles and temporary channels - only when the channel actually changed
   if (oldState.channelId !== newState.channelId) {
     const guild = newState.guild || oldState.guild;
+
     getSettings(guild)
-      .then((settings) => voiceRoleHandler.handleVoiceStateUpdate(oldState, newState, settings))
-      .catch((ex) => client.logger.error("voiceRoles", ex));
+      .then(async (settings) => {
+        await voiceRoleHandler
+          .handleVoiceStateUpdate(oldState, newState, settings)
+          .catch((ex) => client.logger.error("voiceRoles", ex));
+
+        // Leaving first: a member hopping out of their own channel into the hub
+        // should not have the old one linger behind them.
+        if (oldState.channelId) {
+          await tempVoiceHandler.handleChannelLeave(oldState).catch((ex) => client.logger.error("tempVoice", ex));
+        }
+        if (newState.channelId) {
+          await tempVoiceHandler.handleHubJoin(newState, settings).catch((ex) => client.logger.error("tempVoice", ex));
+        }
+      })
+      .catch((ex) => client.logger.error("voiceStateUpdate", ex));
   }
 
   // Lavalink

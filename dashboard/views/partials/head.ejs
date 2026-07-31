@@ -49,34 +49,42 @@
             <%- include("icon", { name: "grid" }) %><span><%= t("nav.overview") %></span>
           </a>
           <% if (canGuild("config.edit")) { %>
-            <a class="nav-item <%= routeActive(guildRoot + "/config") ? "active" : "" %>" href="<%= basePath + guildRoot %>/config">
+            <a class="nav-item <%= routeActive(guildRoot + "/config") ? "active" : "" %>" href="<%= basePath + guildRoot %>/config" <%- routeActive(guildRoot + "/config") ? 'aria-current="page"' : "" %>>
               <%- include("icon", { name: "settings" }) %><span><%= t("nav.config") %></span>
             </a>
           <% } %>
           <% if (canGuild("automod.edit")) { %>
-            <a class="nav-item <%= routeActive(guildRoot + "/automod") ? "active" : "" %>" href="<%= basePath + guildRoot %>/automod">
+            <a class="nav-item <%= routeActive(guildRoot + "/automod") ? "active" : "" %>" href="<%= basePath + guildRoot %>/automod" <%- routeActive(guildRoot + "/automod") ? 'aria-current="page"' : "" %>>
               <%- include("icon", { name: "shield" }) %><span><%= t("nav.automod") %></span>
             </a>
           <% } %>
+          <a class="nav-item <%= routeActive(guildRoot + "/commands") ? "active" : "" %>" href="<%= basePath + guildRoot %>/commands" <%- routeActive(guildRoot + "/commands") ? 'aria-current="page"' : "" %>>
+            <%- include("icon", { name: "command" }) %><span><%= t("nav.commands") %></span>
+          </a>
+          <% if (canGuild("members.moderate")) { %>
+            <a class="nav-item <%= routeActive(guildRoot + "/members") ? "active" : "" %>" href="<%= basePath + guildRoot %>#member-lookup" <%- routeActive(guildRoot + "/members") ? 'aria-current="page"' : "" %>>
+              <%- include("icon", { name: "users" }) %><span><%= t("nav.members") %></span>
+            </a>
+          <% } %>
           <% if (canGuild("smartinvites.manage")) { %>
-            <a class="nav-item <%= routeActive(guildRoot + "/smart-invites") ? "active" : "" %>" href="<%= basePath + guildRoot %>/smart-invites">
+            <a class="nav-item <%= routeActive(guildRoot + "/smart-invites") ? "active" : "" %>" href="<%= basePath + guildRoot %>/smart-invites" <%- routeActive(guildRoot + "/smart-invites") ? 'aria-current="page"' : "" %>>
               <%- include("icon", { name: "link" }) %><span><%= t("nav.smartInvites") %></span>
             </a>
           <% } %>
 
           <span class="nav-label nav-label-spaced"><%= t("nav.observability") %></span>
           <% if (canGuild("audit.view")) { %>
-            <a class="nav-item <%= routeActive(guildRoot + "/modlog") ? "active" : "" %>" href="<%= basePath + guildRoot %>/modlog">
+            <a class="nav-item <%= routeActive(guildRoot + "/modlog") ? "active" : "" %>" href="<%= basePath + guildRoot %>/modlog" <%- routeActive(guildRoot + "/modlog") ? 'aria-current="page"' : "" %>>
               <%- include("icon", { name: "scroll" }) %><span><%= t("nav.modlog") %></span>
             </a>
           <% } %>
           <% if (canGuild("diagnostics.run")) { %>
-            <a class="nav-item <%= routeActive(guildRoot + "/diagnostics") ? "active" : "" %>" href="<%= basePath + guildRoot %>/diagnostics">
+            <a class="nav-item <%= routeActive(guildRoot + "/diagnostics") ? "active" : "" %>" href="<%= basePath + guildRoot %>/diagnostics" <%- routeActive(guildRoot + "/diagnostics") ? 'aria-current="page"' : "" %>>
               <%- include("icon", { name: "pulse" }) %><span><%= t("nav.diagnostics") %></span>
             </a>
           <% } %>
           <% if (canGuild("audit.view")) { %>
-            <a class="nav-item <%= routeActive(guildRoot + "/audit") ? "active" : "" %>" href="<%= basePath + guildRoot %>/audit">
+            <a class="nav-item <%= routeActive(guildRoot + "/audit") ? "active" : "" %>" href="<%= basePath + guildRoot %>/audit" <%- routeActive(guildRoot + "/audit") ? 'aria-current="page"' : "" %>>
               <%- include("icon", { name: "history" }) %><span><%= t("nav.audit") %></span>
             </a>
           <% } %>
@@ -88,11 +96,11 @@
             </a>
           <% } %>
           <% if (locals.canAccessOwner === true) { %>
-            <a class="nav-item <%= routeActive("/owner") ? "active" : "" %>" href="<%= basePath %>/owner">
+            <a class="nav-item <%= routeActive("/owner") ? "active" : "" %>" href="<%= basePath %>/owner" <%- routeActive("/owner") ? 'aria-current="page"' : "" %>>
               <%- include("icon", { name: "crown" }) %><span><%= t("nav.owner") %></span>
             </a>
           <% } %>
-          <a class="nav-item <%= routeActive("/status") ? "active" : "" %>" href="<%= basePath %>/status">
+          <a class="nav-item <%= routeActive("/status") ? "active" : "" %>" href="<%= basePath %>/status" <%- routeActive("/status") ? 'aria-current="page"' : "" %>>
             <%- include("icon", { name: "pulse" }) %><span><%= t("nav.status") %></span>
           </a>
         <% } %>
@@ -130,10 +138,16 @@
           <small><%= hasGuild ? t("common.overview") : "SLAYBOT" %></small>
         </div>
         <div class="topbar-actions">
+          <% if (locals.sessionUser) { %>
+            <button class="quick-open" type="button" data-command-menu-open aria-haspopup="dialog">
+              <%- include("icon", { name: "search" }) %><span><%= t("common.quickOpen") %></span><kbd>⌘ K</kbd>
+            </button>
+          <% } %>
+          <button class="icon-button" type="button" data-theme-toggle title="<%= t("common.toggleTheme") %>" aria-label="<%= t("common.toggleTheme") %>"><%- include("icon", { name: "sun" }) %></button>
           <div class="lang-switch" aria-label="<%= t("common.language") %>">
             <% locales.forEach((entry) => { %><a href="?lang=<%= entry.code %>" class="<%= entry.active ? "active" : "" %>" lang="<%= entry.code %>"><%= entry.code.toUpperCase() %></a><% }) %>
           </div>
-          <a class="status-chip" href="<%= basePath %>/status"><span></span><%= t("common.live") %></a>
+          <a class="status-chip" href="<%= basePath %>/status" data-live-status data-status-url="<%= basePath %>/status.json"><span></span><b><%= t("common.live") %></b></a>
         </div>
       </header>
 

@@ -10,6 +10,7 @@ const {
   isImageAttachment,
   DEFAULT_THRESHOLD,
 } = require("@src/services/imageSpamClassifier");
+const { getAiService } = require("@src/services/ai/AiService");
 
 const antispamCache = new Map();
 const MESSAGE_SPAM_THRESHOLD = 3000;
@@ -137,12 +138,51 @@ async function inspectImageSpam(message, automod, classifier = classifyImage) {
   return { shouldDelete: true, strikes: 1, fields };
 }
 
+async function inspectTextRisk(message, aiSettings, classifier) {
+  const fields = [];
+  const content = String(message.content || "").trim();
+  if (!aiSettings?.enabled || !aiSettings.automod_enabled || !content) {
+    return { shouldDelete: false, strikes: 0, shadowTriggered: false, fields };
+  }
+
+  const threshold = Math.min(100, Math.max(50, Number(aiSettings.automod_threshold) || 85));
+  const mode = aiSettings.automod_mode === "ENFORCE" ? "ENFORCE" : "SHADOW";
+  const classify =
+    classifier ||
+    ((input) =>
+      getAiService().moderateText({
+        content: input.content,
+        guildId: input.guildId,
+      }));
+
+  const result = await classify({ content, guildId: message.guildId });
+  if (!result?.risky || Number(result.score) < threshold) {
+    return { shouldDelete: false, strikes: 0, shadowTriggered: false, fields };
+  }
+
+  const score = Math.min(100, Math.max(0, Math.round(Number(result.score) || 0)));
+  const category = String(result.category || "OTHER").slice(0, 50);
+  const reason = String(result.reason || "No reason provided").slice(0, 700);
+  fields.push({
+    name: `AI Text Risk: ${score}/100 (${mode})`,
+    value: `Category: ${category}\n${reason}`.slice(0, 1024),
+    inline: false,
+  });
+
+  return {
+    shouldDelete: mode === "ENFORCE",
+    strikes: mode === "ENFORCE" ? 1 : 0,
+    shadowTriggered: mode === "SHADOW",
+    fields,
+  };
+}
+
 /**
  * Perform moderation on the message
  * @param {import('discord.js').Message} message
  * @param {object} settings
  */
-async function performAutomod(message, settings, imageClassifier = classifyImage) {
+async function performAutomod(message, settings, imageClassifier = classifyImage, textClassifier) {
   const { automod } = settings;
   const ordinaryMember = shouldModerate(message);
 
@@ -158,6 +198,7 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
 
   let shouldDelete = false;
   let strikesTotal = 0;
+  let shadowTriggered = false;
 
   const fields = [];
 
@@ -169,6 +210,18 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
     fields.push(...result.fields);
     shouldDelete ||= result.shouldDelete;
     strikesTotal += result.strikes;
+  }
+
+  if (settings.ai?.enabled && settings.ai.automod_enabled && (ordinaryMember || automod.debug) && content.trim()) {
+    try {
+      const result = await inspectTextRisk(message, settings.ai, textClassifier);
+      fields.push(...result.fields);
+      shouldDelete ||= result.shouldDelete;
+      strikesTotal += result.strikes;
+      shadowTriggered ||= result.shadowTriggered;
+    } catch (error) {
+      message.client.logger.warn(`AI text moderation skipped message ${message.id}: ${error.message}`);
+    }
   }
 
   // Max mentions
@@ -264,11 +317,7 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
     }
   }
 
-  if (strikesTotal > 0) {
-    // add strikes to member
-    const memberDb = await getMember(guild.id, author.id);
-    memberDb.strikes += strikesTotal;
-
+  if (strikesTotal > 0 || shadowTriggered) {
     // log to db
     const reason = fields.map((field) => field.name + ": " + field.value).join("\n");
     addAutoModLogToDb(member, content, reason, strikesTotal).catch(() => {});
@@ -288,6 +337,12 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
 
       logChannel.safeSend({ embeds: [logEmbed] });
     }
+  }
+
+  if (strikesTotal > 0) {
+    // add strikes to member
+    const memberDb = await getMember(guild.id, author.id);
+    memberDb.strikes += strikesTotal;
 
     // DM strike details
     const strikeEmbed = new EmbedBuilder()
@@ -323,12 +378,14 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
     triggered: strikesTotal > 0,
     deleted,
     strikes: strikesTotal,
+    shadowTriggered,
   };
 }
 
 module.exports = {
   performAutomod,
   inspectImageSpam,
+  inspectTextRisk,
   isAntiSpamWhitelisted,
   isRepeatedMessage,
   antispamCache,

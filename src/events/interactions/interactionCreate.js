@@ -2,13 +2,16 @@ const { getSettings } = require("@schemas/Guild");
 const {
   commandHandler,
   contextHandler,
+  controlPanelHandler,
   formHandler,
+  languageHandler,
   statsHandler,
   pollHandler,
   suggestionHandler,
   selfRoleHandler,
   verificationHandler,
   smartInvitesHandler,
+  tempVoiceHandler,
   ticketHandler,
 } = require("@src/handlers");
 const { InteractionType } = require("discord.js");
@@ -23,6 +26,8 @@ module.exports = async (client, interaction) => {
       .reply({ content: "Command can only be executed in a discord server", ephemeral: true })
       .catch(() => {});
   }
+
+  client.telemetry?.recordInteraction(interaction);
 
   // Slash Commands
   if (interaction.isChatInputCommand()) {
@@ -39,6 +44,20 @@ module.exports = async (client, interaction) => {
   // Buttons
   else if (interaction.isButton()) {
     if (await smartInvitesHandler.handleButton(interaction)) return;
+
+    // The settings panels: the hub and every system inside it.
+    if (controlPanelHandler.matches(interaction.customId)) {
+      return controlPanelHandler.handle(interaction, await getSettings(interaction.guild));
+    }
+
+    if (tempVoiceHandler.matchesButton(interaction.customId)) {
+      return tempVoiceHandler.handleButton(interaction, await getSettings(interaction.guild));
+    }
+
+    // language picker: LANG:<auto|ru|en>
+    if (interaction.customId.startsWith(`${languageHandler.BUTTON_PREFIX}:`)) {
+      return languageHandler.handleButton(interaction, await getSettings(interaction.guild));
+    }
 
     // form buttons carry the form id: FORM_FILL:<formId>
     if (interaction.customId.startsWith(`${formHandler.BUTTON_PREFIX}:`)) {
@@ -83,7 +102,16 @@ module.exports = async (client, interaction) => {
   }
 
   // Select menus
-  else if (interaction.isStringSelectMenu()) {
+  else if (interaction.isAnySelectMenu()) {
+    // TempVoice asks "who?" with both string and user pickers.
+    if (tempVoiceHandler.matchesSelect(interaction.customId)) {
+      return tempVoiceHandler.handleSelect(interaction, await getSettings(interaction.guild));
+    }
+
+    if (controlPanelHandler.matches(interaction.customId)) {
+      return controlPanelHandler.handle(interaction, await getSettings(interaction.guild));
+    }
+
     if (interaction.customId.startsWith(`${selfRoleHandler.SELECT_PREFIX}:`)) {
       return selfRoleHandler.handleSelect(interaction);
     }
@@ -99,6 +127,15 @@ module.exports = async (client, interaction) => {
     // form modals carry the form id: FORM_MODAL:<formId>
     if (interaction.customId.startsWith(`${formHandler.MODAL_PREFIX}:`)) {
       return formHandler.handleFormModal(interaction);
+    }
+
+    // temp voice modals carry the channel: TV~MOD:<action>:<channelId>
+    if (tempVoiceHandler.matchesModal(interaction.customId)) {
+      return tempVoiceHandler.handleModal(interaction, await getSettings(interaction.guild));
+    }
+
+    if (controlPanelHandler.matches(interaction.customId)) {
+      return controlPanelHandler.handle(interaction, await getSettings(interaction.guild));
     }
 
     if (interaction.customId === verificationHandler.MODAL_ID) {

@@ -25,6 +25,8 @@ const Schema = new mongoose.Schema({
     inviteUrl: String,
   },
   prefix: { type: String, default: PREFIX_COMMANDS.DEFAULT_PREFIX },
+  // null follows the server's own Discord locale; a value pins every message to it.
+  language: { type: String, enum: ["ru", "en", null], default: null },
   stats: {
     enabled: Boolean,
     xp: {
@@ -36,6 +38,15 @@ const Schema = new mongoose.Schema({
     log_channel: String,
     limit: { type: Number, default: 10 },
     staff_roles: { type: [String], default: [] },
+    // The "open a ticket" message, so the panel can be moved or refreshed.
+    panel_channel_id: String,
+    panel_message_id: String,
+    panel_title: { type: String, default: "Support Ticket", maxlength: 100 },
+    panel_description: {
+      type: String,
+      default: "Please click the button below to create a ticket",
+      maxlength: 1000,
+    },
     categories: [
       {
         _id: false,
@@ -145,6 +156,26 @@ const Schema = new mongoose.Schema({
       },
     ],
   },
+  temp_voice: {
+    enabled: { type: Boolean, default: false },
+    // Joining this channel hands the member a channel of their own.
+    hub_channel_id: String,
+    // Where those channels are created; defaults to the hub's own category.
+    category_id: String,
+    // Text channel holding the button panel, and the panel message itself.
+    panel_channel_id: String,
+    panel_message_id: String,
+    // {user} and {count} are substituted when a channel is created.
+    name_template: { type: String, default: "{user}", maxlength: 100 },
+    default_limit: { type: Number, default: 0, min: 0, max: 99 },
+    // Newly created channels start locked to everyone but their owner.
+    default_locked: { type: Boolean, default: false },
+    // How many channels one member may own at a time.
+    max_per_member: { type: Number, default: 1, min: 1, max: 5 },
+    // Hand the channel to somebody still inside instead of deleting it when the
+    // owner leaves.
+    claimable: { type: Boolean, default: true },
+  },
   branding: {
     // Lets a server give the bot its own look without a separate application.
     name: { type: String, default: null, maxlength: 60 },
@@ -208,6 +239,21 @@ const Schema = new mongoose.Schema({
     approved_channel: String,
     rejected_channel: String,
     staff_roles: [String],
+  },
+  ai: {
+    enabled: { type: Boolean, default: false },
+    automod_enabled: { type: Boolean, default: false },
+    automod_mode: {
+      type: String,
+      enum: ["SHADOW", "ENFORCE"],
+      default: "SHADOW",
+    },
+    automod_threshold: { type: Number, min: 50, max: 100, default: 85 },
+    ticket_summaries: { type: Boolean, default: false },
+    knowledge_enabled: { type: Boolean, default: false },
+    knowledge: { type: String, default: "", maxlength: 12000 },
+    suggestion_analysis: { type: Boolean, default: false },
+    form_analysis: { type: Boolean, default: false },
   },
 });
 

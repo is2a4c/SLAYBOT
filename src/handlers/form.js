@@ -11,6 +11,8 @@ const { EMBED_COLORS } = require("@root/config.js");
 
 // schemas
 const { findForm, hasResponded, addResponse } = require("@schemas/Forms");
+const { getSettings } = require("@schemas/Guild");
+const { getAiService } = require("@src/services/ai/AiService");
 
 // helpers
 const { error } = require("@helpers/Logger");
@@ -119,7 +121,7 @@ function buildFormModal(form) {
  * @param {import('discord.js').User} user
  * @param {{question: string, answer: string}[]} answers
  */
-async function sendResponseToChannel(guild, form, user, answers) {
+async function sendResponseToChannel(guild, form, user, answers, analysis) {
   const channelId = form.response_channel || form.channel_id;
   const channel = guild.channels.cache.get(channelId);
   if (!channel || !channel.canSendEmbeds()) return false;
@@ -138,6 +140,15 @@ async function sendResponseToChannel(guild, form, user, answers) {
       value: (ans.answer || "_No answer_").slice(0, 1024),
     }))
   );
+  if (analysis) {
+    embed.addFields(
+      { name: "AI summary", value: analysis.summary.slice(0, 1024) },
+      { name: "Suggested follow-up", value: analysis.followUpQuestions.slice(0, 1024) }
+    );
+    embed.setFooter({
+      text: `Form ID: ${form.form_id} • User ID: ${user.id} • AI assistance is advisory`,
+    });
+  }
 
   const sent = await channel.safeSend({ embeds: [embed] });
   return !!sent;
@@ -187,7 +198,9 @@ async function handleFormModal(interaction) {
     }));
 
     await addResponse(interaction.guildId, formId, interaction.user.id, answers);
-    const delivered = await sendResponseToChannel(interaction.guild, form, interaction.user, answers);
+    const settings = await getSettings(interaction.guild);
+    const analysis = await analyzeFormResponseSafely(interaction, form, answers, settings);
+    const delivered = await sendResponseToChannel(interaction.guild, form, interaction.user, answers, analysis);
 
     return interaction.followUp(
       delivered
@@ -197,6 +210,20 @@ async function handleFormModal(interaction) {
   } catch (ex) {
     error("handleFormModal", ex);
     return interaction.followUp("Failed to save your response, an error occurred!");
+  }
+}
+
+async function analyzeFormResponseSafely(interaction, form, answers, settings, service = getAiService()) {
+  if (!settings.ai?.enabled || !settings.ai.form_analysis || !service.isConfigured()) return null;
+  try {
+    return await service.analyzeFormResponse({
+      guildId: interaction.guildId,
+      formTitle: form.title,
+      answers,
+    });
+  } catch (error) {
+    interaction.client.logger.warn(`AI form analysis failed in ${interaction.guildId}: ${error.message}`);
+    return null;
   }
 }
 
@@ -210,4 +237,6 @@ module.exports = {
   buildFormButtonRow,
   handleFormButton,
   handleFormModal,
+  analyzeFormResponseSafely,
+  sendResponseToChannel,
 };

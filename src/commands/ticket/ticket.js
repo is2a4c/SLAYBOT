@@ -18,9 +18,10 @@ const {
   memberHasPermission,
   syncStaffRoleAccess,
 } = require("@helpers/TicketPermissions");
+const { getAiService } = require("@src/services/ai/AiService");
 
 const ADMIN_SUBCOMMANDS = new Set(["setup", "log", "limit", "closeall", "staff-add", "staff-remove", "staff-list"]);
-const STAFF_SUBCOMMANDS = new Set(["add", "remove"]);
+const STAFF_SUBCOMMANDS = new Set(["add", "remove", "summary"]);
 const MAX_STAFF_ROLES = 25;
 
 /**
@@ -53,6 +54,10 @@ module.exports = {
       {
         trigger: "closeall",
         description: "close all open tickets",
+      },
+      {
+        trigger: "summary",
+        description: "generate an on-demand AI summary for support staff",
       },
       {
         trigger: "add <userId|roleId>",
@@ -128,6 +133,11 @@ module.exports = {
       {
         name: "closeall",
         description: "closes all open tickets",
+        type: ApplicationCommandOptionType.Subcommand,
+      },
+      {
+        name: "summary",
+        description: "generate an on-demand AI summary [ticket support only]",
         type: ApplicationCommandOptionType.Subcommand,
       },
       {
@@ -243,6 +253,11 @@ module.exports = {
       return sent.editable ? sent.edit(response) : message.channel.send(response);
     }
 
+    // AI ticket summary
+    else if (input === "summary") {
+      response = await summarizeTicket(message.channel, data.settings);
+    }
+
     // Add user to ticket
     else if (input === "add") {
       if (args.length < 2) return message.safeReply("Please provide a user or role to add to the ticket");
@@ -332,6 +347,11 @@ module.exports = {
     // Close all
     else if (sub === "closeall") {
       response = await closeAll(interaction, interaction.user);
+    }
+
+    // AI ticket summary
+    else if (sub === "summary") {
+      response = await summarizeTicket(interaction.channel, data.settings);
     }
 
     // Add to ticket
@@ -491,6 +511,61 @@ async function closeAll({ guild }, user) {
   return `Completed! Success: \`${stats[0]}\` Failed: \`${stats[1]}\``;
 }
 
+async function summarizeTicket(channel, settings, service = getAiService()) {
+  if (!isTicketChannel(channel)) return "This command can only be used in ticket channels.";
+  if (!settings.ai?.enabled || !settings.ai.ticket_summaries) {
+    return "AI ticket summaries are disabled for this server.";
+  }
+  if (!service.isConfigured()) return "The AI provider is not configured by the bot operator.";
+
+  try {
+    const messages = await channel.messages.fetch({ limit: 100 });
+    const transcript = Array.from(messages.values())
+      .reverse()
+      .filter((message) => message.cleanContent || message.attachments?.size)
+      .map((message) => {
+        const attachments =
+          message.attachments?.size > 0
+            ? ` [attachments: ${message.attachments.map((attachment) => attachment.name || "file").join(", ")}]`
+            : "";
+        return `[${message.createdAt?.toISOString?.() || "unknown time"}] ${message.author?.username || "Unknown"}: ${
+          message.cleanContent || ""
+        }${attachments}`;
+      })
+      .join("\n")
+      .slice(-24_000);
+
+    if (!transcript.trim()) return "There are no ticket messages to summarize.";
+
+    const result = await service.summarizeTicket({
+      transcript,
+      guildId: channel.guildId,
+    });
+    const urgencyColors = {
+      LOW: EMBED_COLORS.SUCCESS,
+      MEDIUM: EMBED_COLORS.WARNING,
+      HIGH: EMBED_COLORS.ERROR,
+    };
+    return {
+      embeds: [
+        new EmbedBuilder()
+          .setColor(urgencyColors[result.urgency] || EMBED_COLORS.BOT_EMBED)
+          .setAuthor({ name: "SLAYBOT AI • Ticket summary" })
+          .setDescription(result.summary.slice(0, 1800))
+          .addFields(
+            { name: "Category", value: result.category.slice(0, 1024), inline: true },
+            { name: "Urgency", value: result.urgency, inline: true },
+            { name: "Recommended next step", value: result.nextStep.slice(0, 1024), inline: false }
+          )
+          .setFooter({ text: "AI-generated draft • Staff review required" }),
+      ],
+    };
+  } catch (error) {
+    channel.client.logger.warn(`AI ticket summary failed in ${channel.id}: ${error.message}`);
+    return "The AI service is temporarily unavailable. The ticket was not changed.";
+  }
+}
+
 async function addToTicket({ channel }, inputId) {
   if (!isTicketChannel(channel)) return "This command can only be used in ticket channel";
   if (!inputId || isNaN(inputId)) return "Oops! You need to input a valid userId/roleId";
@@ -560,3 +635,5 @@ async function removeStaffRole(guild, settings, role) {
     (result.failed > 0 ? `; failed to update ${result.failed}.` : ".")
   );
 }
+
+module.exports.summarizeTicket = summarizeTicket;

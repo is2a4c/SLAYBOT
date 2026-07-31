@@ -1,4 +1,4 @@
-const { counterHandler, inviteHandler, presenceHandler } = require("@src/handlers");
+const { counterHandler, inviteHandler, presenceHandler, tempVoiceHandler } = require("@src/handlers");
 const { cacheReactionRoles } = require("@schemas/ReactionRoles");
 const { cacheSelfRolePanels } = require("@schemas/SelfRolePanel");
 const { cacheStickyMessages } = require("@schemas/StickyMessage");
@@ -104,6 +104,13 @@ module.exports = async (client) => {
     // cache invites
     if (settings.invite.tracking) {
       inviteHandler.cacheGuildInvites(guild);
+    }
+
+    // temporary voice channels that emptied out or vanished while the bot was down
+    if (settings.temp_voice?.enabled) {
+      await tempVoiceHandler
+        .reconcileGuild(guild)
+        .catch((error) => client.logger.error(`Failed to reconcile temp voice for ${guild.id}`, error));
     }
   }
 

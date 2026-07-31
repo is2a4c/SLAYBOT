@@ -1,0 +1,67 @@
+<%- include("../partials/head", { title, guild }) %>
+<header class="page-header">
+  <div class="page-heading">
+    <p class="eyebrow"><%= t("commands.eyebrow") %></p>
+    <h1><%= t("commands.title") %></h1>
+    <p class="subtitle"><%= t("commands.subtitle", { prefix }) %></p>
+  </div>
+  <span class="badge pass"><%= t("commands.availableCount", { ready: summary.ready, total: summary.total }) %></span>
+</header>
+
+<% if (!commands.some((command) => command.memberPresent)) { %>
+  <div class="attention"><h2><%= t("commands.notMemberTitle") %></h2><p><%= t("commands.notMemberHint") %></p></div>
+<% } %>
+
+<div class="metric-grid command-metrics">
+  <div class="metric-card"><span class="metric-icon"><%- include("../partials/icon", { name: "command" }) %></span><div><div class="label"><%= t("commands.total") %></div><div class="value"><%= summary.total %></div></div></div>
+  <div class="metric-card"><span class="metric-icon success"><%- include("../partials/icon", { name: "check" }) %></span><div><div class="label"><%= t("commands.ready") %></div><div class="value"><%= summary.ready %></div></div></div>
+  <div class="metric-card"><span class="metric-icon warning"><%- include("../partials/icon", { name: "users" }) %></span><div><div class="label"><%= t("commands.userBlocked") %></div><div class="value"><%= summary.userBlocked %></div></div></div>
+  <div class="metric-card"><span class="metric-icon danger"><%- include("../partials/icon", { name: "alert" }) %></span><div><div class="label"><%= t("commands.botBlocked") %></div><div class="value"><%= summary.botBlocked %></div></div></div>
+</div>
+
+<div class="command-toolbar panel">
+  <label class="field command-search">
+    <span><%= t("commands.searchLabel") %></span>
+    <input type="search" placeholder="<%= t("commands.searchPlaceholder") %>" data-command-search />
+  </label>
+  <label class="field">
+    <span><%= t("commands.category") %></span>
+    <select data-command-category>
+      <option value=""><%= t("common.all") %></option>
+      <% categories.forEach((category) => { %><option value="<%= category.toLowerCase() %>"><%= category %></option><% }) %>
+    </select>
+  </label>
+  <label class="field">
+    <span><%= t("commands.readiness") %></span>
+    <select data-command-readiness>
+      <option value=""><%= t("common.all") %></option>
+      <option value="ready"><%= t("commands.ready") %></option>
+      <option value="blocked"><%= t("commands.blocked") %></option>
+    </select>
+  </label>
+</div>
+
+<div class="command-grid" data-command-grid>
+  <% commands.forEach((command) => { %>
+    <article class="command-card" data-command-card data-category="<%= command.category.toLowerCase() %>" data-readiness="<%= command.ready ? "ready" : "blocked" %>" data-search-value="<%= `${command.name} ${command.description} ${command.category} ${command.userPermissions.join(" ")} ${command.botPermissions.join(" ")}`.toLowerCase() %>">
+      <div class="command-card-header">
+        <div><span class="command-category"><%= command.category %></span><h2>/<%= command.name %></h2></div>
+        <span class="badge <%= command.ready ? "pass" : "warn" %>"><%= command.ready ? t("commands.ready") : t("commands.blocked") %></span>
+      </div>
+      <p><%= command.description || t("commands.noDescription") %></p>
+
+      <div class="command-usages">
+        <% [...command.slashUsages, ...command.prefixUsages].forEach((usage) => { %>
+          <button type="button" class="command-usage" data-copy="<%= usage %>" data-copied="<%= t("common.copied") %>" title="<%= t("commands.copyUsage") %>"><code><%= usage %></code><%- include("../partials/icon", { name: "copy" }) %></button>
+        <% }) %>
+      </div>
+
+      <dl class="permission-list">
+        <div><dt><%= t("commands.yourPermissions") %></dt><dd class="<%= command.userReady ? "permission-ok" : "permission-missing" %>"><%= command.memberPresent ? (command.userPermissions.join(", ") || t("commands.noneRequired")) : t("commands.notOnServer") %></dd></div>
+        <div><dt><%= t("commands.botPermissions") %></dt><dd class="<%= command.botReady ? "permission-ok" : "permission-missing" %>"><%= command.botPermissions.join(", ") || t("commands.noneRequired") %></dd></div>
+      </dl>
+    </article>
+  <% }) %>
+</div>
+<div class="panel empty" data-command-empty hidden><%= t("commands.empty") %></div>
+<%- include("../partials/foot") %>

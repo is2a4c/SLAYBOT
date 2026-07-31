@@ -11,6 +11,10 @@ module.exports = async (client, member) => {
 
   const { guild } = member;
   const settings = await getSettings(guild);
+  if (!member.user.bot) {
+    client.telemetry?.record("member_leaves", { guildId: guild.id, userId: member.id });
+  }
+
   // Snapshot roles first - the member object still carries them here
   if (!member.partial) {
     await memberRoleHandler.saveRoles(member, settings).catch((err) => client.logger.error("saveRoles", err));

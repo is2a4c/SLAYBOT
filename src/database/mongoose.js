@@ -43,6 +43,8 @@ module.exports = {
     SmartInvite: require("./schemas/SmartInvite"),
     SmartInviteControl: require("./schemas/SmartInviteControl"),
     VerificationAttempt: require("./schemas/VerificationAttempt").model,
+    TelemetryBucket: require("./schemas/TelemetryBucket"),
+    TelemetryActor: require("./schemas/TelemetryActor"),
     DashboardAuditLog: require("./schemas/DashboardAuditLog"),
     StaffAccount: require("./schemas/StaffAccount").model,
   },

@@ -1,5 +1,5 @@
 ---
-description: 5 commands
+description: 6 commands
 ---
 
 # 📈 Statistics
@@ -17,6 +17,11 @@ description: 5 commands
 **Levelup Channel**
 - **Description**: set the channel to send level up messages to
 - **Usage**: `!levelup channel <#channel>`
+
+**Telemetry**
+- **Description**: private operational statistics for this server; bot owners can also select the global scope
+- **Permissions**: `Manage Server` for server scope, configured `OWNER_IDS` for global scope
+- **Usage**: `!telemetry [server|global] [1d|7d|30d]` or `/telemetry`
 
 ### User Commands
 

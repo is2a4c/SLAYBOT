@@ -2,6 +2,36 @@
     </div>
   </div>
   <button class="sidebar-overlay" type="button" data-sidebar-close tabindex="-1" aria-hidden="true"></button>
+  <%# EJS compiles every include separately, so the values head.ejs derived are not
+      in scope here and have to be derived again. %>
+  <% const hasGuild = typeof guild !== "undefined" && guild; %>
+  <% const guildRoot = hasGuild ? `/g/${guild.id}` : ""; %>
+  <% if (locals.sessionUser) { %>
+    <dialog class="command-menu" data-command-menu aria-label="<%= t("common.quickOpen") %>">
+      <div class="command-menu-head">
+        <%- include("icon", { name: "search" }) %>
+        <input type="search" data-command-menu-search placeholder="<%= t("common.quickSearch") %>" autocomplete="off" />
+        <button class="icon-button" type="button" data-command-menu-close aria-label="<%= t("common.close") %>">×</button>
+      </div>
+      <div class="command-menu-list" data-command-menu-list>
+        <a href="<%= basePath %>/"><span><%= t("selector.title") %></span><small><%= t("nav.workspace") %></small></a>
+        <% if (hasGuild) { %>
+          <a href="<%= basePath + guildRoot %>"><span><%= t("nav.overview") %></span><small><%= guild.name %></small></a>
+          <a href="<%= basePath + guildRoot %>/commands"><span><%= t("nav.commands") %></span><small><%= t("commands.title") %></small></a>
+          <% if (canGuild("config.edit")) { %><a href="<%= basePath + guildRoot %>/config"><span><%= t("nav.config") %></span><small><%= guild.name %></small></a><% } %>
+          <% if (canGuild("automod.edit")) { %><a href="<%= basePath + guildRoot %>/automod"><span><%= t("nav.automod") %></span><small><%= guild.name %></small></a><% } %>
+          <% if (canGuild("members.moderate")) { %><a href="<%= basePath + guildRoot %>#member-lookup"><span><%= t("nav.members") %></span><small><%= t("overview.memberLookup") %></small></a><% } %>
+          <% if (canGuild("smartinvites.manage")) { %><a href="<%= basePath + guildRoot %>/smart-invites"><span><%= t("nav.smartInvites") %></span><small><%= guild.name %></small></a><% } %>
+          <% if (canGuild("diagnostics.run")) { %><a href="<%= basePath + guildRoot %>/diagnostics"><span><%= t("nav.diagnostics") %></span><small><%= guild.name %></small></a><% } %>
+          <% if (canGuild("audit.view")) { %><a href="<%= basePath + guildRoot %>/modlog"><span><%= t("nav.modlog") %></span><small><%= guild.name %></small></a><a href="<%= basePath + guildRoot %>/audit"><span><%= t("nav.audit") %></span><small><%= guild.name %></small></a><% } %>
+        <% } %>
+        <% if (locals.canAccessOwner === true) { %><a href="<%= basePath %>/owner"><span><%= t("nav.owner") %></span><small><%= t("owner.title") %></small></a><% } %>
+        <a href="<%= basePath %>/status"><span><%= t("nav.status") %></span><small>SLAYBOT</small></a>
+        <div class="command-menu-empty" data-command-menu-empty hidden><%= t("common.noResults") %></div>
+      </div>
+      <div class="command-menu-foot"><span>↑↓ <%= t("common.navigate") %></span><span>Enter <%= t("common.open") %></span><span>Esc <%= t("common.close") %></span></div>
+    </dialog>
+  <% } %>
   <div class="toast-region" aria-live="polite" aria-atomic="true"></div>
 </body>
 </html>

@@ -19,7 +19,10 @@ client.loadCommands("src/commands");
 client.loadContexts("src/contexts");
 client.loadEvents("src/events");
 
-process.on("unhandledRejection", (err) => client.logger.error(`Unhandled exception`, err));
+process.on("unhandledRejection", (err) => {
+  client.telemetry.record("client_errors");
+  client.logger.error(`Unhandled exception`, err);
+});
 
 (async () => {
   await checkForUpdates();
@@ -37,6 +40,7 @@ process.on("unhandledRejection", (err) => client.logger.error(`Unhandled excepti
     await initializeMongoose();
   }
 
+  client.telemetry.start();
   await require("@src/slaynode/control/runtime").start(client);
 
   await client.login(process.env.BOT_TOKEN);
@@ -44,6 +48,7 @@ process.on("unhandledRejection", (err) => client.logger.error(`Unhandled excepti
 
 async function shutdown(signal) {
   client.logger.log(`Received ${signal}, shutting down`);
+  await client.telemetry.stop().catch((error) => client.logger.warn(`Final telemetry flush failed: ${error.message}`));
   await require("@src/services/smart-invites/runtime")
     .stop(client)
     .catch(() => {});

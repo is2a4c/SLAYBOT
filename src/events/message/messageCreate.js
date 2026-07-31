@@ -16,6 +16,11 @@ module.exports = async (client, message) => {
 
   const settings = await getSettings(message.guild);
   const messageContent = message.content || "";
+  client.telemetry?.record("messages", {
+    guildId: message.guildId,
+    userId: message.author.id,
+    at: message.createdAt,
+  });
 
   // command handler
   let isCommand = false;
@@ -42,6 +47,14 @@ module.exports = async (client, message) => {
   if (!isCommand) {
     const automodResult = await automodHandler.performAutomod(message, settings);
     skipXp = Boolean(automodResult?.triggered);
+    if (automodResult?.triggered || automodResult?.shadowTriggered) {
+      client.telemetry?.recordAutomod({
+        guildId: message.guildId,
+        userId: message.author.id,
+        deleted: automodResult.deleted,
+        strikes: automodResult.strikes,
+      });
+    }
 
     // Don't reward command-like noise such as unknown prefix invocations.
     if (startsWithPrefix) skipXp = true;

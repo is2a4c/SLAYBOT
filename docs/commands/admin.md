@@ -4,6 +4,31 @@
 These commands can only be used by members who have **MANAGE_SERVER** permission
 {% endhint %}
 
+### Control panel
+
+- **Description**: configure every system from one panel of buttons — no command options to remember
+- **Usage**: `!panel`
+- **Slash**: `/panel`
+
+Each system's settings, and how the buttons behave, are in
+[Control Panels](../panels.md).
+
+### Language
+
+- **Description**: pick the language the bot speaks on this server, or follow the server's own locale
+- **Usage**: `!language`
+- **Slash**: `/language`
+
+### Temporary voice channels
+
+- **Description**: hand every member a voice channel of their own, controlled from a panel of icons
+- **Usage**: `!tempvoice setup <#channel>`, `!tempvoice panel <#channel>`, `!tempvoice status`, `!tempvoice off`
+- **Slash**: `/tempvoice setup panel_channel: [hub_channel] [category]`, `/tempvoice config ...`,
+  `/tempvoice panel channel:`, `/tempvoice status`, `/tempvoice off`
+
+The join-to-create channel is made for you if you do not name one. The fifteen
+buttons members get are listed in [Control Panels](../panels.md#temporary-voice-channels).
+
 ### Set Prefix
 
 - **Description**: Set bot prefix

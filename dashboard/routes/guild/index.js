@@ -6,6 +6,7 @@ router.use(requireGuildAccess);
 
 router.use("/config", requireGuildPermission("config.edit"), require("./config"));
 router.use("/automod", requireGuildPermission("automod.edit"), require("./automod"));
+router.use("/commands", requireGuildPermission("guilds.view"), require("./commands"));
 router.use("/modlog", requireGuildPermission("audit.view"), require("./modlog"));
 router.use("/members", requireGuildPermission("members.moderate"), require("./members"));
 router.use("/smart-invites", requireGuildPermission("smartinvites.manage"), require("./smart-invites"));
