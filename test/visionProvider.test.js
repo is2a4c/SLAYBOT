@@ -55,3 +55,31 @@ test("every preset points at a chat completions endpoint", () => {
     assert.equal(url, `${preset.baseURL}/chat/completions`);
   }
 });
+
+/* ---------------------------------------------------------------- proxying */
+
+const { proxyDispatcher } = require("@src/services/ai/visionProvider");
+
+test("requests go direct unless a proxy is configured", () => {
+  assert.equal(proxyDispatcher({}), undefined);
+  assert.equal(proxyDispatcher({ IMAGE_AI_PROXY: "" }), undefined);
+});
+
+test("a configured proxy produces a dispatcher, reused between calls", () => {
+  const first = proxyDispatcher({ IMAGE_AI_PROXY: "http://127.0.0.1:8080" });
+
+  assert.ok(first, "a proxy URL must produce a dispatcher");
+  assert.equal(proxyDispatcher({ IMAGE_AI_PROXY: "http://127.0.0.1:8080" }), first, "the agent is cached");
+  assert.notEqual(
+    proxyDispatcher({ IMAGE_AI_PROXY: "http://127.0.0.1:9090" }),
+    first,
+    "a different proxy gets its own agent"
+  );
+});
+
+test("mistral is offered as a provider with a vision model", () => {
+  const provider = resolveProvider({ MISTRAL_API_KEY: "k" });
+
+  assert.equal(provider.name, "mistral");
+  assert.match(provider.model, /pixtral/i, "the default must be able to read images");
+});

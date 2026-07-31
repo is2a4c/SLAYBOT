@@ -105,9 +105,14 @@ OpenAI-compatible endpoint. Which one is a matter of configuration:
 
 | Provider | Key | Free? |
 | --- | --- | --- |
-| Google Gemini (AI Studio) | `GEMINI_API_KEY` | yes, no card |
+| Google Gemini | `GEMINI_API_KEY` | yes, but only from supported countries |
+| Mistral | `MISTRAL_API_KEY` | yes, Experiment tier, Pixtral reads images |
 | OpenRouter | `OPENROUTER_API_KEY` | free models, 50 requests/day until topped up |
 | io.net | `IO_INTELLIGENCE_API_KEY` | no, paid per token |
+
+Gemini checks where the request comes from, not just the key: from an
+unsupported country it answers `User location is not supported for the API use`.
+`IMAGE_AI_PROXY` routes provider calls through somewhere it accepts.
 
 Set one key and that provider is used. `IMAGE_AI_PROVIDER`, `IMAGE_AI_BASE_URL`,
 `IMAGE_AI_MODEL` and `IMAGE_AI_API_KEY` override the choice or point at any

@@ -26,7 +26,39 @@ const PRESETS = {
     model: "google/gemma-4-26b-a4b-it:free",
     keyEnv: "OPENROUTER_API_KEY",
   },
+  mistral: {
+    label: "Mistral",
+    baseURL: "https://api.mistral.ai/v1",
+    model: "pixtral-12b-2409",
+    keyEnv: "MISTRAL_API_KEY",
+  },
 };
+
+let proxyAgent;
+let proxyAgentFor;
+
+/**
+ * Dispatcher for the provider request, if a proxy is configured.
+ *
+ * Some providers refuse the request itself based on where it comes from —
+ * Gemini answers "User location is not supported" to an otherwise valid key —
+ * so the way out is routing these calls through somewhere they accept.
+ *
+ * @param {object} [env]
+ * @returns {object|undefined}
+ */
+function proxyDispatcher(env = process.env) {
+  const url = env.IMAGE_AI_PROXY;
+  if (!url) return undefined;
+
+  if (proxyAgentFor !== url) {
+    const { ProxyAgent } = require("undici");
+    proxyAgent = new ProxyAgent(url);
+    proxyAgentFor = url;
+  }
+
+  return proxyAgent;
+}
 
 /**
  * Work out the provider in force.
@@ -63,4 +95,4 @@ function completionsURL(env = process.env) {
   return `${resolveProvider(env).baseURL}/chat/completions`;
 }
 
-module.exports = { PRESETS, completionsURL, resolveProvider };
+module.exports = { PRESETS, completionsURL, proxyDispatcher, resolveProvider };

@@ -6,7 +6,7 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT_MS = 15_000;
 const MAX_PENDING_ANALYSES = 2;
 const IMAGE_EXTENSIONS = /\.(?:avif|gif|jpe?g|png|webp)$/i;
-const { resolveProvider } = require("./ai/visionProvider");
+const { proxyDispatcher, resolveProvider } = require("./ai/visionProvider");
 
 // How many of the prepared regions are transcribed. One is the full frame.
 const OCR_REGIONS = Math.max(1, Number.parseInt(process.env.IMAGE_SPAM_OCR_REGIONS, 10) || 1);
@@ -139,6 +139,7 @@ async function runIoOcr(buffer) {
         max_tokens: 1024,
       }),
       signal: controller.signal,
+      dispatcher: proxyDispatcher(),
     });
 
     if (!response.ok) {
@@ -319,6 +320,7 @@ async function runIoVision(buffers, caption, ocrHint = "") {
         max_tokens: 64,
       }),
       signal: controller.signal,
+      dispatcher: proxyDispatcher(),
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
