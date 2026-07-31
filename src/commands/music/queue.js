@@ -51,7 +51,7 @@ function getQueue({ client, guild }, pgNo) {
 
   // change for the amount of tracks per page
   const multiple = 10;
-  const page = pgNo || 1;
+  const page = Number.isInteger(pgNo) && pgNo > 0 ? pgNo : 1;
 
   const end = page * multiple;
   const start = end - multiple;
@@ -62,7 +62,7 @@ function getQueue({ client, guild }, pgNo) {
   if (!tracks.length) embed.setDescription(`No tracks in ${page > 1 ? `page ${page}` : "the queue"}.`);
   else embed.setDescription(tracks.map((track, i) => `${start + ++i} - [${track.title}](${track.uri})`).join("\n"));
 
-  const maxPages = Math.ceil(queue.tracks.length / multiple);
+  const maxPages = Math.max(1, Math.ceil(queue.tracks.length / multiple));
 
   embed.setFooter({ text: `Page ${page > maxPages ? maxPages : page} of ${maxPages}` });
 

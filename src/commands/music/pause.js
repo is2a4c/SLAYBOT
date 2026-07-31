@@ -16,12 +16,12 @@ module.exports = {
   },
 
   async messageRun(message, args) {
-    const response = pause(message);
+    const response = await pause(message);
     await message.safeReply(response);
   },
 
   async interactionRun(interaction) {
-    const response = pause(interaction);
+    const response = await pause(interaction);
     await interaction.followUp(response);
   },
 };
@@ -29,10 +29,10 @@ module.exports = {
 /**
  * @param {import("discord.js").CommandInteraction|import("discord.js").Message} arg0
  */
-function pause({ client, guildId }) {
+async function pause({ client, guildId }) {
   const player = client.musicManager.getPlayer(guildId);
   if (player.paused) return "The player is already paused.";
 
-  player.pause(true);
+  await player.pause(true);
   return "⏸️ Paused the music player.";
 }

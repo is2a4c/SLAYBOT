@@ -57,16 +57,13 @@ module.exports = {
  */
 function toggleLoop({ client, guildId }, type) {
   const player = client.musicManager.getPlayer(guildId);
+  const requested = type === "queue" ? LoopType.Queue : LoopType.Song;
 
-  // track
-  if (type === "track") {
-    player.queue.setLoop(LoopType.Song);
-    return "Loop mode is set to `track`";
+  if (player.queue.loop.type === requested) {
+    player.queue.setLoop(LoopType.None);
+    return "Loop mode is `off`";
   }
 
-  // queue
-  else if (type === "queue") {
-    player.queue.setLoop(1);
-    return "Loop mode is set to `queue`";
-  }
+  player.queue.setLoop(requested);
+  return `Loop mode is set to \`${type}\``;
 }

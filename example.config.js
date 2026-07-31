@@ -97,13 +97,6 @@ module.exports = {
         secure: true,
       },
       {
-        id: "Jirayu",
-        host: "lavalink.jirayu.net",
-        port: 443,
-        password: "youshallnotpass",
-        secure: true,
-      },
-      {
         id: "MilloHost",
         host: "lava-v4.millohost.my.id",
         port: 443,

@@ -2,6 +2,8 @@ const { trackVoiceStats } = require("@handlers/stats");
 const { voiceRoleHandler } = require("@src/handlers");
 const { getSettings } = require("@schemas/Guild");
 
+const musicIdleTimers = new Map();
+
 /**
  * @param {import('@src/structures').BotClient} client
  * @param {import('discord.js').VoiceState} oldState
@@ -21,23 +23,47 @@ module.exports = async (client, oldState, newState) => {
 
   // Lavalink
   if (client.config.MUSIC.enabled && client.musicManager) {
-    const guild = oldState.guild;
-
-    // if nobody left the channel in question, return.
-    if (oldState.channelId !== guild.members.me.voice.channelId || newState.channel) return;
-
-    // otherwise, check how many people are in the channel now
-    if (oldState.channel.members.size === 1) {
-      setTimeout(() => {
-        // if 1 (you), wait 1 minute
-        if (oldState.channel.members.size === 1) {
-          const player = client.musicManager.getPlayer(guild.id);
-          if (player) {
-            player.disconnect();
-            client.musicManager.destroyPlayer(guild.id);
-          }
-        }
-      }, client.config.MUSIC.IDLE_TIME * 1000);
-    }
+    handleMusicIdleState(client, oldState, newState);
   }
 };
+
+function handleMusicIdleState(client, oldState, newState) {
+  const guild = newState.guild || oldState.guild;
+  const botChannel = guild.members.me.voice.channel;
+  const existingTimer = musicIdleTimers.get(guild.id);
+
+  if (!botChannel) {
+    if (existingTimer) clearTimeout(existingTimer);
+    musicIdleTimers.delete(guild.id);
+    return;
+  }
+
+  if (oldState.channelId !== botChannel.id && newState.channelId !== botChannel.id) return;
+
+  if (botChannel.members.size > 1) {
+    if (existingTimer) clearTimeout(existingTimer);
+    musicIdleTimers.delete(guild.id);
+    return;
+  }
+
+  if (existingTimer) return;
+
+  const timer = setTimeout(async () => {
+    musicIdleTimers.delete(guild.id);
+    const currentChannel = guild.members.me.voice.channel;
+    if (!currentChannel || currentChannel.id !== botChannel.id || currentChannel.members.size > 1) return;
+
+    const player = client.musicManager.getPlayer(guild.id);
+    if (!player) return;
+
+    await Promise.resolve(player.disconnect()).catch(() => {});
+    await client.musicManager
+      .destroyPlayer(guild.id)
+      .catch((error) => client.logger.error("Could not destroy idle music player", error));
+  }, client.config.MUSIC.IDLE_TIME * 1000);
+
+  musicIdleTimers.set(guild.id, timer);
+}
+
+module.exports.handleMusicIdleState = handleMusicIdleState;
+module.exports.musicIdleTimers = musicIdleTimers;

@@ -45,8 +45,11 @@ async function volume({ client, guildId }, volume) {
   const player = client.musicManager.getPlayer(guildId);
 
   if (volume === null || volume === undefined || volume === "") return `> The player volume is \`${player.volume}\`.`;
-  if (volume < 1 || volume > 100) return "you need to give me a volume between 1 and 100.";
+  const amount = Number(volume);
+  if (!Number.isInteger(amount) || amount < 1 || amount > 100) {
+    return "you need to give me a whole-number volume between 1 and 100.";
+  }
 
-  await player.setVolume(volume);
-  return `🎶 Music player volume is set to \`${volume}\`.`;
+  await player.setVolume(amount);
+  return `🎶 Music player volume is set to \`${amount}\`.`;
 }

@@ -8,6 +8,7 @@ const {
 const prettyMs = require("pretty-ms");
 const { EMBED_COLORS, MUSIC } = require("@root/config");
 const { loadTracks, normalizeLoadResult, toError, toQueueTrack } = require("@helpers/LavalinkUtils");
+const { connectMusicPlayer, getMissingVoicePermissions } = require("@helpers/MusicPlayer");
 
 const search_prefix = {
   YT: "ytsearch",
@@ -64,12 +65,19 @@ async function search({ member, guild, channel }, query) {
   const musicManager = guild.client.musicManager;
   if (!musicManager) return "🚫 Music system is not available. Try again later";
 
+  const voiceChannel = member.voice.channel;
+  const missingVoicePermissions = getMissingVoicePermissions(voiceChannel, guild.members.me);
+  if (missingVoicePermissions.length) {
+    return `🚫 I need these permissions in ${voiceChannel}: ${missingVoicePermissions.join(", ")}`;
+  }
+
   let player = musicManager.getPlayer(guild.id);
   if (player && !guild.members.me.voice.channel) {
-    player.disconnect();
+    await Promise.resolve(player.disconnect()).catch(() => {});
     await musicManager.destroyPlayer(guild.id);
+    player = null;
   }
-  if (player && member.voice.channel !== guild.members.me.voice.channel) {
+  if (player && member.voice.channelId !== guild.members.me.voice.channelId) {
     return "🚫 You must be in the same voice channel as mine";
   }
 
@@ -219,13 +227,24 @@ async function search({ member, guild, channel }, query) {
   }
 
   if (!tracks) return "🚫 An error occurred while searching";
-  tracks = tracks.map(toQueueTrack);
+  tracks = tracks.map(toQueueTrack).filter((track) => track?.track && track?.info);
+  if (!tracks.length) return "🚫 No playable tracks were found";
 
   // create a player and/or join the member's vc
   if (!player?.connected) {
-    player = musicManager.createPlayer(guild.id);
+    try {
+      player = await connectMusicPlayer({
+        manager: musicManager,
+        guildId: guild.id,
+        voiceChannel,
+        textChannel: channel,
+        logger: guild.client.logger,
+      });
+    } catch {
+      return "🚫 I could not connect to your voice channel. Check my channel permissions and try again";
+    }
+  } else {
     player.queue.data.channel = channel;
-    player.connect(member.voice.channel.id, { deafened: true });
   }
 
   // do queue things

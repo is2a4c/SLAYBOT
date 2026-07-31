@@ -1,5 +1,5 @@
 ---
-description: 13 commands
+description: 14 commands
 ---
 
 # 🎵 Music
@@ -8,6 +8,7 @@ description: 13 commands
 | ----------------------- | -------------- | ----------------------------------------------------------- |
 | **!bassboost \<level>** | **/bassboost** | set bassboost level                                         |
 | **!loop**               | **/loop**      | loops the song or queue                                     |
+| **!lyric \<query>**     | **/lyric**     | find lyrics for a song                                      |
 | **!np**                 | **/np**        | show's what track is currently being played                 |
 | **!pause**              | **/pause**     | pause the current song                                      |
 | **!play \<song>**       | **/play**      | play a song from youtube                                    |

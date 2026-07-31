@@ -25,7 +25,7 @@
     "image-spam:e2e": "node scripts/check-image-spam-e2e.js",
     "ai:check": "node scripts/check-ai.js",
     "test": "node --test test/*.test.js",
-    "music:check": "node scripts/check-music-queue.js",
+    "music:check": "node scripts/check-music-queue.js && node --test test/lavalinkNodes.test.js test/musicPlayer.test.js test/voiceConnection.test.js",
     "slaynode:worker": "node slaynode/worker.js",
     "slaynode:enroll": "node slaynode/enroll.js",
     "slaynode:e2e": "node scripts/check-slaynode-e2e.js"

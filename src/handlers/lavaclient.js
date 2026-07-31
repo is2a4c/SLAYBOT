@@ -94,13 +94,21 @@ module.exports = (client) => {
     }
 
     embed.setFields(fields);
-    queue.data.channel.safeSend({ embeds: [embed] });
+    queue.data.channel?.safeSend({ embeds: [embed] }).catch((error) => {
+      client.logger.warn(`Could not send the now-playing message: ${error.message}`);
+    });
   });
 
   lavaclient.on("nodeQueueFinish", async (_node, queue) => {
-    queue.data.channel.safeSend("Queue has ended.");
-    queue.player.disconnect();
-    await client.musicManager.destroyPlayer(queue.player.id);
+    await queue.data.channel?.safeSend("Queue has ended.").catch((error) => {
+      client.logger.warn(`Could not send the queue-finished message: ${error.message}`);
+    });
+    await Promise.resolve(queue.player.disconnect()).catch(() => {});
+    if (client.musicManager.getPlayer(queue.player.id) === queue.player) {
+      await client.musicManager
+        .destroyPlayer(queue.player.id)
+        .catch((error) => client.logger.error("Could not destroy the finished music player", error));
+    }
   });
 
   lavaclient.connect();
@@ -172,7 +180,7 @@ function wrapLegacyPlayer(player) {
   player.disconnect = () => player.voice.disconnect();
   Object.defineProperty(player, "connected", {
     get() {
-      return player.voice.connected || Boolean(player.voice.channelId);
+      return player.voice.connected;
     },
   });
   Object.defineProperty(player, "channelId", {

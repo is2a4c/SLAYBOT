@@ -2,7 +2,8 @@ const { EmbedBuilder, ApplicationCommandOptionType } = require("discord.js");
 const { getJson } = require("@helpers/HttpUtils");
 const { MESSAGES, EMBED_COLORS } = require("@root/config");
 
-const BASE_URL = "https://some-random-api.com/lyrics";
+const BASE_URL = "https://lrclib.net/api/search";
+const USER_AGENT = "SLAYBOT/2.1 (https://github.com/PashaBritva/SLAYBOT)";
 
 /**
  * @type {import("@structures/Command")}
@@ -46,19 +47,21 @@ module.exports = {
 };
 
 async function getLyric(user, choice) {
-  const lyric = await getJson(`${BASE_URL}?title=${choice}`);
-  if (!lyric.success) return MESSAGES.API_ERROR;
+  const response = await getJson(`${BASE_URL}?q=${encodeURIComponent(choice)}`, {
+    headers: { "User-Agent": USER_AGENT },
+  });
+  if (!response.success) return MESSAGES.API_ERROR;
 
-  const thumbnail = lyric.data?.thumbnail.genius;
-  const author = lyric.data?.author;
-  const lyrics = lyric.data?.lyrics;
-  const title = lyric.data?.title;
+  const result = Array.isArray(response.data) ? response.data.find((item) => item.plainLyrics) : null;
+  if (!result) return `No lyrics found matching ${choice}`;
 
-  const embed = new EmbedBuilder();
-  embed
+  const title = [result.artistName, result.trackName].filter(Boolean).join(" - ").slice(0, 256);
+  const lyrics =
+    result.plainLyrics.length > 4096 ? result.plainLyrics.slice(0, 4093).trimEnd() + "..." : result.plainLyrics;
+
+  const embed = new EmbedBuilder()
     .setColor(EMBED_COLORS.BOT_EMBED)
-    .setTitle(`${author} - ${title}`)
-    .setThumbnail(thumbnail)
+    .setTitle(title || choice.slice(0, 256))
     .setDescription(lyrics)
     .setFooter({ text: `Request By: ${user.username}` });
 

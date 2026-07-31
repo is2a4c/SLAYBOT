@@ -1,4 +1,5 @@
 const { musicValidations } = require("@helpers/BotUtils");
+const { setBassBoost: applyBassBoost } = require("@helpers/MusicPlayer");
 const { ApplicationCommandOptionType } = require("discord.js");
 
 const levels = {
@@ -54,13 +55,13 @@ module.exports = {
   async messageRun(message, args) {
     let level = "none";
     if (args.length && args[0].toLowerCase() in levels) level = args[0].toLowerCase();
-    const response = setBassBoost(message, level);
+    const response = await setBassBoost(message, level);
     await message.safeReply(response);
   },
 
   async interactionRun(interaction) {
     let level = interaction.options.getString("level");
-    const response = setBassBoost(interaction, level);
+    const response = await setBassBoost(interaction, level);
     await interaction.followUp(response);
   },
 };
@@ -69,9 +70,8 @@ module.exports = {
  * @param {import("discord.js").CommandInteraction|import("discord.js").Message} arg0
  * @param {number} level
  */
-function setBassBoost({ client, guildId }, level) {
+async function setBassBoost({ client, guildId }, level) {
   const player = client.musicManager.getPlayer(guildId);
-  const bands = new Array(3).fill(null).map((_, i) => ({ band: i, gain: levels[level] }));
-  player.setEqualizer(...bands);
+  await applyBassBoost(player, levels[level]);
   return `> Set the bassboost level to \`${level}\``;
 }

@@ -29,13 +29,13 @@ module.exports = {
 
   async messageRun(message, args) {
     const time = args.join(" ");
-    const response = seekTo(message, time);
+    const response = await seekTo(message, time);
     await message.safeReply(response);
   },
 
   async interactionRun(interaction) {
     const time = interaction.options.getString("time");
-    const response = seekTo(interaction, time);
+    const response = await seekTo(interaction, time);
     await interaction.followUp(response);
   },
 };
@@ -44,7 +44,7 @@ module.exports = {
  * @param {import("discord.js").CommandInteraction|import("discord.js").Message} arg0
  * @param {number} time
  */
-function seekTo({ client, guildId }, time) {
+async function seekTo({ client, guildId }, time) {
   const player = client.musicManager?.getPlayer(guildId);
   const seekTo = durationToMillis(time);
   if (!Number.isFinite(seekTo) || seekTo < 0) return "Please provide a valid duration. Example: 1:30";
@@ -54,6 +54,6 @@ function seekTo({ client, guildId }, time) {
     return "The duration you provide exceeds the duration of the current track";
   }
 
-  player.seek(seekTo);
+  await player.seek(seekTo);
   return `Seeked to ${prettyMs(seekTo, { colonNotation: true, secondsDecimalDigits: 0 })}`;
 }

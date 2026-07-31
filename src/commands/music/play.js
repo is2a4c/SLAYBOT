@@ -1,9 +1,9 @@
-const { EmbedBuilder, ApplicationCommandOptionType, PermissionFlagsBits } = require("discord.js");
+const { EmbedBuilder, ApplicationCommandOptionType } = require("discord.js");
 const prettyMs = require("pretty-ms");
 const { EMBED_COLORS, MUSIC } = require("@root/config");
 const { SpotifyItemType } = require("@lavaclient/spotify");
 const { loadTracks, normalizeLoadResult, toError, toQueueTrack } = require("@helpers/LavalinkUtils");
-const { waitForVoiceConnection } = require("@helpers/VoiceConnection");
+const { connectMusicPlayer, getMissingVoicePermissions } = require("@helpers/MusicPlayer");
 
 const search_prefix = {
   YT: "ytsearch",
@@ -60,14 +60,7 @@ async function play({ member, guild, channel }, query) {
   if (!mm) return "🚫 Music system is not available. Try again later";
 
   const voiceChannel = member.voice.channel;
-  const voicePermissions = voiceChannel.permissionsFor(guild.members.me);
-  const missingVoicePermissions = [
-    [PermissionFlagsBits.ViewChannel, "View Channel"],
-    [PermissionFlagsBits.Connect, "Connect"],
-    [PermissionFlagsBits.Speak, "Speak"],
-  ]
-    .filter(([permission]) => !voicePermissions?.has(permission))
-    .map(([, label]) => label);
+  const missingVoicePermissions = getMissingVoicePermissions(voiceChannel, guild.members.me);
 
   if (missingVoicePermissions.length) {
     return `🚫 I need these permissions in ${voiceChannel}: ${missingVoicePermissions.join(", ")}`;
@@ -75,11 +68,12 @@ async function play({ member, guild, channel }, query) {
 
   let player = mm.getPlayer(guild.id);
   if (player && !guild.members.me.voice.channel) {
-    player.disconnect();
+    await Promise.resolve(player.disconnect()).catch(() => {});
     await mm.destroyPlayer(guild.id);
+    player = null;
   }
 
-  if (player && member.voice.channel !== guild.members.me.voice.channel) {
+  if (player && member.voice.channelId !== guild.members.me.voice.channelId) {
     return "🚫 You must be in the same voice channel as mine";
   }
 
@@ -160,7 +154,8 @@ async function play({ member, guild, channel }, query) {
   }
 
   if (!tracks) return "🚫 An error occurred while searching for the song";
-  tracks = tracks.map(toQueueTrack);
+  tracks = tracks.map(toQueueTrack).filter((track) => track?.track && track?.info);
+  if (!tracks.length) return "🚫 No playable tracks were found";
 
   if (tracks.length === 1) {
     const track = tracks[0];
@@ -215,38 +210,19 @@ async function play({ member, guild, channel }, query) {
 
   // create a player and/or join the member's vc
   if (!player?.connected) {
-    const excludedNodeIdentifiers = new Set();
-    const maxAttempts = Math.max(1, mm.nodes?.size || 1);
-
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      try {
-        player ||= mm.createPlayer(guild.id, { excludedNodeIdentifiers });
-        player.queue.data.channel = channel;
-        guild.client.logger.log(
-          `Music voice connect requested for guild=${guild.id}, channel=${voiceChannel.id}, node=${player.node.identifier}`
-        );
-        player.connect(voiceChannel.id, { deafened: true });
-        await waitForVoiceConnection(player, voiceChannel.id);
-        guild.client.logger.log(
-          `Music voice connected for guild=${guild.id}, channel=${voiceChannel.id}, node=${player.node.identifier}`
-        );
-        break;
-      } catch (error) {
-        const failedNodeIdentifier = player?.node?.identifier;
-        if (failedNodeIdentifier) excludedNodeIdentifiers.add(failedNodeIdentifier);
-        guild.client.logger.error(
-          `Music voice connection failed for guild=${guild.id}, channel=${voiceChannel.id}, node=${failedNodeIdentifier || "unknown"}`,
-          toError(error)
-        );
-        player?.disconnect();
-        await mm.destroyPlayer(guild.id).catch(() => {});
-        player = null;
-      }
-    }
-
-    if (!player?.connected) {
+    try {
+      player = await connectMusicPlayer({
+        manager: mm,
+        guildId: guild.id,
+        voiceChannel,
+        textChannel: channel,
+        logger: guild.client.logger,
+      });
+    } catch {
       return "🚫 I could not connect to your voice channel. Check my channel permissions and try again";
     }
+  } else {
+    player.queue.data.channel = channel;
   }
 
   // do queue things
