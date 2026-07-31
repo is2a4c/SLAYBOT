@@ -45,14 +45,17 @@ test("base URL and model can be overridden for any endpoint that speaks the same
 });
 
 test("every preset points at a chat completions endpoint", () => {
+  const env = { CLOUDFLARE_ACCOUNT_ID: "account" };
+
   for (const [name, preset] of Object.entries(PRESETS)) {
-    assert.match(preset.baseURL, /^https:\/\//, `${name} must be https`);
-    assert.doesNotMatch(preset.baseURL, /\/$/, `${name} must not end in a slash`);
+    const baseURL = typeof preset.baseURL === "function" ? preset.baseURL(env) : preset.baseURL;
+    assert.match(baseURL, /^https:\/\//, `${name} must be https`);
+    assert.doesNotMatch(baseURL, /\/$/, `${name} must not end in a slash`);
     assert.ok(preset.model, `${name} has no default model`);
     assert.ok(preset.keyEnv, `${name} has no key variable`);
 
-    const url = completionsURL({ IMAGE_AI_PROVIDER: name });
-    assert.equal(url, `${preset.baseURL}/chat/completions`);
+    const url = completionsURL({ ...env, IMAGE_AI_PROVIDER: name });
+    assert.equal(url, `${baseURL}/chat/completions`);
   }
 });
 
@@ -82,4 +85,16 @@ test("mistral is offered as a provider with a vision model", () => {
 
   assert.equal(provider.name, "mistral");
   assert.match(provider.model, /pixtral/i, "the default must be able to read images");
+});
+
+test("cloudflare needs its account id, not just a token", () => {
+  const withoutAccount = resolveProvider({ CLOUDFLARE_API_TOKEN: "t" });
+  assert.equal(withoutAccount.name, "cloudflare");
+  assert.equal(withoutAccount.configured, false, "an account-less URL would 404 on every image");
+  assert.deepEqual(withoutAccount.missing, ["CLOUDFLARE_ACCOUNT_ID"]);
+
+  const complete = resolveProvider({ CLOUDFLARE_API_TOKEN: "t", CLOUDFLARE_ACCOUNT_ID: "abc123" });
+  assert.equal(complete.configured, true);
+  assert.equal(complete.baseURL, "https://api.cloudflare.com/client/v4/accounts/abc123/ai/v1");
+  assert.match(complete.model, /vision/i);
 });

@@ -32,6 +32,15 @@ const PRESETS = {
     model: "pixtral-12b-2409",
     keyEnv: "MISTRAL_API_KEY",
   },
+  cloudflare: {
+    label: "Cloudflare Workers AI",
+    // The account id is part of the path rather than a header.
+    baseURL: (env) => `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID || ""}/ai/v1`,
+    model: "@cf/meta/llama-3.2-11b-vision-instruct",
+    keyEnv: "CLOUDFLARE_API_TOKEN",
+    // Without the account there is nowhere to send the request.
+    requires: ["CLOUDFLARE_ACCOUNT_ID"],
+  },
 };
 
 let proxyAgent;
@@ -75,7 +84,9 @@ function resolveProvider(env = process.env) {
   const preset = PRESETS[name];
 
   const apiKey = env.IMAGE_AI_API_KEY || env[preset.keyEnv] || null;
-  const baseURL = (env.IMAGE_AI_BASE_URL || preset.baseURL).replace(/\/+$/, "");
+  const preseUrl = typeof preset.baseURL === "function" ? preset.baseURL(env) : preset.baseURL;
+  const baseURL = (env.IMAGE_AI_BASE_URL || preseUrl).replace(/\/+$/, "");
+  const missing = (preset.requires || []).filter((variable) => !env[variable] && !env.IMAGE_AI_BASE_URL);
 
   return {
     name,
@@ -83,7 +94,8 @@ function resolveProvider(env = process.env) {
     baseURL,
     model: env.IMAGE_AI_MODEL || preset.model,
     apiKey,
-    configured: Boolean(apiKey),
+    missing,
+    configured: Boolean(apiKey) && missing.length === 0,
   };
 }
 

@@ -106,6 +106,7 @@ OpenAI-compatible endpoint. Which one is a matter of configuration:
 | Provider | Key | Free? |
 | --- | --- | --- |
 | Google Gemini | `GEMINI_API_KEY` | yes, but only from supported countries |
+| Cloudflare Workers AI | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` | yes, 10k neurons/day |
 | Mistral | `MISTRAL_API_KEY` | yes, Experiment tier, Pixtral reads images |
 | OpenRouter | `OPENROUTER_API_KEY` | free models, 50 requests/day until topped up |
 | io.net | `IO_INTELLIGENCE_API_KEY` | no, paid per token |
