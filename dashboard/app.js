@@ -108,6 +108,10 @@ module.exports.launch = async function launch(client) {
   dashboardRouter.use((req, res, next) => {
     res.locals.sessionUser = req.session.user || null;
     res.locals.csrfToken = res.locals.sessionUser ? ensureCsrfToken(req) : null;
+    res.locals.currentPath = req.path.replace(/\/+$/, "") || "/";
+    const noticeKey = typeof req.query.notice === "string" ? req.query.notice : "";
+    const allowedNotices = new Set(["saved", "created", "refreshed", "deleted", "actionComplete"]);
+    res.locals.notice = allowedNotices.has(noticeKey) ? res.locals.t(`notices.${noticeKey}`) : null;
     next();
   });
   dashboardRouter.use(loadDashboardActor);

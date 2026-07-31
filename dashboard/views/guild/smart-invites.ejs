@@ -1,5 +1,9 @@
 <%- include("../partials/head", { title, guild }) %>
-<h1>Smart Invites</h1>
+<header class="page-header"><div class="page-heading">
+  <p class="eyebrow"><%= t("nav.management") %></p>
+  <h1><%= t("smartInvites.title") %></h1>
+  <p class="subtitle"><%= t("smartInvites.subtitle") %></p>
+</div></header>
 
 <% if (error) { %><div class="error-banner"><%= error %></div><% } %>
 <% if (!enabled) { %><div class="error-banner"><%= t("smartInvites.disabled") %></div><% } %>
@@ -7,7 +11,7 @@
 <% if (records.length === 0) { %>
   <div class="panel empty"><%= t("smartInvites.empty") %></div>
 <% } else { %>
-  <table>
+  <div class="table-shell"><table>
     <thead><tr><th><%= t("smartInvites.slug") %></th><th><%= t("common.channel") %></th><th><%= t("common.status") %></th><th><%= t("smartInvites.clicks") %></th><th><%= t("smartInvites.joins") %></th><th></th></tr></thead>
     <tbody>
       <% records.forEach((r) => { %>
@@ -22,7 +26,7 @@
               <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
               <button type="submit" class="btn secondary"><%= t("common.refresh") %></button>
             </form>
-            <form method="post" action="<%= basePath %>/g/<%= guild.id %>/smart-invites/<%= r.slug %>/delete">
+            <form method="post" action="<%= basePath %>/g/<%= guild.id %>/smart-invites/<%= r.slug %>/delete" data-confirm="<%= t("common.dangerousAction") %>">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
               <button type="submit" class="btn danger"><%= t("common.delete") %></button>
             </form>
@@ -30,7 +34,7 @@
         </tr>
       <% }) %>
     </tbody>
-  </table>
+  </table></div>
 <% } %>
 
 <div class="panel">

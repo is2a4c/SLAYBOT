@@ -58,7 +58,7 @@ router.post("/", requireCsrf, async (req, res) => {
       targetId: req.body.slug,
       reason: "Dashboard: создание Smart Invite",
     });
-    res.redirect(backTo);
+    res.redirect(`${backTo}?notice=created`);
   } catch (ex) {
     const message = ex instanceof SmartInviteError ? ex.safeMessage : "Не удалось создать Smart Invite.";
     if (!(ex instanceof SmartInviteError)) req.client.logger.error("dashboard smart invite create failed", ex);
@@ -81,7 +81,7 @@ router.post("/:slug/refresh", requireCsrf, async (req, res) => {
       targetType: "smart_invite",
       targetId: req.params.slug,
     });
-    res.redirect(backTo);
+    res.redirect(`${backTo}?notice=refreshed`);
   } catch (ex) {
     const message = ex instanceof SmartInviteError ? ex.safeMessage : "Не удалось обновить Smart Invite.";
     if (!(ex instanceof SmartInviteError)) req.client.logger.error("dashboard smart invite refresh failed", ex);
@@ -104,7 +104,7 @@ router.post("/:slug/delete", requireCsrf, async (req, res) => {
       targetType: "smart_invite",
       targetId: req.params.slug,
     });
-    res.redirect(backTo);
+    res.redirect(`${backTo}?notice=deleted`);
   } catch (ex) {
     const message = ex instanceof SmartInviteError ? ex.safeMessage : "Не удалось удалить Smart Invite.";
     if (!(ex instanceof SmartInviteError)) req.client.logger.error("dashboard smart invite delete failed", ex);

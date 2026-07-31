@@ -40,6 +40,7 @@ router.get("/", async (req, res) => {
       errors24h: dailySummary.counters.client_errors,
     },
     attention,
+    error: typeof req.query.error === "string" ? req.query.error : null,
   });
 });
 

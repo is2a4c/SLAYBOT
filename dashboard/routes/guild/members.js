@@ -38,6 +38,15 @@ async function loadTarget(req, res, next) {
   next();
 }
 
+router.get("/", (req, res) => {
+  const userId = String(req.query.userId || "").trim();
+  const overview = `${res.locals.basePath}/g/${req.guild.id}`;
+  if (!/^\d{17,20}$/.test(userId)) {
+    return res.redirect(`${overview}?error=${encodeURIComponent(res.locals.t("errors.invalidUserId"))}`);
+  }
+  return res.redirect(`${res.locals.basePath}/g/${req.guild.id}/members/${userId}`);
+});
+
 router.get("/:userId", loadTarget, async (req, res) => {
   const { guild } = req;
   const userId = req.params.userId;
@@ -126,7 +135,7 @@ router.post("/:userId/actions", requireCsrf, loadTarget, async (req, res) => {
     reason,
   });
 
-  res.redirect(backTo);
+  res.redirect(`${backTo}?notice=actionComplete`);
 });
 
 module.exports = router;

@@ -60,7 +60,7 @@ router.post("/", requireCsrf, async (req, res) => {
     reason: "Dashboard: base configuration",
   });
 
-  res.redirect(`${res.locals.basePath}/g/${guild.id}/config`);
+  res.redirect(`${res.locals.basePath}/g/${guild.id}/config?notice=saved`);
 });
 
 module.exports = router;

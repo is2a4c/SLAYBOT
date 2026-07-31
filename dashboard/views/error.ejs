@@ -1,5 +1,8 @@
 <%- include("partials/head", { title }) %>
-<h1><%= title %></h1>
-<p><%= message %></p>
-<p><a href="<%= basePath %>/"><%= t("common.home") %></a></p>
+<div class="panel empty">
+  <p class="eyebrow">SLAYBOT</p>
+  <h1><%= title %></h1>
+  <p><%= message %></p>
+  <a class="btn secondary" href="<%= basePath %>/"><%= t("common.home") %></a>
+</div>
 <%- include("partials/foot") %>

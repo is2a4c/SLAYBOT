@@ -1,9 +1,15 @@
 <%- include("../partials/head", { title, guild }) %>
-<h1>Automod</h1>
+<header class="page-header"><div class="page-heading">
+  <p class="eyebrow"><%= t("nav.management") %></p>
+  <h1><%= t("automod.title") %></h1>
+  <p class="subtitle"><%= t("automod.subtitle") %></p>
+</div></header>
 
 <form class="panel" method="post" action="<%= basePath %>/g/<%= guild.id %>/automod">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+  <div class="panel-header"><h2><%= t("automod.enforcementHeading") %></h2><p class="hint"><%= t("automod.saveHint") %></p></div>
 
+  <div class="form-grid">
   <div class="field">
     <label for="action"><%= t("automod.action") %></label>
     <select id="action" name="action">
@@ -16,8 +22,10 @@
     <label for="strikes"><%= t("automod.strikes") %></label>
     <input type="number" id="strikes" name="strikes" min="1" max="100" value="<%= settings.automod.strikes %>" />
   </div>
+  </div>
 
   <h2><%= t("automod.rulesHeading") %></h2>
+  <div class="toggle-grid">
   <div class="checkbox-field field">
     <input type="checkbox" id="anti_links" name="anti_links" <%= settings.automod.anti_links ? "checked" : "" %> />
     <label for="anti_links">Anti-links</label>
@@ -42,6 +50,7 @@
     <input type="checkbox" id="anti_image_spam" name="anti_image_spam" <%= settings.automod.anti_image_spam ? "checked" : "" %> />
     <label for="anti_image_spam">Image Spam Guard</label>
   </div>
+  </div>
   <div class="field">
     <label for="image_spam_threshold"><%= t("automod.imageSpamThreshold") %></label>
     <input type="number" id="image_spam_threshold" name="image_spam_threshold" min="50" max="100" value="<%= settings.automod.image_spam_threshold %>" />
@@ -65,7 +74,7 @@
     <input type="number" id="max_role_mentions" name="max_role_mentions" min="0" max="20" value="<%= settings.automod.max_role_mentions %>" />
   </div>
 
-  <h2>Whitelist</h2>
+  <h2><%= t("automod.whitelistHeading") %></h2>
   <div class="field">
     <label for="spam_whitelist_roles"><%= t("automod.whitelistRoles") %></label>
     <input type="text" id="spam_whitelist_roles" name="spam_whitelist_roles" value="<%= (settings.automod.spam_whitelist_roles || []).join(', ') %>" />
@@ -76,6 +85,6 @@
     <input type="text" id="spam_whitelist_users" name="spam_whitelist_users" value="<%= (settings.automod.spam_whitelist_users || []).join(', ') %>" />
   </div>
 
-  <button type="submit" class="btn"><%= t("common.save") %></button>
+  <div class="form-actions"><span class="hint"><%= t("automod.saveHint") %></span><button type="submit" class="btn"><%= t("common.save") %></button></div>
 </form>
 <%- include("../partials/foot") %>

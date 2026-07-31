@@ -1,11 +1,14 @@
 <%- include("../partials/head", { title }) %>
-<h1><%= t("audit.globalTitle") %></h1>
-<p class="hint"><%= t("audit.globalHint") %></p>
+<header class="page-header"><div class="page-heading">
+  <p class="eyebrow"><%= t("nav.owner") %></p>
+  <h1><%= t("audit.globalTitle") %></h1>
+  <p class="subtitle"><%= t("audit.globalHint") %></p>
+</div></header>
 
 <% if (entries.length === 0) { %>
   <div class="panel empty"><%= t("common.noEntries") %></div>
 <% } else { %>
-  <table>
+  <div class="table-shell"><table>
     <thead><tr><th><%= t("common.time") %></th><th><%= t("common.action") %></th><th><%= t("common.who") %></th><th><%= t("common.server") %></th><th><%= t("common.target") %></th><th><%= t("common.reason") %></th></tr></thead>
     <tbody>
       <% entries.forEach((e) => { %>
@@ -19,6 +22,6 @@
         </tr>
       <% }) %>
     </tbody>
-  </table>
+  </table></div>
 <% } %>
 <%- include("../partials/foot") %>

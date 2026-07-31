@@ -1,8 +1,13 @@
 <%- include("../partials/head", { title, guild }) %>
-<h1><%= t("config.title") %></h1>
+<header class="page-header"><div class="page-heading">
+  <p class="eyebrow"><%= t("nav.management") %></p>
+  <h1><%= t("config.title") %></h1>
+  <p class="subtitle"><%= t("config.subtitle") %></p>
+</div></header>
 
 <form class="panel" method="post" action="<%= basePath %>/g/<%= guild.id %>/config">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+  <div class="panel-header"><h2><%= t("config.generalHeading") %></h2><p class="hint"><%= t("config.saveHint") %></p></div>
 
   <div class="field">
     <label for="prefix"><%= t("config.prefix") %></label>
@@ -84,6 +89,6 @@
     <div class="hint"><%= t("config.availableRoles", { roles: roles.map((r) => `${r.name} (${r.id})`).join(", ") || t("common.none") }) %></div>
   </div>
 
-  <button type="submit" class="btn"><%= t("common.save") %></button>
+  <div class="form-actions"><span class="hint"><%= t("config.saveHint") %></span><button type="submit" class="btn"><%= t("common.save") %></button></div>
 </form>
 <%- include("../partials/foot") %>

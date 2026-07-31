@@ -1,28 +1,54 @@
 <%- include("../partials/head", { title, guild }) %>
-<h1><%= guild.name %></h1>
-<p class="hint"><%= t("overview.idAndMembers", { id: guild.id, count: guild.memberCount }) %></p>
-
-<% if (attention.length > 0) { %>
-  <div class="attention">
-    <h2><%= t("overview.attention") %></h2>
-    <ul>
-      <% attention.forEach((item) => { %><li><%= item %></li><% }) %>
-    </ul>
+<header class="page-header">
+  <div class="page-heading">
+    <p class="eyebrow"><%= t("overview.eyebrow") %></p>
+    <h1><%= guild.name %></h1>
+    <p class="subtitle"><%= t("overview.subtitle") %> · <%= t("overview.idAndMembers", { id: guild.id, count: guild.memberCount }) %></p>
   </div>
+  <button class="btn secondary" type="button" data-copy="<%= guild.id %>" data-copied="<%= t("common.copied") %>"><%= t("common.copy") %> ID</button>
+</header>
+
+<% if (error) { %><div class="error-banner" role="alert"><%= error %></div><% } %>
+<% if (attention.length > 0) { %>
+  <div class="attention"><h2><%= t("overview.attention") %></h2><ul><% attention.forEach((item) => { %><li><%= item %></li><% }) %></ul></div>
+<% } else { %>
+  <div class="notice-banner"><%- include("../partials/icon", { name: "check" }) %><span><%= t("overview.healthGood") %></span></div>
 <% } %>
 
-<div class="cards">
-  <div class="card"><div class="label"><%= t("overview.members") %></div><div class="value"><%= counters.members %></div></div>
-  <div class="card"><div class="label"><%= t("overview.messages24h") %></div><div class="value"><%= counters.messages24h %></div></div>
-  <div class="card"><div class="label"><%= t("overview.automod24h") %></div><div class="value"><%= counters.automodActions24h %></div></div>
-  <div class="card"><div class="label"><%= t("overview.openTickets") %></div><div class="value"><%= counters.openTickets %></div></div>
-  <div class="card"><div class="label"><%= t("overview.activeSmartInvites") %></div><div class="value"><%= counters.activeSmartInvites %></div></div>
-  <div class="card"><div class="label"><%= t("overview.errors24h") %></div><div class="value"><%= counters.errors24h %></div></div>
+<div class="metric-grid">
+  <% [
+    ["users", t("overview.members"), counters.members],
+    ["message", t("overview.messages24h"), counters.messages24h],
+    ["shield", t("overview.automod24h"), counters.automodActions24h],
+    ["ticket", t("overview.openTickets"), counters.openTickets],
+    ["link", t("overview.activeSmartInvites"), counters.activeSmartInvites],
+    ["alert", t("overview.errors24h"), counters.errors24h]
+  ].forEach(([icon, label, value]) => { %>
+    <div class="metric-card">
+      <span class="metric-icon"><%- include("../partials/icon", { name: icon }) %></span>
+      <div><div class="label"><%= label %></div><div class="value"><%= value %></div></div>
+    </div>
+  <% }) %>
 </div>
 
-<div class="btn-row">
-  <% if (canGuild("config.edit")) { %><a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/config"><%= t("nav.config") %></a><% } %>
-  <% if (canGuild("automod.edit")) { %><a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/automod">Automod</a><% } %>
-  <% if (canGuild("diagnostics.run")) { %><a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/diagnostics"><%= t("nav.diagnostics") %></a><% } %>
+<div class="section-heading"><h2><%= t("overview.quickActions") %></h2></div>
+<div class="quick-grid">
+  <section class="quick-card">
+    <h3><%= t("overview.memberLookup") %></h3>
+    <p><%= t("overview.memberLookupHint") %></p>
+    <form class="search-row" method="get" action="<%= basePath %>/g/<%= guild.id %>/members">
+      <input type="search" name="userId" inputmode="numeric" pattern="[0-9]{17,20}" placeholder="<%= t("overview.memberIdPlaceholder") %>" required />
+      <button class="btn" type="submit"><%= t("common.search") %></button>
+    </form>
+  </section>
+  <section class="quick-card">
+    <h3><%= t("nav.management") %></h3>
+    <p><%= t("overview.subtitle") %></p>
+    <div class="btn-row">
+      <% if (canGuild("config.edit")) { %><a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/config"><%= t("nav.config") %></a><% } %>
+      <% if (canGuild("automod.edit")) { %><a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/automod"><%= t("nav.automod") %></a><% } %>
+      <% if (canGuild("diagnostics.run")) { %><a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/diagnostics"><%= t("nav.diagnostics") %></a><% } %>
+    </div>
+  </section>
 </div>
 <%- include("../partials/foot") %>

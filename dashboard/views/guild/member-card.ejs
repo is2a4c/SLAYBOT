@@ -1,6 +1,8 @@
 <%- include("../partials/head", { title, guild }) %>
-<h1><%= user.username %></h1>
-<p class="hint">ID: <%= user.id %> <% if (isBanned) { %><span class="badge fail"><%= t("member.banned") %></span><% } %></p>
+<header class="page-header">
+  <div class="page-heading"><p class="eyebrow"><%= t("overview.memberLookup") %></p><h1><%= user.username %></h1><p class="subtitle"><%= t("member.subtitle") %> · ID: <%= user.id %> <% if (isBanned) { %><span class="badge fail"><%= t("member.banned") %></span><% } %></p></div>
+  <button class="btn secondary" type="button" data-copy="<%= user.id %>" data-copied="<%= t("common.copied") %>"><%= t("common.copy") %> ID</button>
+</header>
 
 <% if (error) { %><div class="error-banner"><%= error %></div><% } %>
 
@@ -22,7 +24,7 @@
 
 <div class="panel">
   <h2 style="margin-top:0"><%= t("member.moderationHeading") %></h2>
-  <form method="post" action="<%= basePath %>/g/<%= guild.id %>/members/<%= user.id %>/actions">
+  <form method="post" action="<%= basePath %>/g/<%= guild.id %>/members/<%= user.id %>/actions" data-confirm="<%= t("common.dangerousAction") %>">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
     <div class="field">
       <label for="action"><%= t("common.action") %></label>
@@ -59,7 +61,7 @@
 <% if (modLogs.length === 0) { %>
   <div class="panel empty"><%= t("common.noEntries") %></div>
 <% } else { %>
-  <table>
+  <div class="table-shell"><table>
     <thead><tr><th><%= t("common.time") %></th><th><%= t("common.type") %></th><th><%= t("common.moderator") %></th><th><%= t("common.reason") %></th></tr></thead>
     <tbody>
       <% modLogs.forEach((e) => { %>
@@ -71,6 +73,6 @@
         </tr>
       <% }) %>
     </tbody>
-  </table>
+  </table></div>
 <% } %>
 <%- include("../partials/foot") %>

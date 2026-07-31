@@ -1,10 +1,13 @@
 <%- include("../partials/head", { title }) %>
-<h1><%= t("owner.staffRoles") %></h1>
-<p class="hint"><%= t("owner.staffHint") %></p>
+<header class="page-header"><div class="page-heading">
+  <p class="eyebrow"><%= t("nav.owner") %></p>
+  <h1><%= t("owner.staffRoles") %></h1>
+  <p class="subtitle"><%= t("owner.staffHint") %></p>
+</div></header>
 
 <% if (error) { %><div class="error-banner"><%= error %></div><% } %>
 
-<table>
+<div class="table-shell"><table>
   <thead><tr><th><%= t("owner.discordId") %></th><th><%= t("common.role") %></th><th><%= t("owner.addedBy") %></th><th><%= t("owner.joinedAt") %></th><th></th></tr></thead>
   <tbody>
     <% if (accounts.length === 0) { %>
@@ -17,7 +20,7 @@
         <td><%= a.addedBy %></td>
         <td><%= formatDate(a.added_at) %></td>
         <td>
-          <form method="post" action="<%= basePath %>/owner/staff/<%= a._id %>/remove">
+          <form method="post" action="<%= basePath %>/owner/staff/<%= a._id %>/remove" data-confirm="<%= t("common.dangerousAction") %>">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
             <button type="submit" class="btn danger"><%= t("common.delete") %></button>
           </form>
@@ -25,7 +28,7 @@
       </tr>
     <% }) %>
   </tbody>
-</table>
+</table></div>
 
 <div class="panel">
   <h2 style="margin-top:0"><%= t("owner.addStaffHeading") %></h2>

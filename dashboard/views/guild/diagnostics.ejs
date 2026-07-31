@@ -1,5 +1,9 @@
 <%- include("../partials/head", { title, guild }) %>
-<h1><%= t("diagnostics.title") %></h1>
+<header class="page-header"><div class="page-heading">
+  <p class="eyebrow"><%= t("nav.observability") %></p>
+  <h1><%= t("diagnostics.title") %></h1>
+  <p class="subtitle"><%= t("diagnostics.subtitle") %></p>
+</div></header>
 
 <div class="cards">
   <div class="card"><div class="label"><%= t("diagnostics.total") %></div><div class="value"><%= result.summary.total %></div></div>

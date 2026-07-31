@@ -37,7 +37,7 @@ router.post("/", requireCsrf, requirePermission("staff.manage"), async (req, res
     after: { role },
   });
 
-  res.redirect(`${res.locals.basePath}/owner/staff`);
+  res.redirect(`${res.locals.basePath}/owner/staff?notice=saved`);
 });
 
 router.post("/:discordId/remove", requireCsrf, requirePermission("staff.manage"), async (req, res) => {
@@ -49,7 +49,7 @@ router.post("/:discordId/remove", requireCsrf, requirePermission("staff.manage")
     targetType: "staff_account",
     targetId: req.params.discordId,
   });
-  res.redirect(`${res.locals.basePath}/owner/staff`);
+  res.redirect(`${res.locals.basePath}/owner/staff?notice=deleted`);
 });
 
 module.exports = router;

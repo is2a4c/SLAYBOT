@@ -152,6 +152,11 @@ test("the status page renders in both languages", () => {
         formatDate: (value) => new Date(value).toISOString(),
         csrfToken: "test",
         sessionUser: null,
+        currentPath: "/status",
+        notice: null,
+        canAccessOwner: false,
+        canGuild: () => false,
+        canGlobal: () => false,
         isOwnerUser: false,
       },
       { filename: path.join(VIEWS_DIR, "status.ejs") }
@@ -176,6 +181,11 @@ function renderView(view, locals) {
       csrfToken: "test",
       sessionUser: { id: "1", username: "staff" },
       canAccessOwner: true,
+      currentPath: "/",
+      notice: null,
+      error: null,
+      canGuild: () => false,
+      canGlobal: () => false,
       isOwnerUser: false,
       ...locals,
     },
@@ -197,6 +207,7 @@ test("guild navigation only renders links granted by the effective role", () => 
       activeSmartInvites: 0,
       errors24h: 0,
     },
+    currentPath: "/g/100000000000000001",
     canGuild: (permission) => allowed.has(permission),
     canGlobal: () => false,
   });
@@ -205,6 +216,9 @@ test("guild navigation only renders links granted by the effective role", () => 
   assert.match(html, /\/diagnostics/);
   assert.doesNotMatch(html, /\/config/);
   assert.doesNotMatch(html, /\/smart-invites/);
+  assert.match(html, /class="skip-link"/);
+  assert.match(html, /data-sidebar-toggle/);
+  assert.match(html, /aria-current/);
 });
 
 test("owner dashboard hides staff and audit controls without their permissions", () => {

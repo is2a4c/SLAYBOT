@@ -3,37 +3,141 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b0d12" />
   <title><%= typeof title !== "undefined" ? title + " — SLAYBOT" : "SLAYBOT" %></title>
   <link rel="stylesheet" href="<%= basePath %>/style.css" />
   <script src="<%= basePath %>/dashboard.js" defer></script>
 </head>
-<body>
-  <header class="topbar">
-    <a href="<%= basePath %>/" class="brand">SLAYBOT</a>
-    <nav>
-      <% if (typeof guild !== "undefined" && guild) { %>
-        <a href="<%= basePath %>/g/<%= guild.id %>"><%= t("nav.overview") %></a>
-        <% if (typeof canGuild === "function" && canGuild("config.edit")) { %><a href="<%= basePath %>/g/<%= guild.id %>/config"><%= t("nav.config") %></a><% } %>
-        <% if (typeof canGuild === "function" && canGuild("automod.edit")) { %><a href="<%= basePath %>/g/<%= guild.id %>/automod"><%= t("nav.automod") %></a><% } %>
-        <% if (typeof canGuild === "function" && canGuild("audit.view")) { %><a href="<%= basePath %>/g/<%= guild.id %>/modlog"><%= t("nav.modlog") %></a><% } %>
-        <% if (typeof canGuild === "function" && canGuild("smartinvites.manage")) { %><a href="<%= basePath %>/g/<%= guild.id %>/smart-invites"><%= t("nav.smartInvites") %></a><% } %>
-        <% if (typeof canGuild === "function" && canGuild("diagnostics.run")) { %><a href="<%= basePath %>/g/<%= guild.id %>/diagnostics"><%= t("nav.diagnostics") %></a><% } %>
-        <% if (typeof canGuild === "function" && canGuild("audit.view")) { %><a href="<%= basePath %>/g/<%= guild.id %>/audit"><%= t("nav.audit") %></a><% } %>
-        <a href="<%= basePath %>/"><%= t("nav.myServers") %></a>
+<body class="<%= locals.sessionUser ? "is-authenticated" : "is-public" %>">
+  <% const hasGuild = typeof guild !== "undefined" && guild; %>
+  <% const routeActive = (route, exact = false) => exact ? currentPath === route : (currentPath === route || currentPath.startsWith(route + "/")); %>
+  <% const guildRoot = hasGuild ? `/g/${guild.id}` : ""; %>
+  <a class="skip-link" href="#main-content"><%= t("common.skipToContent") %></a>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="app-sidebar" aria-label="<%= t("common.dashboard") %>">
+      <div class="sidebar-top">
+        <a href="<%= basePath %>/" class="brand" aria-label="SLAYBOT">
+          <span class="brand-mark">S</span>
+          <span class="brand-copy"><strong>SLAYBOT</strong><small>CONTROL</small></span>
+        </a>
+        <button class="icon-button sidebar-close" type="button" data-sidebar-close aria-label="<%= t("common.closeMenu") %>">×</button>
+      </div>
+
+      <% if (hasGuild) { %>
+        <div class="workspace-card">
+          <div class="workspace-avatar">
+            <% if (guild.icon) { %>
+              <img src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png?size=96" alt="" />
+            <% } else { %>
+              <span><%= guild.name.slice(0, 1).toUpperCase() %></span>
+            <% } %>
+          </div>
+          <div class="workspace-copy">
+            <span><%= t("nav.workspace") %></span>
+            <strong title="<%= guild.name %>"><%= guild.name %></strong>
+          </div>
+          <a class="workspace-switch" href="<%= basePath %>/" aria-label="<%= t("nav.myServers") %>">⌄</a>
+        </div>
       <% } %>
-      <% if (locals.canAccessOwner === true) { %>
-        <a href="<%= basePath %>/owner"><%= t("nav.owner") %></a>
-      <% } %>
-    </nav>
-    <% if (locals.sessionUser) { %>
-      <form method="post" action="<%= basePath %>/auth/logout" class="logout-form">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-        <span class="username"><%= sessionUser.username %></span>
-        <button type="submit" class="link-button"><%= t("common.logout") %></button>
-      </form>
-    <% } %>
-    <span class="lang-switch" aria-label="<%= t("common.language") %>">
-      <% locales.forEach((entry) => { %><a href="?lang=<%= entry.code %>" class="<%= entry.active ? "active" : "" %>"><%= entry.code.toUpperCase() %></a><% }) %>
-    </span>
-  </header>
-  <main class="content">
+
+      <nav class="sidebar-nav">
+        <% if (hasGuild) { %>
+          <span class="nav-label"><%= t("nav.management") %></span>
+          <a class="nav-item <%= routeActive(guildRoot, true) ? "active" : "" %>" href="<%= basePath + guildRoot %>" <%- routeActive(guildRoot, true) ? 'aria-current="page"' : "" %>>
+            <%- include("icon", { name: "grid" }) %><span><%= t("nav.overview") %></span>
+          </a>
+          <% if (canGuild("config.edit")) { %>
+            <a class="nav-item <%= routeActive(guildRoot + "/config") ? "active" : "" %>" href="<%= basePath + guildRoot %>/config">
+              <%- include("icon", { name: "settings" }) %><span><%= t("nav.config") %></span>
+            </a>
+          <% } %>
+          <% if (canGuild("automod.edit")) { %>
+            <a class="nav-item <%= routeActive(guildRoot + "/automod") ? "active" : "" %>" href="<%= basePath + guildRoot %>/automod">
+              <%- include("icon", { name: "shield" }) %><span><%= t("nav.automod") %></span>
+            </a>
+          <% } %>
+          <% if (canGuild("smartinvites.manage")) { %>
+            <a class="nav-item <%= routeActive(guildRoot + "/smart-invites") ? "active" : "" %>" href="<%= basePath + guildRoot %>/smart-invites">
+              <%- include("icon", { name: "link" }) %><span><%= t("nav.smartInvites") %></span>
+            </a>
+          <% } %>
+
+          <span class="nav-label nav-label-spaced"><%= t("nav.observability") %></span>
+          <% if (canGuild("audit.view")) { %>
+            <a class="nav-item <%= routeActive(guildRoot + "/modlog") ? "active" : "" %>" href="<%= basePath + guildRoot %>/modlog">
+              <%- include("icon", { name: "scroll" }) %><span><%= t("nav.modlog") %></span>
+            </a>
+          <% } %>
+          <% if (canGuild("diagnostics.run")) { %>
+            <a class="nav-item <%= routeActive(guildRoot + "/diagnostics") ? "active" : "" %>" href="<%= basePath + guildRoot %>/diagnostics">
+              <%- include("icon", { name: "pulse" }) %><span><%= t("nav.diagnostics") %></span>
+            </a>
+          <% } %>
+          <% if (canGuild("audit.view")) { %>
+            <a class="nav-item <%= routeActive(guildRoot + "/audit") ? "active" : "" %>" href="<%= basePath + guildRoot %>/audit">
+              <%- include("icon", { name: "history" }) %><span><%= t("nav.audit") %></span>
+            </a>
+          <% } %>
+        <% } else { %>
+          <span class="nav-label"><%= t("nav.workspace") %></span>
+          <% if (locals.sessionUser) { %>
+            <a class="nav-item <%= currentPath === "/" ? "active" : "" %>" href="<%= basePath %>/" <%- currentPath === "/" ? 'aria-current="page"' : "" %>>
+              <%- include("icon", { name: "server" }) %><span><%= t("selector.title") %></span>
+            </a>
+          <% } %>
+          <% if (locals.canAccessOwner === true) { %>
+            <a class="nav-item <%= routeActive("/owner") ? "active" : "" %>" href="<%= basePath %>/owner">
+              <%- include("icon", { name: "crown" }) %><span><%= t("nav.owner") %></span>
+            </a>
+          <% } %>
+          <a class="nav-item <%= routeActive("/status") ? "active" : "" %>" href="<%= basePath %>/status">
+            <%- include("icon", { name: "pulse" }) %><span><%= t("nav.status") %></span>
+          </a>
+        <% } %>
+      </nav>
+
+      <div class="sidebar-footer">
+        <% if (locals.sessionUser) { %>
+          <div class="user-card">
+            <div class="user-avatar">
+              <% if (sessionUser.avatar) { %>
+                <img src="https://cdn.discordapp.com/avatars/<%= sessionUser.id %>/<%= sessionUser.avatar %>.png?size=64" alt="" />
+              <% } else { %>
+                <span><%= sessionUser.username.slice(0, 1).toUpperCase() %></span>
+              <% } %>
+            </div>
+            <div class="user-copy"><strong><%= sessionUser.globalName || sessionUser.username %></strong><span>@<%= sessionUser.username %></span></div>
+            <form method="post" action="<%= basePath %>/auth/logout">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+              <button class="icon-button" type="submit" title="<%= t("common.logout") %>" aria-label="<%= t("common.logout") %>"><%- include("icon", { name: "logout" }) %></button>
+            </form>
+          </div>
+        <% } else { %>
+          <div class="service-live"><span></span><%= t("common.live") %></div>
+        <% } %>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="topbar">
+        <button class="icon-button menu-toggle" type="button" data-sidebar-toggle aria-controls="app-sidebar" aria-expanded="false" aria-label="<%= t("common.menu") %>">
+          <%- include("icon", { name: "menu" }) %>
+        </button>
+        <div class="topbar-context">
+          <span><%= hasGuild ? guild.name : t("common.dashboard") %></span>
+          <small><%= hasGuild ? t("common.overview") : "SLAYBOT" %></small>
+        </div>
+        <div class="topbar-actions">
+          <div class="lang-switch" aria-label="<%= t("common.language") %>">
+            <% locales.forEach((entry) => { %><a href="?lang=<%= entry.code %>" class="<%= entry.active ? "active" : "" %>" lang="<%= entry.code %>"><%= entry.code.toUpperCase() %></a><% }) %>
+          </div>
+          <a class="status-chip" href="<%= basePath %>/status"><span></span><%= t("common.live") %></a>
+        </div>
+      </header>
+
+      <main class="content" id="main-content">
+        <% if (locals.notice) { %>
+          <div class="notice-banner" role="status"><%- include("icon", { name: "check" }) %><span><%= notice %></span><button type="button" data-dismiss aria-label="Close">×</button></div>
+        <% } %>

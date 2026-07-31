@@ -1,13 +1,17 @@
 <%- include("../partials/head", { title }) %>
-<h1><%= t("owner.title") %></h1>
+<header class="page-header">
+  <div class="page-heading"><p class="eyebrow"><%= t("nav.owner") %></p><h1><%= t("owner.title") %></h1><p class="subtitle"><%= t("owner.subtitle") %></p></div>
+  <div class="btn-row">
+  <% if (canGlobal("staff.manage")) { %><a class="btn secondary" href="<%= basePath %>/owner/staff"><%= t("owner.staffRoles") %></a><% } %>
+  <% if (canGlobal("audit.view")) { %><a class="btn secondary" href="<%= basePath %>/owner/audit"><%= t("nav.audit") %></a><% } %>
+  </div>
+</header>
 
-<div class="btn-row" style="margin-bottom:16px">
+<div class="section-heading"><h2><%= t("owner.fleetHeading") %></h2><div class="btn-row">
   <a class="btn secondary" href="?period=1"><%= t("owner.period24h") %></a>
   <a class="btn secondary" href="?period=7"><%= t("owner.period7d") %></a>
   <a class="btn secondary" href="?period=30"><%= t("owner.period30d") %></a>
-  <% if (canGlobal("staff.manage")) { %><a class="btn secondary" href="<%= basePath %>/owner/staff"><%= t("owner.staffRoles") %></a><% } %>
-  <% if (canGlobal("audit.view")) { %><a class="btn secondary" href="<%= basePath %>/owner/audit"><%= t("nav.audit") %></a><% } %>
-</div>
+</div></div>
 
 <div class="cards">
   <div class="card"><div class="label"><%= t("owner.guilds") %></div><div class="value"><%= guildCount %></div></div>
@@ -18,8 +22,8 @@
   <div class="card"><div class="label"><%= t("owner.commandLatency") %></div><div class="value"><%= summary.commandLatency.averageMs %> ms</div></div>
 </div>
 
-<h2><%= t("owner.guildsHeading", { days: periodDays }) %></h2>
-<table>
+<div class="section-heading"><h2><%= t("owner.serverDirectory") %></h2><span class="hint"><%= t("owner.guildsHeading", { days: periodDays }) %></span></div>
+<div class="table-shell"><table>
   <thead><tr><th><%= t("common.server") %></th><th><%= t("common.members") %></th><th><%= t("owner.guildOwner") %></th><th><%= t("owner.joinedAt") %></th><th><%= t("owner.modlogConfigured") %></th></tr></thead>
   <tbody>
     <% guilds.forEach((g) => { %>
@@ -32,5 +36,5 @@
       </tr>
     <% }) %>
   </tbody>
-</table>
+</table></div>
 <%- include("../partials/foot") %>

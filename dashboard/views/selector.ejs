@@ -1,14 +1,25 @@
 <%- include("partials/head", { title }) %>
-<h1><%= t("selector.title") %></h1>
+<header class="page-header">
+  <div class="page-heading">
+    <p class="eyebrow"><%= t("selector.eyebrow") %></p>
+    <h1><%= t("selector.title") %></h1>
+    <p class="subtitle"><%= t("selector.subtitle") %></p>
+  </div>
+  <span class="badge pass"><%= t("selector.serverCount", { count: guilds.length }) %></span>
+</header>
 
 <% if (guilds.length === 0) { %>
   <div class="panel empty"><%= t("selector.empty") %></div>
 <% } else { %>
-  <div class="list-card">
+  <div class="guild-grid">
     <% guilds.forEach((g) => { %>
-      <div class="list-row">
+      <article class="guild-card">
         <div class="guild-tile">
-          <img src="<%= g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=64` : "" %>" alt="" />
+          <% if (g.icon) { %>
+            <img src="https://cdn.discordapp.com/icons/<%= g.id %>/<%= g.icon %>.png?size=96" alt="" />
+          <% } else { %>
+            <span class="guild-avatar workspace-fallback"><%= g.name.slice(0, 1).toUpperCase() %></span>
+          <% } %>
           <div>
             <div class="name"><%= g.name %></div>
             <div class="meta"><%= g.botPresent ? t("selector.botPresent") : t("selector.botMissing") %></div>
@@ -19,12 +30,8 @@
         <% } else { %>
           <a class="btn secondary" href="<%= g.inviteUrl %>" target="_blank" rel="noopener"><%= t("common.invite") %></a>
         <% } %>
-      </div>
+      </article>
     <% }) %>
   </div>
-<% } %>
-
-<% if (locals.canAccessOwner === true) { %>
-  <p><a href="<%= basePath %>/owner"><%= t("selector.ownerLink") %></a></p>
 <% } %>
 <%- include("partials/foot") %>

@@ -1,5 +1,9 @@
 <%- include("partials/head", { title }) %>
-<h1><%= t("status.heading") %></h1>
+<header class="page-header"><div class="page-heading">
+  <p class="eyebrow">SLAYBOT</p>
+  <h1><%= t("status.heading") %></h1>
+  <p class="subtitle"><%= t("status.subtitle") %></p>
+</div></header>
 
 <p class="status-banner status-<%= report.status %>">
   <strong><%= t(`status.${report.status}`) %></strong>
@@ -7,7 +11,7 @@
 </p>
 
 <h2><%= t("status.componentsHeading") %></h2>
-<table class="status-table">
+<div class="table-shell"><table class="status-table">
   <thead>
     <tr><th><%= t("status.component") %></th><th><%= t("status.state") %></th><th><%= t("status.details") %></th></tr>
   </thead>
@@ -20,7 +24,7 @@
       </tr>
     <% }); %>
   </tbody>
-</table>
+</table></div>
 
 <h2><%= t("status.metricsHeading") %></h2>
 <ul class="status-metrics">
@@ -34,14 +38,14 @@
 
 <% if (report.shards.length > 1) { %>
   <h2><%= t("status.shardsHeading") %></h2>
-  <table class="status-table">
+  <div class="table-shell"><table class="status-table">
     <thead><tr><th>#</th><th><%= t("status.latency") %></th><th><%= t("status.state") %></th></tr></thead>
     <tbody>
       <% report.shards.forEach((shard) => { %>
         <tr><td><%= shard.id %></td><td><%= shard.ping %> ms</td><td><%= shard.status %></td></tr>
       <% }); %>
     </tbody>
-  </table>
+  </table></div>
 <% } %>
 
 <p class="muted">

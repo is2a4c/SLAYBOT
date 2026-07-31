@@ -1,5 +1,9 @@
 <%- include("../partials/head", { title, guild }) %>
-<h1>ModLog</h1>
+<header class="page-header"><div class="page-heading">
+  <p class="eyebrow"><%= t("nav.observability") %></p>
+  <h1><%= t("modlog.title") %></h1>
+  <p class="subtitle"><%= t("modlog.subtitle") %></p>
+</div></header>
 
 <form class="panel" method="get" action="<%= basePath %>/g/<%= guild.id %>/modlog">
   <div class="field">
@@ -21,7 +25,7 @@
 <% if (entries.length === 0) { %>
   <div class="panel empty"><%= t("common.notFound") %></div>
 <% } else { %>
-  <table>
+  <div class="table-shell"><table>
     <thead>
       <tr><th><%= t("common.time") %></th><th><%= t("common.type") %></th><th><%= t("common.member") %></th><th><%= t("common.moderator") %></th><th><%= t("common.reason") %></th></tr>
     </thead>
@@ -36,7 +40,7 @@
         </tr>
       <% }) %>
     </tbody>
-  </table>
+  </table></div>
   <div class="pagination">
     <% if (page > 1) { %><a class="btn secondary" href="?page=<%= page - 1 %>&type=<%= filterType || '' %>&memberId=<%= filterMemberId || '' %>"><%= t("common.back") %></a><% } %>
     <span><%= t("common.page", { page, total: totalPages }) %></span>
