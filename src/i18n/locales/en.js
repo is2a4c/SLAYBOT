@@ -16,6 +16,8 @@ module.exports = {
     common: {
       hint: "Use the buttons below — the panel updates as you go.",
       forbidden: "Only someone with **Manage Server** can change these settings.",
+      badColor: "Use a hex colour such as `#A855F7`. Leave it empty to fall back to the default.",
+      badUrl: "Use a link starting with `https://`. Leave it empty to drop the image.",
     },
 
     choices: {

@@ -33,5 +33,5 @@ module.exports = async (client, member) => {
   const inviterData = await inviteHandler.trackLeftMember(guild, member.user);
 
   // Farewell message
-  greetingHandler.sendFarewell(member, inviterData);
+  greetingHandler.sendFarewell(member, inviterData).catch((err) => client.logger.error("sendFarewell", err));
 };

@@ -39,5 +39,7 @@ module.exports = async (client, member) => {
   const inviterData = settings.invite.tracking ? await inviteHandler.trackJoinedMember(member) : {};
 
   // Send welcome message
-  greetingHandler.sendWelcome(member, inviterData);
+  // A greeting configured with a colour Discord refuses would otherwise reject
+  // here, unhandled, and take the rest of the join handling with it.
+  greetingHandler.sendWelcome(member, inviterData).catch((err) => client.logger.error("sendWelcome", err));
 };

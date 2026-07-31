@@ -316,6 +316,18 @@ function defineConfigPanel({ id, titleKey, descriptionKey, actionsKey, hintKey, 
       value = null;
     }
 
+    // Free text that something downstream has to parse — a colour, a URL — is
+    // checked here, because storing it unchecked breaks the feature at the point
+    // it is used rather than at the point it is set.
+    if (value !== null && field.validate) {
+      const checked = field.validate(value);
+      if (!checked.ok) {
+        await interaction.reply({ content: t(checked.reason), ephemeral: true });
+        return true;
+      }
+      value = checked.value ?? value;
+    }
+
     writePath(settings, fieldPath(field), value);
 
     if (interaction.isFromMessage()) {
@@ -334,9 +346,12 @@ function defineConfigPanel({ id, titleKey, descriptionKey, actionsKey, hintKey, 
     build,
     buildPicker,
     fields,
+    // Where each field ends up in the guild document, so the wiring can be checked.
+    fieldPath,
     handle,
     matches: panel.matches,
     panel,
+    path,
     statusLines,
   };
 }

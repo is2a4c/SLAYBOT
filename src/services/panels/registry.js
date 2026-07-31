@@ -11,6 +11,33 @@ const publish = require("./publish");
 
 const TEXT_CHANNELS = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 
+/**
+ * Discord throws when an embed is given a colour it cannot parse, which would
+ * break the greeting at send time rather than here. A missing "#" is forgiven.
+ *
+ * @param {string} value
+ */
+function color(value) {
+  const normalized = value.trim().replace(/^#?/, "#").toUpperCase();
+  if (!/^#[0-9A-F]{6}$/.test(normalized)) return { ok: false, reason: "panels.common.badColor" };
+  return { ok: true, value: normalized };
+}
+
+/**
+ * @param {string} value
+ */
+function httpsUrl(value) {
+  let url;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    return { ok: false, reason: "panels.common.badUrl" };
+  }
+
+  if (url.protocol !== "https:") return { ok: false, reason: "panels.common.badUrl" };
+  return { ok: true, value: url.toString() };
+}
+
 const toggle = (id, emoji, key) => ({ id, emoji, key, type: "toggle", style: ButtonStyle.Secondary });
 const text = (id, emoji, key, options = {}) => ({
   id,
@@ -146,12 +173,12 @@ const PANELS = {
       channel("channel", "📢", "channel"),
       text("content", "💬", "content", { long: true, maxLength: 1000, required: false }),
       text("description", "📝", "embed.description", { long: true, maxLength: 1000, required: false }),
-      text("color", "🎨", "embed.color", { maxLength: 7, required: false }),
+      text("color", "🎨", "embed.color", { maxLength: 7, required: false, validate: color }),
     ],
     [
       text("footer", "🔻", "embed.footer", { maxLength: 200, required: false }),
       toggle("thumbnail", "🖼️", "embed.thumbnail"),
-      text("image", "🏞️", "embed.image", { maxLength: 300, required: false }),
+      text("image", "🏞️", "embed.image", { maxLength: 300, required: false, validate: httpsUrl }),
     ],
   ]),
 
@@ -161,12 +188,12 @@ const PANELS = {
       channel("channel", "📢", "channel"),
       text("content", "💬", "content", { long: true, maxLength: 1000, required: false }),
       text("description", "📝", "embed.description", { long: true, maxLength: 1000, required: false }),
-      text("color", "🎨", "embed.color", { maxLength: 7, required: false }),
+      text("color", "🎨", "embed.color", { maxLength: 7, required: false, validate: color }),
     ],
     [
       text("footer", "🔻", "embed.footer", { maxLength: 200, required: false }),
       toggle("thumbnail", "🖼️", "embed.thumbnail"),
-      text("image", "🏞️", "embed.image", { maxLength: 300, required: false }),
+      text("image", "🏞️", "embed.image", { maxLength: 300, required: false, validate: httpsUrl }),
     ],
   ]),
 
@@ -232,7 +259,10 @@ const PANELS = {
       role("role", "🎂", "role_id"),
       number("hour", "🕘", "hour", 0, 23),
     ],
-    [number("offset", "🌍", "utc_offset", -12, 14), text("color", "🎨", "color", { maxLength: 7, required: false })],
+    [
+      number("offset", "🌍", "utc_offset", -12, 14),
+      text("color", "🎨", "color", { maxLength: 7, required: false, validate: color }),
+    ],
   ]),
 
   ai: system("ai", "ai", [
