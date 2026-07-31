@@ -162,7 +162,7 @@ module.exports = {
     const settings = data.settings;
 
     if (sub === "setup") {
-      return interaction.followUp(
+      return interaction.editReply(
         await setup(interaction.guild, settings, {
           panelChannel: interaction.options.getChannel("panel_channel"),
           hubChannel: interaction.options.getChannel("hub_channel"),
@@ -172,13 +172,13 @@ module.exports = {
     }
 
     if (sub === "panel") {
-      return interaction.followUp(
+      return interaction.editReply(
         await postPanel(interaction.guild, settings, interaction.options.getChannel("channel"))
       );
     }
 
     if (sub === "config") {
-      return interaction.followUp(
+      return interaction.editReply(
         await configure(settings, {
           nameTemplate: interaction.options.getString("name_template"),
           limit: interaction.options.getInteger("limit"),
@@ -190,11 +190,11 @@ module.exports = {
       );
     }
 
-    if (sub === "status") return interaction.followUp({ embeds: [await statusEmbed(interaction.guild, settings)] });
+    if (sub === "status") return interaction.editReply({ embeds: [await statusEmbed(interaction.guild, settings)] });
 
-    if (sub === "off") return interaction.followUp(await disable(interaction.guild, settings));
+    if (sub === "off") return interaction.editReply(await disable(interaction.guild, settings));
 
-    return interaction.followUp("Invalid subcommand");
+    return interaction.editReply("Invalid subcommand");
   },
 };
 

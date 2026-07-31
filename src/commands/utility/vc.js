@@ -17,6 +17,8 @@ module.exports = {
   slashCommand: {
     enabled: true,
     ephemeral: true,
+    // The panel is drawn from settings already in memory; no need to stall first.
+    defer: false,
     options: [],
   },
 
@@ -25,7 +27,10 @@ module.exports = {
   },
 
   async interactionRun(interaction, data) {
-    return interaction.followUp(panelFor(interaction.guild, data.settings));
+    const panel = panelFor(interaction.guild, data.settings);
+    const payload = typeof panel === "string" ? { content: panel } : panel;
+
+    return interaction.reply({ ...payload, ephemeral: true });
   },
 };
 

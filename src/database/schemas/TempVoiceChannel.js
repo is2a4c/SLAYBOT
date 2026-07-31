@@ -1,4 +1,11 @@
 const mongoose = require("mongoose");
+const FixedSizeMap = require("fixedsize-map");
+const { CACHE_SIZE } = require("@root/config.js");
+
+// Every click on the voice panel needs this record, so it is kept in memory: the
+// document is the same object the handlers mutate and save, and it is dropped
+// again the moment the channel goes away.
+const cache = new FixedSizeMap(CACHE_SIZE.GUILDS);
 
 const Schema = new mongoose.Schema(
   {
@@ -26,26 +33,50 @@ const Model = mongoose.models["temp-voice-channel"]
 
 module.exports = {
   model: Model,
+  cache,
 
   /**
    * @param {{channelId: string, guildId: string, ownerId: string, locked?: boolean}} input
    */
-  registerChannel: ({ channelId, guildId, ownerId, locked = false }) =>
-    Model.findOneAndUpdate(
+  registerChannel: async ({ channelId, guildId, ownerId, locked = false }) => {
+    const document = await Model.findOneAndUpdate(
       { _id: channelId },
       { $set: { guild_id: guildId, owner_id: ownerId, locked, trusted: [], blocked: [] } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
-    ),
+    );
 
-  getChannel: (channelId) => Model.findById(channelId),
+    cache.add(channelId, document);
+    return document;
+  },
+
+  /**
+   * @param {string} channelId
+   * @returns {Promise<object|null>}
+   */
+  getChannel: async (channelId) => {
+    const cached = cache.get(channelId);
+    if (cached) return cached;
+
+    const document = await Model.findById(channelId);
+    if (document) cache.add(channelId, document);
+    return document;
+  },
 
   listGuildChannels: (guildId) => Model.find({ guild_id: guildId }).lean(),
 
   countOwned: (guildId, ownerId) => Model.countDocuments({ guild_id: guildId, owner_id: ownerId }),
 
-  deleteChannel: (channelId) => Model.deleteOne({ _id: channelId }),
+  deleteChannel: (channelId) => {
+    cache.remove(channelId);
+    return Model.deleteOne({ _id: channelId });
+  },
 
-  deleteGuildChannels: (guildId) => Model.deleteMany({ guild_id: guildId }),
+  deleteGuildChannels: (guildId) => {
+    // Guild-wide removals are rare, so dropping the whole cache is cheaper than
+    // tracking which ids belonged to which guild.
+    cache.clear();
+    return Model.deleteMany({ guild_id: guildId });
+  },
 
   /**
    * Drop rows whose Discord channel is already gone, so a restart does not leave
@@ -54,5 +85,8 @@ module.exports = {
    * @param {string} guildId
    * @param {string[]} aliveChannelIds
    */
-  pruneMissing: (guildId, aliveChannelIds) => Model.deleteMany({ guild_id: guildId, _id: { $nin: aliveChannelIds } }),
+  pruneMissing: (guildId, aliveChannelIds) => {
+    cache.clear();
+    return Model.deleteMany({ guild_id: guildId, _id: { $nin: aliveChannelIds } });
+  },
 };

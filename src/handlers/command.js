@@ -168,7 +168,9 @@ module.exports = {
     }
 
     try {
-      if (!interaction.deferred && !interaction.replied) {
+      // Deferring costs an extra round-trip and shows a "thinking" placeholder
+      // first. A command that answers straight away can opt out and reply once.
+      if (cmd.slashCommand.defer !== false && !interaction.deferred && !interaction.replied) {
         await interaction.deferReply({ ephemeral: cmd.slashCommand.ephemeral });
       }
       const settings = await getSettings(interaction.guild);

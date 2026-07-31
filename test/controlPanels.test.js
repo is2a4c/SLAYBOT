@@ -175,6 +175,22 @@ test("a toggle flips the setting and redraws", async () => {
   assert.equal(interaction.seen.update.length, 1);
 });
 
+test("the panel redraws without waiting for the database write", async () => {
+  const settings = makeSettings();
+  let finishWrite;
+  settings.save = () => new Promise((resolve) => (finishWrite = resolve));
+
+  const interaction = makeInteraction({ customId: PANELS.automod.panel.buttonId("spam") });
+  const handled = route(interaction, settings);
+
+  // Let the pending microtasks run while the write is still outstanding.
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(interaction.seen.update.length, 1, "the click is answered before the write lands");
+
+  finishWrite();
+  await handled;
+});
+
 test("a picker replaces the buttons instead of sending a new message", async () => {
   const interaction = makeInteraction({ customId: PANELS.ticket.panel.buttonId("staff") });
   await route(interaction, makeSettings());

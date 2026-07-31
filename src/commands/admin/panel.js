@@ -18,6 +18,8 @@ module.exports = {
   slashCommand: {
     enabled: true,
     ephemeral: true,
+    // The hub is built from settings already in memory, so there is nothing to wait for.
+    defer: false,
     options: [],
   },
 
@@ -28,6 +30,9 @@ module.exports = {
 
   async interactionRun(interaction, data) {
     const t = guildTranslator(data.settings, interaction.guild);
-    return interaction.followUp(controlPanelHandler.buildHub(t, data.settings, interaction.client));
+    return interaction.reply({
+      ...controlPanelHandler.buildHub(t, data.settings, interaction.client),
+      ephemeral: true,
+    });
   },
 };

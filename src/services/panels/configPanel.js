@@ -240,6 +240,24 @@ function defineConfigPanel({ id, titleKey, descriptionKey, actionsKey, hintKey, 
     const parsed = panel.parse(interaction.customId);
     const redraw = () => interaction.update(build(t, settings, interaction.client));
 
+    /**
+     * Redraw and store at the same time. The panel already holds the new value,
+     * so a click does not have to wait for the database to acknowledge the write
+     * before it shows anything.
+     *
+     * @param {object} field
+     */
+    async function store(field) {
+      const saving = settings.save().catch((error) => {
+        interaction.client?.logger?.error("panel: failed to save settings", error);
+      });
+
+      await redraw();
+      await saving;
+      // Some settings do something once stored, such as posting a public panel.
+      await field.after?.(interaction, settings, t);
+    }
+
     if (parsed.action === BACK) {
       await redraw();
       return true;
@@ -257,9 +275,7 @@ function defineConfigPanel({ id, titleKey, descriptionKey, actionsKey, hintKey, 
 
       if (field.type === "toggle") {
         writePath(settings, fieldPath(field), !readPath(settings, fieldPath(field)));
-        await settings.save();
-        await field.after?.(interaction, settings, t);
-        await redraw();
+        await store(field);
         return true;
       }
 
@@ -278,10 +294,7 @@ function defineConfigPanel({ id, titleKey, descriptionKey, actionsKey, hintKey, 
       if (field.type === "roleList" || field.type === "channelList") writePath(settings, fieldPath(field), values);
       else writePath(settings, fieldPath(field), values[0] ?? null);
 
-      await settings.save();
-      // Some settings do something once they are stored, such as posting a panel.
-      await field.after?.(interaction, settings, t);
-      await redraw();
+      await store(field);
       return true;
     }
 
@@ -304,11 +317,15 @@ function defineConfigPanel({ id, titleKey, descriptionKey, actionsKey, hintKey, 
     }
 
     writePath(settings, fieldPath(field), value);
+
+    if (interaction.isFromMessage()) {
+      await store(field);
+      return true;
+    }
+
     await settings.save();
     await field.after?.(interaction, settings, t);
-
-    if (interaction.isFromMessage()) await redraw();
-    else await interaction.reply({ content: t("common.saved"), ephemeral: true });
+    await interaction.reply({ content: t("common.saved"), ephemeral: true });
 
     return true;
   }

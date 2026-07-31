@@ -18,6 +18,8 @@ module.exports = {
   slashCommand: {
     enabled: true,
     ephemeral: true,
+    // Nothing is fetched to draw the picker, so answer in one round-trip.
+    defer: false,
     options: [],
   },
 
@@ -28,6 +30,9 @@ module.exports = {
 
   async interactionRun(interaction, data) {
     const t = guildTranslator(data.settings, interaction.guild);
-    return interaction.followUp(languageHandler.buildPanel(t, data.settings, interaction.guild));
+    return interaction.reply({
+      ...languageHandler.buildPanel(t, data.settings, interaction.guild),
+      ephemeral: true,
+    });
   },
 };

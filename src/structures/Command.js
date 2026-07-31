@@ -18,6 +18,8 @@
  * @typedef {Object} InteractionInfo
  * @property {boolean} enabled - Whether the slash command is enabled or not
  * @property {boolean} ephemeral - Whether the reply should be ephemeral
+ * @property {boolean} [defer=true] - Set false when the command answers immediately,
+ *   so it replies once instead of showing a "thinking" placeholder first
  * @property {import('discord.js').ApplicationCommandOptionData[]} options - command options
  */
 

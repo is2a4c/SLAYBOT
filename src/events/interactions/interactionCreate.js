@@ -16,11 +16,42 @@ const {
 } = require("@src/handlers");
 const { InteractionType } = require("discord.js");
 
+// Discord gives three seconds to answer a click before it gives up on us, so
+// anything approaching that is worth having in the log with its custom id.
+const SLOW_INTERACTION_MS = 2000;
+
+/**
+ * @param {import('discord.js').BaseInteraction} interaction
+ * @returns {string}
+ */
+function describe(interaction) {
+  if (interaction.isChatInputCommand()) return `/${interaction.commandName}`;
+  if (interaction.isContextMenuCommand()) return `context ${interaction.commandName}`;
+  return `${interaction.customId || interaction.type}`;
+}
+
 /**
  * @param {import('@src/structures').BotClient} client
  * @param {import('discord.js').BaseInteraction} interaction
  */
 module.exports = async (client, interaction) => {
+  const startedAt = Date.now();
+
+  try {
+    return await route(client, interaction);
+  } finally {
+    const elapsed = Date.now() - startedAt;
+    if (elapsed >= SLOW_INTERACTION_MS) {
+      client.logger.warn(`Slow interaction: ${describe(interaction)} took ${elapsed}ms`);
+    }
+  }
+};
+
+/**
+ * @param {import('@src/structures').BotClient} client
+ * @param {import('discord.js').BaseInteraction} interaction
+ */
+async function route(client, interaction) {
   if (!interaction.guild) {
     return interaction
       .reply({ content: "Command can only be executed in a discord server", ephemeral: true })
@@ -158,4 +189,4 @@ module.exports = async (client, interaction) => {
 
   // track stats
   if (settings.stats.enabled) statsHandler.trackInteractionStats(interaction).catch(() => {});
-};
+}

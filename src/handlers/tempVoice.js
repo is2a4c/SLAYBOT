@@ -83,20 +83,31 @@ function canManage(channel) {
   return Boolean(channel.permissionsFor(channel.guild.members.me)?.has(PermissionFlagsBits.ManageChannels));
 }
 
+// The region list barely changes, and fetching it on every click puts a Discord
+// round-trip between pressing the button and seeing the menu.
+const regionCache = new Map();
+const REGION_TTL_MS = 60 * 60 * 1000;
+
 /**
  * @param {import('discord.js').Guild} guild
  * @returns {Promise<{value: string, label: string}[]>}
  */
 async function fetchRegions(guild) {
+  const cached = regionCache.get(guild.id);
+  if (cached && cached.expires > Date.now()) return cached.regions;
+
+  let regions = FALLBACK_REGIONS.map((id) => ({ value: id, label: id }));
+
   try {
-    const regions = await guild.fetchVoiceRegions();
-    const usable = [...regions.values()].filter((region) => !region.deprecated && !region.custom);
-    if (usable.length) return usable.map((region) => ({ value: region.id, label: region.name }));
+    const fetched = await guild.fetchVoiceRegions();
+    const usable = [...fetched.values()].filter((region) => !region.deprecated && !region.custom);
+    if (usable.length) regions = usable.map((region) => ({ value: region.id, label: region.name }));
   } catch {
-    // fall through to the static list
+    // keep the static list
   }
 
-  return FALLBACK_REGIONS.map((id) => ({ value: id, label: id }));
+  regionCache.set(guild.id, { regions, expires: Date.now() + REGION_TTL_MS });
+  return regions;
 }
 
 /**
