@@ -165,7 +165,7 @@ test("prepares the full image and four overlapping collage regions", async () =>
   assert.equal(prepared.visionImages.length, 5);
 });
 
-test("local vision analyzes every prepared collage region", async () => {
+test("local vision looks at the full frame and the most suspicious region", async () => {
   const images = [Buffer.from("full"), Buffer.from("top-left"), Buffer.from("bottom-right")];
   const candidates = [
     { text: "ordinary screenshot", confidence: 80 },
@@ -178,16 +178,38 @@ test("local vision analyzes every prepared collage region", async () => {
     return buffer.toString() === "bottom-right" ? "IMAGE_SPAM" : "IMAGE_SAFE";
   });
 
+  // Every region used to be analysed, which on a CPU-only host meant minutes per
+  // image. The regions are ranked by OCR risk, so the innocent tile is dropped
+  // and the one holding the payout is still seen.
   assert.deepEqual(
     seen.map(({ image }) => image),
-    ["full", "top-left", "bottom-right"]
+    ["full", "bottom-right"]
   );
   assert.equal(seen[1].split, false);
-  assert.match(seen[2].hint, /4600/);
+  assert.match(seen[1].hint, /4600/);
   assert.equal(result.index, 2);
   assert.equal(result.score, 85);
-  assert.equal(result.regionsAnalyzed, 3);
+  assert.equal(result.regionsAnalyzed, 2);
   assert.equal(result.regionsAvailable, 3);
+});
+
+test("the region budget can be raised back up", async () => {
+  const previous = process.env.IMAGE_SPAM_VISION_MAX_REGIONS;
+  process.env.IMAGE_SPAM_VISION_MAX_REGIONS = "3";
+
+  const images = [Buffer.from("full"), Buffer.from("a"), Buffer.from("b")];
+  const seen = [];
+
+  try {
+    await analyzeVisionImages(images, [], "", async (buffer) => {
+      seen.push(buffer.toString());
+      return "IMAGE_SAFE";
+    });
+    assert.equal(seen.length, 3);
+  } finally {
+    if (previous === undefined) delete process.env.IMAGE_SPAM_VISION_MAX_REGIONS;
+    else process.env.IMAGE_SPAM_VISION_MAX_REGIONS = previous;
+  }
 });
 
 test("local vision can cap regions while keeping the highest OCR-risk tile", async () => {
@@ -563,4 +585,38 @@ test("a working reply clears the pause", async () => {
     if (previousKey === undefined) delete process.env.IO_INTELLIGENCE_API_KEY;
     else process.env.IO_INTELLIGENCE_API_KEY = previousKey;
   }
+});
+
+/* -------------------------------------------------- transcription + verdict */
+
+const { parseAnalysisResponse } = require("../src/services/imageSpamClassifier");
+
+test("one reply carries both the text and the verdict", () => {
+  const spam = parseAnalysisResponse('{"text":"Claim 10000 RUB","confidence":95,"verdict":"IMAGE_SPAM"}');
+  assert.deepEqual(spam, { text: "Claim 10000 RUB", confidence: 95, verdict: "IMAGE_SPAM" });
+
+  const safe = parseAnalysisResponse('{"text":"patch notes","confidence":80,"verdict":"IMAGE_SAFE"}');
+  assert.equal(safe.verdict, "IMAGE_SAFE");
+  assert.equal(safe.text, "patch notes");
+});
+
+test("a verdict stated outside the JSON is still picked up", () => {
+  // Models often add a sentence around the object; the label must survive that.
+  const wrapped = parseAnalysisResponse('Looks fraudulent. {"text":"Bonus","confidence":70} IMAGE_SPAM');
+
+  assert.equal(wrapped.verdict, "IMAGE_SPAM");
+  assert.equal(wrapped.text, "Bonus");
+});
+
+test("a reply with no verdict is not treated as an accusation", () => {
+  assert.equal(parseAnalysisResponse('{"text":"hello","confidence":90}').verdict, null);
+  assert.equal(parseAnalysisResponse("").verdict, null);
+  assert.equal(parseAnalysisResponse(null).verdict, null);
+});
+
+test("an image with no readable text can still be judged", () => {
+  const result = parseAnalysisResponse('{"text":"","confidence":0,"verdict":"IMAGE_SPAM"}');
+
+  assert.equal(result.text, "", "a screenshot may be a scam without legible words");
+  assert.equal(result.verdict, "IMAGE_SPAM");
 });

@@ -162,6 +162,87 @@ async function runIoOcr(buffer) {
   }
 }
 
+const ANALYSIS_PROMPT = [
+  "You are a Discord anti-spam reviewer looking at one image. Do two things at once.",
+  "1) Transcribe every piece of text visible in the image, exactly as written, keeping line breaks.",
+  "Text may be in Russian or English. Do not translate it.",
+  "2) Decide whether the image is a get-rich-quick or reward scam. Scam traits: fake bank transfers or",
+  "payment confirmations, casino or betting balances, in-game currency giveaways, 'claim your reward /",
+  "free money for new users / register to withdraw' promos, crypto wallets and success screens.",
+  "One fraudulent panel inside a collage is enough. Ordinary memes, games, chats and real personal",
+  "screenshots are safe. Judge the picture itself, not only the text.",
+  'Answer with JSON only: {"text": "<transcription>", "confidence": <0-100>, "verdict": "IMAGE_SPAM" or "IMAGE_SAFE"}.',
+  "confidence is how legible the text was; use an empty string and 0 when there is none.",
+].join(" ");
+
+/**
+ * Transcription and verdict from one reply.
+ *
+ * @param {string} reply
+ * @returns {{text: string, confidence: number, verdict: string|null}}
+ */
+function parseAnalysisResponse(reply) {
+  const read = parseOcrResponse(reply);
+  const verdict = typeof reply === "string" ? [...reply.matchAll(/\bIMAGE_(SPAM|SAFE)\b/gi)].at(-1)?.[1] : null;
+
+  return { ...read, verdict: verdict ? `IMAGE_${verdict.toUpperCase()}` : null };
+}
+
+/**
+ * Ask for the text and the verdict together.
+ *
+ * Two separate calls meant two round-trips and twice the quota for the same
+ * image, and the second one only ever received what the first had read.
+ *
+ * @param {Buffer} buffer PNG bytes
+ * @param {string} caption
+ * @returns {Promise<{text: string, confidence: number, verdict: string|null}>}
+ */
+async function runIoAnalysis(buffer, caption = "") {
+  const provider = resolveProvider();
+  const requestedTimeout = Number.parseInt(process.env.IMAGE_SPAM_OCR_TIMEOUT_MS, 10);
+  const timeoutMs = Number.isInteger(requestedTimeout) && requestedTimeout > 0 ? requestedTimeout : 45_000;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${provider.baseURL}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${provider.apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: process.env.IMAGE_SPAM_OCR_MODEL || provider.model,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: `${ANALYSIS_PROMPT} Caption: ${JSON.stringify(caption || "")}` },
+              { type: "image_url", image_url: { url: `data:image/png;base64,${buffer.toString("base64")}` } },
+            ],
+          },
+        ],
+        temperature: 0,
+        max_tokens: 1024,
+      }),
+      signal: controller.signal,
+      dispatcher: proxyDispatcher(),
+    });
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new Error(`${provider.label} returned HTTP ${response.status} ${detail.slice(0, 120)}`.trim());
+    }
+
+    const payload = await response.json();
+    noteIoSuccess();
+    return parseAnalysisResponse(payload?.choices?.[0]?.message?.content);
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error(`${provider.label} timed out after ${timeoutMs} ms`);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 /**
  * @param {Buffer} buffer
  * @returns {Promise<{text: string, confidence: number}>}
@@ -205,7 +286,7 @@ async function downloadImage(url) {
   }
 }
 
-async function prepareImage(buffer) {
+async function prepareImage(buffer, { tiles = 4 } = {}) {
   const image = sharp(buffer, { animated: false, limitInputPixels: 30_000_000 });
   const [metadata, stats, visionBase] = await Promise.all([
     image.metadata(),
@@ -219,6 +300,16 @@ async function prepareImage(buffer) {
   ]);
 
   const prepared = await sharp(visionBase).grayscale().normalize().sharpen().png().toBuffer();
+  const visual = {
+    width: metadata.width || 0,
+    height: metadata.height || 0,
+    entropy: stats.entropy || 0,
+  };
+
+  // Cutting regions costs a second of CPU each time. Skip it when only the full
+  // frame is going to be looked at.
+  if (!tiles) return { ocrImages: [prepared], visionImages: [visionBase], visual };
+
   const preparedMetadata = await sharp(prepared).metadata();
   const width = preparedMetadata.width;
   const height = preparedMetadata.height;
@@ -257,11 +348,7 @@ async function prepareImage(buffer) {
     // small panels in a collage are not lost when the full image is downscaled.
     ocrImages: [prepared, ...ocrTiles],
     visionImages: [visionBase, ...visionTiles],
-    visual: {
-      width: metadata.width || 0,
-      height: metadata.height || 0,
-      entropy: stats.entropy || 0,
-    },
+    visual,
   };
 }
 
@@ -635,15 +722,46 @@ async function classifyImageBuffer({
       });
       if (distributed) return distributed;
     }
-    const { ocrImages, visionImages, visual } = await prepareImage(buffer);
-    // The tiles existed because local OCR could not read small text in a
-    // downscaled frame. A vision model reads the full frame, so transcribing
-    // every region as well would be four extra API calls for the same words.
-    const ocr = await recognizeAll(ocrImages.slice(0, OCR_REGIONS));
+    // A remote model reads the whole frame, so the regions are only cut when the
+    // local model — which cannot — is the one doing the looking.
+    const remote = ioAvailable();
+    const { ocrImages, visionImages, visual } = await prepareImage(buffer, { tiles: remote ? 0 : 4 });
+
+    let ocr;
+    let vision;
+
+    if (remote) {
+      // One call answers both questions about the same image.
+      try {
+        const analysis = await runIoAnalysis(ocrImages[0], caption);
+        const provider = resolveProvider();
+
+        ocr = {
+          text: analysis.text,
+          confidence: analysis.confidence,
+          candidates: [{ text: analysis.text, confidence: analysis.confidence }],
+        };
+        vision = {
+          ...parseVisionResponse(analysis.verdict || "IMAGE_SAFE", `${provider.label} vision`),
+          model: `${process.env.IMAGE_SPAM_OCR_MODEL || provider.model} (${provider.label})`,
+          index: 0,
+          regionsAnalyzed: 1,
+          regionsAvailable: 1,
+        };
+      } catch (error) {
+        noteIoFailure(error);
+        ocr = undefined;
+      }
+    }
+
+    if (!ocr) {
+      // Local path: no transcription is available, so the verdict carries it.
+      const prepared = visionImages.length > 1 ? { ocrImages, visionImages } : await prepareImage(buffer, { tiles: 4 });
+      ocr = await recognizeAll(prepared.ocrImages.slice(0, OCR_REGIONS));
+      vision = await analyzeVisionImages(prepared.visionImages, ocr.candidates, caption);
+    }
+
     const selected = selectVisionCandidate(ocr, visionImages, caption, visual);
-    // Analyze every prepared region. The full image keeps overall context, while
-    // the enlarged regions make each small collage panel readable to the model.
-    const vision = await analyzeVisionImages(visionImages, ocr.candidates, caption);
     const result = scoreImageSpam({
       caption,
       ocrText: ocr.text,
@@ -689,6 +807,7 @@ module.exports = {
   combineImageSpamResults,
   ioAvailable,
   ioStatus,
+  parseAnalysisResponse,
   noteIoSuccess,
   parseOcrResponse,
   parseVisionResponse,

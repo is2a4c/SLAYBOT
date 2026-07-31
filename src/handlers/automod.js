@@ -118,7 +118,7 @@ async function inspectImageSpam(message, automod, classifier = classifyImage) {
   const combined = combineImageSpamResults(results, { caption: message.content, threshold });
   // Logged whatever the verdict: a check that decides "not spam" used to leave
   // no trace at all, which from outside is indistinguishable from a hung bot.
-  message.client.logger?.log(
+  message.client?.logger?.log?.(
     `image check: ${images.length} image(s) in ${Date.now() - startedAt}ms — ` +
       `score ${combined.score}/${threshold}, ${combined.risky ? "REMOVED" : "allowed"}, ` +
       `model ${combined.model}${combined.ocrText ? `, text "${combined.ocrText.slice(0, 60).replace(/\s+/g, " ")}"` : ", no text read"}`
