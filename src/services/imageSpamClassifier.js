@@ -356,10 +356,15 @@ async function analyzeWithVision(buffer, caption, engine = runLocalVision, ocrHi
 
 function selectVisionIndexes(visionImages, candidates, caption) {
   const requestedMax = Number.parseInt(process.env.IMAGE_SPAM_VISION_MAX_REGIONS, 10);
-  const maxRegions =
-    Number.isInteger(requestedMax) && requestedMax > 0
-      ? Math.min(requestedMax, visionImages.length)
-      : visionImages.length;
+  // Analysing every prepared region was meant for a local model that could not
+  // see detail in a downscaled frame. A remote model reads the full frame, so
+  // the extra regions only cost latency and quota; locally they cost minutes of
+  // CPU. Both defaults are deliberately small and can be raised.
+  const defaultMax = ioAvailable() ? 1 : 2;
+  const maxRegions = Math.min(
+    Number.isInteger(requestedMax) && requestedMax > 0 ? requestedMax : defaultMax,
+    visionImages.length
+  );
   const rankedTiles = visionImages
     .map((_, index) => index)
     .slice(1)

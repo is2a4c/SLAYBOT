@@ -84,6 +84,7 @@ async function inspectImageSpam(message, automod, classifier = classifyImage) {
   const threshold = Math.min(100, Math.max(50, automod.image_spam_threshold || DEFAULT_THRESHOLD));
   const results = [];
   const recognizedContext = [];
+  const startedAt = Date.now();
 
   // Analyze every attachment in order and carry recognized text forward. This
   // lets later images be reviewed with the context found in earlier ones while
@@ -115,6 +116,14 @@ async function inspectImageSpam(message, automod, classifier = classifyImage) {
   }
 
   const combined = combineImageSpamResults(results, { caption: message.content, threshold });
+  // Logged whatever the verdict: a check that decides "not spam" used to leave
+  // no trace at all, which from outside is indistinguishable from a hung bot.
+  message.client.logger?.log(
+    `image check: ${images.length} image(s) in ${Date.now() - startedAt}ms — ` +
+      `score ${combined.score}/${threshold}, ${combined.risky ? "REMOVED" : "allowed"}, ` +
+      `model ${combined.model}${combined.ocrText ? `, text "${combined.ocrText.slice(0, 60).replace(/\s+/g, " ")}"` : ", no text read"}`
+  );
+
   if (!combined.risky) return { shouldDelete: false, strikes: 0, fields };
 
   const label =
