@@ -36,5 +36,6 @@ router.get("/", requirePermission("guilds.view"), async (req, res) => {
 
 router.use("/staff", require("./staff"));
 router.use("/audit", require("./audit"));
+router.use("/operations", require("./operations"));
 
 module.exports = router;

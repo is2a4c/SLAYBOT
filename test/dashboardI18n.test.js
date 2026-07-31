@@ -271,3 +271,29 @@ test("owner dashboard exposes direct management actions for every bot guild", ()
   assert.match(html, /\/g\/100000000000000001\/diagnostics/);
   assert.match(html, /data-table-filter="owner-guilds"/);
 });
+
+test("owner operations render command-parity forms and active blocks", () => {
+  const html = renderView("owner/operations.ejs", {
+    title: "Owner Operations",
+    currentPath: "/owner/operations",
+    isOwnerUser: true,
+    success: null,
+    error: null,
+    blockedServers: [
+      {
+        serverId: "100000000000000001",
+        reason: "abuse",
+        isPermanent: true,
+        expiresAt: null,
+        blockedBy: "200000000000000002",
+      },
+    ],
+  });
+
+  assert.match(html, /\/owner\/operations\/block-server/);
+  assert.match(html, /\/owner\/operations\/leave-server/);
+  assert.match(html, /\/owner\/operations\/unblock-server/);
+  assert.match(html, /\/owner\/operations\/smart-invites/);
+  assert.match(html, /100000000000000001/);
+  assert.doesNotMatch(html, /<form[^>]+eval/);
+});

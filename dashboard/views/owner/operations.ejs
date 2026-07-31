@@ -1,0 +1,68 @@
+<%- include("../partials/head", { title }) %>
+<header class="page-header">
+  <div class="page-heading">
+    <p class="eyebrow"><%= t("nav.owner") %></p>
+    <h1><%= t("ownerOps.title") %></h1>
+    <p class="subtitle"><%= t("ownerOps.subtitle") %></p>
+  </div>
+  <a class="btn secondary" href="<%= basePath %>/owner"><%= t("common.back") %></a>
+</header>
+
+<% if (error) { %><div class="error-banner" role="alert"><%= error %></div><% } %>
+<% if (success) { %><div class="notice-banner" role="status"><%- include("../partials/icon", { name: "check" }) %><span><%= success %></span></div><% } %>
+
+<div class="section-heading"><div><h2><%= t("ownerOps.serverControl") %></h2><span class="hint"><%= t("ownerOps.serverControlHint") %></span></div></div>
+<div class="two-column">
+  <form class="panel" method="post" action="<%= basePath %>/owner/operations/block-server">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <div class="panel-header"><h2><%= t("ownerOps.blockServer") %></h2><p class="hint"><%= t("ownerOps.blockHint") %></p></div>
+    <div class="field"><label for="block-server-id"><%= t("ownerOps.serverId") %></label><input id="block-server-id" name="serverId" inputmode="numeric" pattern="[0-9]{17,20}" required /></div>
+    <div class="field"><label for="block-duration"><%= t("ownerOps.duration") %></label><select id="block-duration" name="duration">
+      <option value="forever"><%= t("ownerOps.permanent") %></option>
+      <option value="1h"><%= t("ownerOps.oneHour") %></option><option value="6h"><%= t("ownerOps.sixHours") %></option>
+      <option value="1d"><%= t("ownerOps.oneDay") %></option><option value="7d"><%= t("ownerOps.sevenDays") %></option><option value="30d"><%= t("ownerOps.thirtyDays") %></option>
+    </select></div>
+    <div class="field"><label for="block-reason"><%= t("ownerOps.reason") %></label><textarea id="block-reason" name="reason" maxlength="300" required></textarea></div>
+    <div class="field"><label for="block-confirmation"><%= t("ownerOps.confirmation") %></label><input id="block-confirmation" name="confirmation" inputmode="numeric" required /></div>
+    <button class="btn danger" type="submit"><%= t("ownerOps.blockServer") %></button>
+  </form>
+
+  <form class="panel" method="post" action="<%= basePath %>/owner/operations/leave-server">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <div class="panel-header"><h2><%= t("ownerOps.leaveServer") %></h2><p class="hint"><%= t("ownerOps.leaveHint") %></p></div>
+    <div class="field"><label for="leave-server-id"><%= t("ownerOps.serverId") %></label><input id="leave-server-id" name="serverId" inputmode="numeric" pattern="[0-9]{17,20}" required /></div>
+    <div class="field"><label for="leave-confirmation"><%= t("ownerOps.confirmation") %></label><input id="leave-confirmation" name="confirmation" inputmode="numeric" required /></div>
+    <button class="btn danger" type="submit"><%= t("ownerOps.leaveServer") %></button>
+  </form>
+</div>
+
+<div class="section-heading"><h2><%= t("ownerOps.blockedServers") %></h2></div>
+<div class="table-shell"><table>
+  <thead><tr><th><%= t("ownerOps.serverId") %></th><th><%= t("ownerOps.reason") %></th><th><%= t("ownerOps.expires") %></th><th><%= t("ownerOps.blockedBy") %></th><th></th></tr></thead>
+  <tbody>
+    <% if (blockedServers.length === 0) { %><tr><td colspan="5" class="empty"><%= t("ownerOps.noBlockedServers") %></td></tr><% } %>
+    <% blockedServers.forEach((block) => { %><tr>
+      <td><%= block.serverId %></td><td><%= block.reason %></td>
+      <td><%= block.isPermanent ? t("ownerOps.permanent") : formatDate(block.expiresAt) %></td><td><%= block.blockedBy %></td>
+      <td><form method="post" action="<%= basePath %>/owner/operations/unblock-server"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><input type="hidden" name="serverId" value="<%= block.serverId %>" /><button class="btn secondary" type="submit"><%= t("ownerOps.unblock") %></button></form></td>
+    </tr><% }) %>
+  </tbody>
+</table></div>
+
+<div class="section-heading"><div><h2><%= t("ownerOps.smartInvites") %></h2><span class="hint"><%= t("ownerOps.smartInvitesHint") %></span></div></div>
+<form class="panel" method="post" action="<%= basePath %>/owner/operations/smart-invites">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+  <div class="form-grid">
+    <div class="field"><label for="smart-action"><%= t("ownerOps.smartAction") %></label><select id="smart-action" name="action">
+      <option value="disable"><%= t("ownerOps.disable") %></option><option value="unlock"><%= t("ownerOps.unlock") %></option>
+      <option value="reserve"><%= t("ownerOps.reserve") %></option><option value="block-guild"><%= t("ownerOps.blockGuild") %></option>
+      <option value="unblock-guild"><%= t("ownerOps.unblockGuild") %></option>
+    </select></div>
+    <div class="field"><label for="smart-value"><%= t("ownerOps.targetValue") %></label><input id="smart-value" name="value" required /></div>
+    <div class="field"><label for="smart-confirmation"><%= t("ownerOps.confirmation") %></label><input id="smart-confirmation" name="confirmation" required /></div>
+  </div>
+  <button class="btn danger" type="submit"><%= t("ownerOps.execute") %></button>
+</form>
+
+<div class="attention"><h2><%= t("ownerOps.excludedTitle") %></h2><p><%= t("ownerOps.excludedHint") %></p></div>
+<%- include("../partials/foot") %>

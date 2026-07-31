@@ -2,6 +2,7 @@
 <header class="page-header">
   <div class="page-heading"><p class="eyebrow"><%= t("nav.owner") %></p><h1><%= t("owner.title") %></h1><p class="subtitle"><%= t("owner.subtitle") %></p></div>
   <div class="btn-row">
+  <% if (isOwnerUser) { %><a class="btn" href="<%= basePath %>/owner/operations"><%= t("owner.operations") %></a><% } %>
   <% if (canGlobal("staff.manage")) { %><a class="btn secondary" href="<%= basePath %>/owner/staff"><%= t("owner.staffRoles") %></a><% } %>
   <% if (canGlobal("audit.view")) { %><a class="btn secondary" href="<%= basePath %>/owner/audit"><%= t("nav.audit") %></a><% } %>
   </div>
