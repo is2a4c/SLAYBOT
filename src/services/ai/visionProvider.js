@@ -36,7 +36,9 @@ const PRESETS = {
     label: "Cloudflare Workers AI",
     // The account id is part of the path rather than a header.
     baseURL: (env) => `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID || ""}/ai/v1`,
-    model: "@cf/meta/llama-3.2-11b-vision-instruct",
+    // Scout reads images without the one-off licence prompt that the Llama 3.2
+    // vision model answers 403 until somebody accepts it.
+    model: "@cf/meta/llama-4-scout-17b-16e-instruct",
     keyEnv: "CLOUDFLARE_API_TOKEN",
     // Without the account there is nowhere to send the request.
     requires: ["CLOUDFLARE_ACCOUNT_ID"],

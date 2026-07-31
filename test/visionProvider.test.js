@@ -96,5 +96,5 @@ test("cloudflare needs its account id, not just a token", () => {
   const complete = resolveProvider({ CLOUDFLARE_API_TOKEN: "t", CLOUDFLARE_ACCOUNT_ID: "abc123" });
   assert.equal(complete.configured, true);
   assert.equal(complete.baseURL, "https://api.cloudflare.com/client/v4/accounts/abc123/ai/v1");
-  assert.match(complete.model, /vision/i);
+  assert.match(complete.model, /^@cf\//, "Workers AI models carry the @cf prefix");
 });
