@@ -10,9 +10,9 @@
   --text: #f3f5f8;
   --text-muted: #9ca5b5;
   --text-faint: #727c8f;
-  --accent: #8b5cf6;
-  --accent-hover: #9f7aea;
-  --accent-soft: rgba(139, 92, 246, 0.13);
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-soft: rgba(59, 130, 246, 0.13);
   --success: #35c985;
   --warning: #f4b740;
   --danger: #f05d68;
@@ -49,16 +49,16 @@ textarea {
 }
 
 a {
-  color: #b69cff;
+  color: #93bbfd;
   text-decoration: none;
 }
 
 a:hover {
-  color: #c9b7ff;
+  color: #bdd4fe;
 }
 
 :focus-visible {
-  outline: 3px solid rgba(139, 92, 246, 0.48);
+  outline: 3px solid rgba(59, 130, 246, 0.48);
   outline-offset: 2px;
 }
 
@@ -137,10 +137,10 @@ a:hover {
   width: 34px;
   height: 34px;
   place-items: center;
-  border: 1px solid rgba(139, 92, 246, 0.45);
+  border: 1px solid rgba(59, 130, 246, 0.45);
   border-radius: 10px;
   background: var(--accent-soft);
-  color: #bca7ff;
+  color: #b0c8fe;
 }
 
 .workspace-card,
@@ -180,7 +180,7 @@ a:hover {
   overflow: hidden;
   place-items: center;
   background: var(--accent-soft);
-  color: #c8b7ff;
+  color: #b8cffd;
   font-weight: 800;
 }
 
@@ -195,7 +195,7 @@ a:hover {
   display: grid;
   place-items: center;
   background: var(--accent-soft);
-  color: #c8b7ff;
+  color: #b8cffd;
   font-weight: 800;
 }
 
@@ -267,7 +267,7 @@ a:hover {
 .nav-link.active,
 .nav-item.active {
   background: var(--accent-soft);
-  color: #d7ccff;
+  color: #c5d8fe;
 }
 
 .icon {
@@ -414,7 +414,7 @@ a:hover {
 
 .eyebrow {
   margin: 0 0 7px;
-  color: #ae94ff;
+  color: #8db5fd;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.11em;
@@ -512,7 +512,7 @@ h3 {
   place-items: center;
   border-radius: 10px;
   background: var(--accent-soft);
-  color: #bba5ff;
+  color: #a9c2fd;
 }
 
 .card .label,
@@ -622,7 +622,7 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
   outline: none;
 }
 
