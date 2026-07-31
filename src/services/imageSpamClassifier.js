@@ -6,8 +6,7 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT_MS = 15_000;
 const MAX_PENDING_ANALYSES = 2;
 const IMAGE_EXTENSIONS = /\.(?:avif|gif|jpe?g|png|webp)$/i;
-const IO_API_URL = "https://api.intelligence.io.solutions/api/v1/chat/completions";
-const DEFAULT_IO_MODEL = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8";
+const { resolveProvider } = require("./ai/visionProvider");
 
 // How many of the prepared regions are transcribed. One is the full frame.
 const OCR_REGIONS = Math.max(1, Number.parseInt(process.env.IMAGE_SPAM_OCR_REGIONS, 10) || 1);
@@ -21,7 +20,7 @@ const IO_PAUSE_MS = 10 * 60_000;
 const ioBreaker = { failures: 0, pausedUntil: 0, reason: "" };
 
 function ioAvailable() {
-  if (!process.env.IO_INTELLIGENCE_API_KEY) return false;
+  if (!resolveProvider().configured) return false;
   return Date.now() >= ioBreaker.pausedUntil;
 }
 
@@ -113,8 +112,8 @@ function parseOcrResponse(reply) {
  * @returns {Promise<{text: string, confidence: number}>}
  */
 async function runIoOcr(buffer) {
-  const apiKey = process.env.IO_INTELLIGENCE_API_KEY;
-  if (!apiKey || !ioAvailable()) return { text: "", confidence: 0 };
+  const provider = resolveProvider();
+  if (!provider.configured || !ioAvailable()) return { text: "", confidence: 0 };
 
   const requestedTimeout = Number.parseInt(process.env.IMAGE_SPAM_OCR_TIMEOUT_MS, 10);
   const timeoutMs = Number.isInteger(requestedTimeout) && requestedTimeout > 0 ? requestedTimeout : 45_000;
@@ -122,11 +121,11 @@ async function runIoOcr(buffer) {
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(IO_API_URL, {
+    const response = await fetch(`${provider.baseURL}/chat/completions`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${provider.apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: process.env.IMAGE_SPAM_OCR_MODEL || DEFAULT_IO_MODEL,
+        model: process.env.IMAGE_SPAM_OCR_MODEL || provider.model,
         messages: [
           {
             role: "user",
@@ -144,14 +143,15 @@ async function runIoOcr(buffer) {
 
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
-      throw new Error(`io.net OCR returned HTTP ${response.status} ${detail.slice(0, 120)}`.trim());
+      throw new Error(`${provider.label} OCR returned HTTP ${response.status} ${detail.slice(0, 120)}`.trim());
     }
 
     const payload = await response.json();
     noteIoSuccess();
     return parseOcrResponse(payload?.choices?.[0]?.message?.content);
   } catch (error) {
-    const failure = error.name === "AbortError" ? new Error(`io.net OCR timed out after ${timeoutMs} ms`) : error;
+    const failure =
+      error.name === "AbortError" ? new Error(`${provider.label} OCR timed out after ${timeoutMs} ms`) : error;
     noteIoFailure(failure);
     // A failed transcription is not fatal: scoring still has the caption and
     // the visual verdict to work with.
@@ -290,8 +290,8 @@ async function runLocalVision(buffer, caption, ocrHint = "", split = VISION_SPLI
 }
 
 async function runIoVision(buffers, caption, ocrHint = "") {
-  const apiKey = process.env.IO_INTELLIGENCE_API_KEY;
-  if (!apiKey) throw new Error("IO_INTELLIGENCE_API_KEY is not configured");
+  const provider = resolveProvider();
+  if (!provider.configured) throw new Error("no vision provider is configured");
 
   const requestedTimeout = Number.parseInt(process.env.IMAGE_SPAM_REMOTE_TIMEOUT_MS, 10);
   const timeoutMs = Number.isInteger(requestedTimeout) && requestedTimeout > 0 ? requestedTimeout : 45_000;
@@ -306,14 +306,14 @@ async function runIoVision(buffers, caption, ocrHint = "") {
       });
     }
 
-    const response = await fetch(IO_API_URL, {
+    const response = await fetch(`${provider.baseURL}/chat/completions`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${provider.apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: process.env.IMAGE_SPAM_REMOTE_MODEL || DEFAULT_IO_MODEL,
+        model: process.env.IMAGE_SPAM_REMOTE_MODEL || provider.model,
         messages: [{ role: "user", content }],
         temperature: 0,
         max_tokens: 64,
@@ -321,15 +321,16 @@ async function runIoVision(buffers, caption, ocrHint = "") {
       signal: controller.signal,
     });
     if (!response.ok) {
-      throw new Error(`io.net vision returned HTTP ${response.status}`);
+      const detail = await response.text().catch(() => "");
+      throw new Error(`${provider.label} vision returned HTTP ${response.status} ${detail.slice(0, 120)}`.trim());
     }
 
     const payload = await response.json();
     const result = payload?.choices?.[0]?.message?.content;
-    if (typeof result !== "string") throw new Error("io.net vision returned an invalid response");
+    if (typeof result !== "string") throw new Error(`${provider.label} vision returned an invalid response`);
     return result;
   } catch (error) {
-    if (error.name === "AbortError") throw new Error(`io.net vision timed out after ${timeoutMs} ms`);
+    if (error.name === "AbortError") throw new Error(`${provider.label} vision timed out after ${timeoutMs} ms`);
     throw error;
   } finally {
     clearTimeout(timeout);
@@ -392,14 +393,14 @@ async function analyzeVisionImages(visionImages, candidates, caption, engine) {
           caption,
           ocrHint
         ),
-        "io.net vision"
+        `${resolveProvider().label} vision`
       );
       noteIoSuccess();
 
-      const modelName = process.env.IMAGE_SPAM_REMOTE_MODEL || DEFAULT_IO_MODEL;
+      const provider = resolveProvider();
       return {
         ...result,
-        model: `${modelName} (io.net)`,
+        model: `${process.env.IMAGE_SPAM_REMOTE_MODEL || provider.model} (${provider.label})`,
         index: selectedIndexes[0],
         regionsAnalyzed: selectedIndexes.length,
         regionsAvailable: visionImages.length,
@@ -434,9 +435,9 @@ async function analyzeVisionImages(visionImages, candidates, caption, engine) {
 }
 
 async function preloadVisionModel() {
-  if (process.env.IO_INTELLIGENCE_API_KEY) {
-    return process.env.IMAGE_SPAM_REMOTE_MODEL || DEFAULT_IO_MODEL;
-  }
+  const provider = resolveProvider();
+  if (provider.configured) return process.env.IMAGE_SPAM_REMOTE_MODEL || provider.model;
+
   return localVision.preload();
 }
 

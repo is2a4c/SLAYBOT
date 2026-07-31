@@ -98,6 +98,30 @@ npm run db:fix-appearance -- --dry-run
 Drop `--dry-run` to apply it. It is safe to run repeatedly — a second pass finds
 nothing to do.
 
+## Image checks
+
+Reading text out of an image and judging whether it is a scam both go to an
+OpenAI-compatible endpoint. Which one is a matter of configuration:
+
+| Provider | Key | Free? |
+| --- | --- | --- |
+| Google Gemini (AI Studio) | `GEMINI_API_KEY` | yes, no card |
+| OpenRouter | `OPENROUTER_API_KEY` | free models, 50 requests/day until topped up |
+| io.net | `IO_INTELLIGENCE_API_KEY` | no, paid per token |
+
+Set one key and that provider is used. `IMAGE_AI_PROVIDER`, `IMAGE_AI_BASE_URL`,
+`IMAGE_AI_MODEL` and `IMAGE_AI_API_KEY` override the choice or point at any
+other endpoint speaking the same dialect.
+
+With no key at all the bot uses a local model on its own CPU: free, private, and
+slower. It runs in a worker thread, so an image never blocks the bot. If the
+configured provider starts failing — out of credits, rate limited, unreachable —
+checks fall back to that local model, and three failures in a row park the
+provider for ten minutes.
+
+Free tiers usually allow the provider to train on what is sent, and what is sent
+here is members' images. Bear that in mind when picking one.
+
 ## Language
 
 ```
