@@ -21,8 +21,7 @@ router.get("/", async (req, res) => {
   const attention = [];
   if (!settings.modlog_channel) attention.push(res.locals.t("overview.attModlogMissing"));
   if (!guild.members.me.permissions.has("ManageMessages")) attention.push(res.locals.t("overview.attManageMessages"));
-  if (!guild.members.me.permissions.has("ModerateMembers"))
-    attention.push(res.locals.t("overview.attModerateMembers"));
+  if (!guild.members.me.permissions.has("ModerateMembers")) attention.push(res.locals.t("overview.attModerateMembers"));
   if (settings.ticket?.log_channel && !guild.channels.cache.has(settings.ticket.log_channel)) {
     attention.push(res.locals.t("overview.attTicketLogMissing"));
   }

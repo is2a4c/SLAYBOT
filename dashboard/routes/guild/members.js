@@ -93,18 +93,21 @@ router.post("/:userId/actions", requireCsrf, loadTarget, async (req, res) => {
   try {
     switch (action) {
       case "warn":
-        if (!req.targetMember) return res.redirect(`${backTo}?error=${encodeURIComponent(res.locals.t("errors.userNotFound"))}`);
+        if (!req.targetMember)
+          return res.redirect(`${backTo}?error=${encodeURIComponent(res.locals.t("errors.userNotFound"))}`);
         result = await ModUtils.warnTarget(issuer, req.targetMember, reason);
         break;
       case "timeout": {
-        if (!req.targetMember) return res.redirect(`${backTo}?error=${encodeURIComponent(res.locals.t("errors.userNotFound"))}`);
+        if (!req.targetMember)
+          return res.redirect(`${backTo}?error=${encodeURIComponent(res.locals.t("errors.userNotFound"))}`);
         const minutes = TIMEOUT_OPTIONS_MIN[req.body.durationMinutes] || 60;
         const ms = Math.min(MAX_TIMEOUT_MS, minutes * 60 * 1000);
         result = await ModUtils.timeoutTarget(issuer, req.targetMember, ms, reason);
         break;
       }
       case "kick":
-        if (!req.targetMember) return res.redirect(`${backTo}?error=${encodeURIComponent(res.locals.t("errors.userNotFound"))}`);
+        if (!req.targetMember)
+          return res.redirect(`${backTo}?error=${encodeURIComponent(res.locals.t("errors.userNotFound"))}`);
         result = await ModUtils.kickTarget(issuer, req.targetMember, reason);
         break;
       case "ban":
@@ -122,7 +125,9 @@ router.post("/:userId/actions", requireCsrf, loadTarget, async (req, res) => {
   }
 
   if (result !== true) {
-    return res.redirect(`${backTo}?error=${encodeURIComponent(res.locals.t("member." + (ERROR_MESSAGES[result] || ERROR_MESSAGES.ERROR)))}`);
+    return res.redirect(
+      `${backTo}?error=${encodeURIComponent(res.locals.t("member." + (ERROR_MESSAGES[result] || ERROR_MESSAGES.ERROR)))}`
+    );
   }
 
   await logAudit({

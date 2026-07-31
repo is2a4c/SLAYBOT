@@ -100,8 +100,7 @@ function buildCommandCatalog({ client, guild, member, isOwner, prefix = "!" }) {
     })
     .sort(
       (left, right) =>
-        categoryRank(left.category) - categoryRank(right.category) ||
-        left.name.localeCompare(right.name, "en")
+        categoryRank(left.category) - categoryRank(right.category) || left.name.localeCompare(right.name, "en")
     );
 
   const categories = [...new Set(commands.map((command) => command.category))];

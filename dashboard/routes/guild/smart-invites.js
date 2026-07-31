@@ -36,9 +36,10 @@ router.get("/", async (req, res) => {
       error: typeof req.query.error === "string" ? req.query.error : null,
     });
   } catch (ex) {
-    const message = ex instanceof SmartInviteError
-      ? res.locals.t("smartInvites.serviceUnavailable")
-      : res.locals.t("smartInvites.serviceUnavailable");
+    const message =
+      ex instanceof SmartInviteError
+        ? res.locals.t("smartInvites.serviceUnavailable")
+        : res.locals.t("smartInvites.serviceUnavailable");
     if (!(ex instanceof SmartInviteError)) req.client.logger.error("dashboard smart invite list failed", ex);
     res.render("guild/smart-invites", {
       title: `Smart Invites — ${guild.name}`,
