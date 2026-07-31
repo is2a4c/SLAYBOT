@@ -239,3 +239,35 @@ test("owner dashboard hides staff and audit controls without their permissions",
   assert.doesNotMatch(html, /\/owner\/staff/);
   assert.doesNotMatch(html, /\/owner\/audit/);
 });
+
+test("owner dashboard exposes direct management actions for every bot guild", () => {
+  const html = renderView("owner/index.ejs", {
+    title: "Owner",
+    currentPath: "/owner",
+    periodDays: 1,
+    summary: {
+      counters: { commands: 0, automod_actions: 0, client_errors: 0 },
+      activeUsers: 0,
+      commandLatency: { averageMs: 0 },
+    },
+    guildCount: 1,
+    guilds: [
+      {
+        id: "100000000000000001",
+        name: "Managed guild",
+        memberCount: 10,
+        ownerId: "200000000000000002",
+        joinedAt: null,
+        modlogConfigured: true,
+      },
+    ],
+    canGuild: () => true,
+    canGlobal: () => true,
+  });
+
+  assert.match(html, /\/g\/100000000000000001"/);
+  assert.match(html, /\/g\/100000000000000001\/config/);
+  assert.match(html, /\/g\/100000000000000001\/automod/);
+  assert.match(html, /\/g\/100000000000000001\/diagnostics/);
+  assert.match(html, /data-table-filter="owner-guilds"/);
+});

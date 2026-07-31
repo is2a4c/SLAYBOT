@@ -22,19 +22,34 @@
   <div class="card"><div class="label"><%= t("owner.commandLatency") %></div><div class="value"><%= summary.commandLatency.averageMs %> ms</div></div>
 </div>
 
-<div class="section-heading"><h2><%= t("owner.serverDirectory") %></h2><span class="hint"><%= t("owner.guildsHeading", { days: periodDays }) %></span></div>
-<div class="table-shell"><table>
-  <thead><tr><th><%= t("common.server") %></th><th><%= t("common.members") %></th><th><%= t("owner.guildOwner") %></th><th><%= t("owner.joinedAt") %></th><th><%= t("owner.modlogConfigured") %></th></tr></thead>
+<div class="section-heading"><div><h2><%= t("owner.serverDirectory") %></h2><span class="hint"><%= t("owner.controlsHint") %></span></div><span class="hint"><%= t("owner.guildsHeading", { days: periodDays }) %></span></div>
+<div class="owner-toolbar">
+  <label class="field owner-search">
+    <span><%= t("owner.searchServers") %></span>
+    <input type="search" placeholder="<%= t("owner.searchServers") %>" data-table-filter="owner-guilds" />
+  </label>
+</div>
+<div class="table-shell"><table id="owner-guilds">
+  <thead><tr><th><%= t("common.server") %></th><th><%= t("common.members") %></th><th><%= t("owner.guildOwner") %></th><th><%= t("owner.joinedAt") %></th><th><%= t("owner.modlogConfigured") %></th><th><%= t("owner.controlsHeading") %></th></tr></thead>
   <tbody>
     <% guilds.forEach((g) => { %>
-      <tr>
-        <td><a href="<%= basePath %>/g/<%= g.id %>"><%= g.name %></a></td>
+      <tr data-filter-value="<%= `${g.name} ${g.id} ${g.ownerId || ""}`.toLowerCase() %>">
+        <td><strong><%= g.name %></strong><div class="hint"><%= g.id %></div></td>
         <td><%= g.memberCount %></td>
         <td><%= g.ownerId || t("common.none") %></td>
         <td><%= g.joinedAt ? formatDate(g.joinedAt) : t("common.none") %></td>
         <td><span class="badge <%= g.modlogConfigured ? 'pass' : 'warn' %>"><%= g.modlogConfigured ? t("common.yes") : t("common.no") %></span></td>
+        <td>
+          <div class="owner-actions">
+            <a class="btn" href="<%= basePath %>/g/<%= g.id %>"><%= t("owner.openDashboard") %></a>
+            <% if (canGlobal("config.edit")) { %><a class="btn secondary" href="<%= basePath %>/g/<%= g.id %>/config"><%= t("nav.config") %></a><% } %>
+            <% if (canGlobal("automod.edit")) { %><a class="btn secondary" href="<%= basePath %>/g/<%= g.id %>/automod"><%= t("nav.automod") %></a><% } %>
+            <% if (canGlobal("diagnostics.run")) { %><a class="btn secondary" href="<%= basePath %>/g/<%= g.id %>/diagnostics"><%= t("nav.diagnostics") %></a><% } %>
+          </div>
+        </td>
       </tr>
     <% }) %>
+    <tr class="table-empty-filter" data-filter-empty hidden><td colspan="6"><%= t("owner.noMatchingServers") %></td></tr>
   </tbody>
 </table></div>
 <%- include("../partials/foot") %>

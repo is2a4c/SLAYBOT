@@ -968,6 +968,35 @@ tbody tr:hover td {
   flex: 1;
 }
 
+.owner-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.owner-search {
+  width: min(100%, 420px);
+  margin: 0;
+}
+
+.owner-actions {
+  display: flex;
+  min-width: 430px;
+  gap: 7px;
+}
+
+.owner-actions .btn {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.table-empty-filter td {
+  color: var(--text-muted);
+  padding: 30px;
+  text-align: center;
+}
+
 .status-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

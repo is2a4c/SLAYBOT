@@ -226,6 +226,11 @@ module.exports = {
     subtitle: "Глобальная статистика, серверы и управление доступом команды.",
     fleetHeading: "Сводка инфраструктуры",
     serverDirectory: "Каталог серверов",
+    controlsHeading: "Управление",
+    controlsHint: "Откройте нужный раздел сервера без поиска по меню.",
+    searchServers: "Поиск по названию или ID сервера",
+    openDashboard: "Управление",
+    noMatchingServers: "Серверы по этому запросу не найдены.",
   },
   status: {
     title: "Статус SLAYBOT",

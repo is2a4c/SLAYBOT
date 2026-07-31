@@ -225,6 +225,11 @@ module.exports = {
     subtitle: "Global metrics, server fleet and team access management.",
     fleetHeading: "Infrastructure summary",
     serverDirectory: "Server directory",
+    controlsHeading: "Controls",
+    controlsHint: "Open a server section directly without hunting through menus.",
+    searchServers: "Search by server name or ID",
+    openDashboard: "Manage",
+    noMatchingServers: "No servers match this search.",
   },
   status: {
     title: "SLAYBOT status",

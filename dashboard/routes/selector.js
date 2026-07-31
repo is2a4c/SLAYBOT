@@ -3,51 +3,41 @@ const router = express.Router();
 const { PermissionsBitField } = require("discord.js");
 const { requireAuth } = require("../auth/middleware");
 
-router.get("/", requireAuth, (req, res) => {
-  const client = req.client;
-  const canViewAllGuilds = req.dashboardPermissions?.has("guilds.view");
+function canManageOAuthGuild(guild) {
+  if (guild.owner) return true;
+  if (!guild.permissions) return false;
+  try {
+    return new PermissionsBitField(BigInt(guild.permissions)).has(PermissionsBitField.Flags.ManageGuild);
+  } catch {
+    return false;
+  }
+}
 
-  const guildsById = new Map(
-    (req.session.user.guilds || [])
-      .map((g) => {
-        let manageable = g.owner;
-        if (!manageable && g.permissions) {
-          try {
-            manageable = new PermissionsBitField(BigInt(g.permissions)).has(PermissionsBitField.Flags.ManageGuild);
-          } catch {
-            manageable = false;
-          }
-        }
-        const botPresent = client.guilds.cache.has(g.id);
-        return {
-          id: g.id,
-          name: g.name,
-          icon: g.icon,
-          manageable,
-          botPresent,
-          inviteUrl: botPresent ? null : `${client.getInvite()}&guild_id=${g.id}`,
-        };
-      })
-      .filter((g) => g.manageable)
-      .map((guild) => [guild.id, guild])
-  );
-
-  if (canViewAllGuilds) {
-    for (const guild of client.guilds.cache.values()) {
-      guildsById.set(guild.id, {
+function buildSelectorGuilds({ oauthGuilds, client }) {
+  return (oauthGuilds || [])
+    .filter(canManageOAuthGuild)
+    .map((guild) => {
+      const botPresent = client.guilds.cache.has(guild.id);
+      return {
         id: guild.id,
         name: guild.name,
         icon: guild.icon,
         manageable: true,
-        botPresent: true,
-        inviteUrl: null,
-      });
-    }
-  }
+        botPresent,
+        inviteUrl: botPresent ? null : `${client.getInvite()}&guild_id=${guild.id}`,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
 
-  const guilds = [...guildsById.values()].sort((a, b) => a.name.localeCompare(b.name));
+router.get("/", requireAuth, (req, res) => {
+  const guilds = buildSelectorGuilds({
+    oauthGuilds: req.session.user.guilds,
+    client: req.client,
+  });
 
   res.render("selector", { title: res.locals.t("selector.title"), guilds });
 });
 
 module.exports = router;
+module.exports.buildSelectorGuilds = buildSelectorGuilds;

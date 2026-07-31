@@ -42,6 +42,23 @@
     });
   });
 
+  document.querySelectorAll("[data-table-filter]").forEach((input) => {
+    const table = document.getElementById(input.dataset.tableFilter);
+    if (!table) return;
+    const rows = [...table.querySelectorAll("tbody tr[data-filter-value]")];
+    const empty = table.querySelector("[data-filter-empty]");
+    input.addEventListener("input", () => {
+      const query = input.value.trim().toLocaleLowerCase();
+      let visible = 0;
+      rows.forEach((row) => {
+        const matches = !query || row.dataset.filterValue.includes(query);
+        row.hidden = !matches;
+        if (matches) visible += 1;
+      });
+      if (empty) empty.hidden = visible !== 0;
+    });
+  });
+
   document.addEventListener("submit", (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || event.defaultPrevented) return;
