@@ -171,8 +171,13 @@ _Enabling this feature will allow members to simply react to any message with a 
 
 ### Auto Role
 
-- **Description**: setup role to be given when a member joins the server
-- **Usage**: `!autorole <role|off>`
+- **Description**: roles given to every member who joins the server, up to ten of them
+- **Usage**: `!autorole <role>` adds one, `!autorole off` removes them all
+- **Slash**: `/autorole add role:`, `/autorole remove [role]`, `/autorole list`
+
+`/autorole remove` without a role clears the list. Roles above the bot, roles
+managed by an integration and `@everyone` are refused, since the bot cannot hand
+them out.
 
 ### Greeting
 

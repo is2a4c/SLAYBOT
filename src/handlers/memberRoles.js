@@ -7,6 +7,38 @@ const { saveMemberRoles, getMemberRoles, clearMemberRoles } = require("@schemas/
  */
 module.exports = {
   filterRestorable,
+  normalizeAutoRoles,
+
+  /**
+   * Hand a new member every autorole the bot is actually able to give.
+   *
+   * @param {import('discord.js').GuildMember} member
+   * @param {object} settings guild settings document
+   * @returns {Promise<string[]>} roles that were given
+   */
+  async applyAutoRoles(member, settings) {
+    const wanted = normalizeAutoRoles(settings?.autorole);
+    if (!wanted.length) return [];
+
+    const guild = member.guild;
+    if (!guild.members.me?.permissions.has("ManageRoles")) return [];
+
+    const highest = guild.members.me.roles.highest.position;
+    const giveable = wanted.filter((roleId) => {
+      const role = guild.roles.cache.get(roleId);
+      return Boolean(role) && !role.managed && role.id !== guild.id && highest > role.position;
+    });
+
+    if (!giveable.length) return [];
+
+    return member.roles
+      .add(giveable, "Autorole")
+      .then(() => giveable)
+      .catch((ex) => {
+        member.client.logger?.error("autorole: failed to give roles", ex);
+        return [];
+      });
+  },
 
   /**
    * @param {import('discord.js').GuildMember} member
@@ -58,6 +90,18 @@ module.exports = {
     return restorable;
   },
 };
+
+/**
+ * Autoroles are a list, but older installs stored a single role id. Read both so
+ * a server configured before the change keeps working.
+ *
+ * @param {string[]|string|null|undefined} value
+ * @returns {string[]}
+ */
+function normalizeAutoRoles(value) {
+  if (Array.isArray(value)) return value.filter(Boolean).map(String);
+  return value ? [String(value)] : [];
+}
 
 /**
  * Narrow a snapshot down to roles the bot may hand back right now.

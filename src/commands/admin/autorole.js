@@ -1,11 +1,15 @@
 const { ApplicationCommandOptionType } = require("discord.js");
+const { normalizeAutoRoles } = require("@handlers/memberRoles");
+
+// Matches the cap the dashboard applies, so both ways in agree.
+const MAX_AUTOROLES = 10;
 
 /**
  * @type {import("@structures/Command")}
  */
 module.exports = {
   name: "autorole",
-  description: "setup role to be given when a member joins the server",
+  description: "setup roles to be given when a member joins the server",
   category: "ADMIN",
   userPermissions: ["ManageGuild"],
   command: {
@@ -19,7 +23,7 @@ module.exports = {
     options: [
       {
         name: "add",
-        description: "setup the autorole",
+        description: "give this role to new members",
         type: ApplicationCommandOptionType.Subcommand,
         options: [
           {
@@ -38,7 +42,20 @@ module.exports = {
       },
       {
         name: "remove",
-        description: "disable the autorole",
+        description: "stop giving a role, or all of them",
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: "role",
+            description: "the role to stop giving; leave empty to remove every autorole",
+            type: ApplicationCommandOptionType.Role,
+            required: false,
+          },
+        ],
+      },
+      {
+        name: "list",
+        description: "show the roles new members are given",
         type: ApplicationCommandOptionType.Subcommand,
       },
     ],
@@ -46,67 +63,112 @@ module.exports = {
 
   async messageRun(message, args, data) {
     const input = args.join(" ");
-    let response;
 
     if (input.toLowerCase() === "off") {
-      response = await setAutoRole(message, null, data.settings);
-    } else {
-      const roles = message.guild.findMatchingRoles(input);
-      if (roles.length === 0) response = "No matching roles found matching your query";
-      else response = await setAutoRole(message, roles[0], data.settings);
+      return message.safeReply(await removeAutoRole(message.guild, null, data.settings));
     }
 
-    await message.safeReply(response);
+    const roles = message.guild.findMatchingRoles(input);
+    if (roles.length === 0) return message.safeReply("No matching roles found matching your query");
+
+    return message.safeReply(await addAutoRole(message.guild, roles[0], data.settings));
   },
 
   async interactionRun(interaction, data) {
     const sub = interaction.options.getSubcommand();
-    let response;
+    const settings = data.settings;
 
-    // add
+    if (sub === "list") return interaction.safeFollowUp(listAutoRoles(settings));
+
+    if (sub === "remove") {
+      return interaction.safeFollowUp(
+        await removeAutoRole(interaction.guild, interaction.options.getRole("role"), settings)
+      );
+    }
+
     if (sub === "add") {
       let role = interaction.options.getRole("role");
       if (!role) {
-        const role_id = interaction.options.getString("role_id");
-        if (!role_id) return interaction.safeFollowUp("Please provide a role or role id");
+        const roleId = interaction.options.getString("role_id");
+        if (!roleId) return interaction.safeFollowUp("Please provide a role or role id");
 
-        const roles = interaction.guild.findMatchingRoles(role_id);
+        const roles = interaction.guild.findMatchingRoles(roleId);
         if (roles.length === 0) return interaction.safeFollowUp("No matching roles found matching your query");
         role = roles[0];
       }
 
-      response = await setAutoRole(interaction, role, data.settings);
+      return interaction.safeFollowUp(await addAutoRole(interaction.guild, role, settings));
     }
 
-    // remove
-    else if (sub === "remove") {
-      response = await setAutoRole(interaction, null, data.settings);
-    }
-
-    // default
-    else response = "Invalid subcommand";
-
-    await interaction.safeFollowUp(response);
+    return interaction.safeFollowUp("Invalid subcommand");
   },
 };
 
 /**
- * @param {import("discord.js").Message | import("discord.js").CommandInteraction} message
- * @param {import("discord.js").Role} role
- * @param {import("@models/Guild")} settings
+ * @param {import('discord.js').Guild} guild
+ * @param {import('discord.js').Role} role
+ * @returns {string|null} why the role cannot be handed out
  */
-async function setAutoRole({ guild }, role, settings) {
-  if (role) {
-    if (role.id === guild.roles.everyone.id) return "You cannot set `@everyone` as the autorole";
-    if (!guild.members.me.permissions.has("ManageRoles")) return "I don't have the `ManageRoles` permission";
-    if (guild.members.me.roles.highest.position < role.position)
-      return "I don't have the permissions to assign this role";
-    if (role.managed) return "Oops! This role is managed by an integration";
+function roleProblem(guild, role) {
+  if (role.id === guild.roles.everyone.id) return "You cannot set `@everyone` as an autorole";
+  if (!guild.members.me.permissions.has("ManageRoles")) return "I don't have the `ManageRoles` permission";
+  if (guild.members.me.roles.highest.position < role.position) {
+    return "I don't have the permissions to assign this role";
+  }
+  if (role.managed) return "Oops! This role is managed by an integration";
+  return null;
+}
+
+/**
+ * @param {import('discord.js').Guild} guild
+ * @param {import('discord.js').Role} role
+ * @param {object} settings guild settings document
+ */
+async function addAutoRole(guild, role, settings) {
+  const problem = roleProblem(guild, role);
+  if (problem) return problem;
+
+  const current = normalizeAutoRoles(settings.autorole);
+  if (current.includes(role.id)) return `${role} is already given to new members`;
+  if (current.length >= MAX_AUTOROLES) return `You can have at most ${MAX_AUTOROLES} autoroles`;
+
+  settings.autorole = [...current, role.id];
+  await settings.save();
+
+  return `New members now get ${role}. Autoroles: ${settings.autorole.length}`;
+}
+
+/**
+ * @param {import('discord.js').Guild} guild
+ * @param {import('discord.js').Role|null} role removes every autorole when omitted
+ * @param {object} settings guild settings document
+ */
+async function removeAutoRole(guild, role, settings) {
+  const current = normalizeAutoRoles(settings.autorole);
+
+  if (!role) {
+    if (!current.length) return "There are no autoroles to remove";
+    settings.autorole = [];
+    await settings.save();
+    return "Autorole is disabled. New members are given nothing";
   }
 
-  if (!role) settings.autorole = null;
-  else settings.autorole = role.id;
+  if (!current.includes(role.id)) return `${role} is not an autorole`;
 
+  settings.autorole = current.filter((id) => id !== role.id);
   await settings.save();
-  return `Configuration saved! Autorole is ${!role ? "disabled" : "setup"}`;
+
+  return settings.autorole.length
+    ? `${role} is no longer given. Autoroles: ${settings.autorole.length}`
+    : `${role} is no longer given. Autorole is now disabled`;
+}
+
+/**
+ * @param {object} settings guild settings document
+ */
+function listAutoRoles(settings) {
+  const current = normalizeAutoRoles(settings.autorole);
+  if (!current.length) return "No autoroles are set. New members are given nothing";
+
+  return `New members are given: ${current.map((id) => `<@&${id}>`).join(", ")}`;
 }

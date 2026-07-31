@@ -20,10 +20,7 @@ module.exports = async (client, member) => {
     .catch((err) => client.logger.error("restoreRoles", err));
 
   // Autorole
-  if (settings.autorole) {
-    const role = guild.roles.cache.get(settings.autorole);
-    if (role) member.roles.add(role).catch((err) => {});
-  }
+  await memberRoleHandler.applyAutoRoles(member, settings).catch((err) => client.logger.error("autorole", err));
 
   if (restored?.length) {
     client.logger.debug(`Restored ${restored.length} roles for ${member.id} in ${guild.id}`);
