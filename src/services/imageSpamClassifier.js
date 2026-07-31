@@ -1,6 +1,5 @@
 const sharp = require("sharp");
-const os = require("os");
-const path = require("path");
+const localVision = require("./vision/localVision");
 
 const DEFAULT_THRESHOLD = 70;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -13,7 +12,6 @@ const DEFAULT_IO_MODEL = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8";
 // How many of the prepared regions are transcribed. One is the full frame.
 const OCR_REGIONS = Math.max(1, Number.parseInt(process.env.IMAGE_SPAM_OCR_REGIONS, 10) || 1);
 
-let localVisionPromise;
 let visionQueue = Promise.resolve();
 let ocrQueue = Promise.resolve();
 let pendingAnalyses = 0;
@@ -216,43 +214,6 @@ async function prepareImage(buffer) {
   };
 }
 
-async function getLocalVision() {
-  if (!localVisionPromise) {
-    localVisionPromise = (async () => {
-      const { env, AutoProcessor, AutoModelForImageTextToText, RawImage } = await import("@huggingface/transformers");
-      env.cacheDir = process.env.IMAGE_SPAM_MODEL_CACHE || path.join(process.cwd(), ".cache", "image-spam");
-      // The 500M model keeps moderation responsive on CPU-only hosts. Operators
-      // with sufficient capacity can explicitly select the larger 2.2B model.
-      const modelId = process.env.IMAGE_SPAM_VISION_MODEL || "HuggingFaceTB/SmolVLM-500M-Instruct";
-      // dtype and model are configurable: a larger model or higher precision reads
-      // image intent far better, at the cost of RAM and CPU latency.
-      const dtype = process.env.IMAGE_SPAM_VISION_DTYPE || "q4";
-      const requestedThreads = Number.parseInt(process.env.IMAGE_SPAM_ONNX_THREADS, 10);
-      const availableThreads = os.availableParallelism?.() || os.cpus().length;
-      const inferenceThreads =
-        Number.isInteger(requestedThreads) && requestedThreads > 0
-          ? Math.min(requestedThreads, availableThreads)
-          : Math.max(1, Math.floor(availableThreads / 2));
-      const [processor, model] = await Promise.all([
-        AutoProcessor.from_pretrained(modelId),
-        AutoModelForImageTextToText.from_pretrained(modelId, {
-          dtype,
-          device: "cpu",
-          session_options: {
-            intraOpNumThreads: inferenceThreads,
-            interOpNumThreads: 1,
-          },
-        }),
-      ]);
-      return { processor, model, RawImage, modelId, inferenceThreads };
-    })().catch((error) => {
-      localVisionPromise = undefined;
-      throw error;
-    });
-  }
-  return localVisionPromise;
-}
-
 const VISION_SPLIT = process.env.IMAGE_SPAM_VISION_SPLIT !== "false";
 
 function buildVisionPrompt(caption, ocrHint = "") {
@@ -269,19 +230,11 @@ function buildVisionPrompt(caption, ocrHint = "") {
 }
 
 async function runLocalVision(buffer, caption, ocrHint = "", split = VISION_SPLIT) {
-  const runtime = await getLocalVision();
-  const job = visionQueue.then(async () => {
-    const prompt = buildVisionPrompt(caption, ocrHint);
-    const messages = [{ role: "user", content: [{ type: "image" }, { type: "text", text: prompt }] }];
-    const formatted = runtime.processor.tokenizer.apply_chat_template(messages, {
-      add_generation_prompt: true,
-      tokenize: false,
-    });
-    const image = await runtime.RawImage.fromBlob(new Blob([buffer], { type: "image/jpeg" }));
-    const inputs = await runtime.processor(formatted, image, { do_image_splitting: split });
-    const output = await runtime.model.generate({ ...inputs, max_new_tokens: 8, do_sample: false });
-    return runtime.processor.tokenizer.batch_decode(output, { skip_special_tokens: true })[0] || "";
-  });
+  // Handed to a worker thread: generation is a token loop with tensor work in
+  // between, and running it here freezes the gateway for its whole duration.
+  const job = visionQueue.then(() =>
+    localVision.describe({ buffer, prompt: buildVisionPrompt(caption, ocrHint), split })
+  );
   visionQueue = job.catch(() => {});
   return job;
 }
@@ -425,8 +378,7 @@ async function preloadVisionModel() {
   if (process.env.IO_INTELLIGENCE_API_KEY) {
     return process.env.IMAGE_SPAM_REMOTE_MODEL || DEFAULT_IO_MODEL;
   }
-  const runtime = await getLocalVision();
-  return runtime.modelId;
+  return localVision.preload();
 }
 
 function scoreImageSpam({ caption = "", ocrText = "", confidence = 0, visual = {} }) {
