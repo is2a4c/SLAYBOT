@@ -841,6 +841,121 @@ tbody tr:hover td {
   margin-top: auto;
 }
 
+.command-metrics {
+  margin-bottom: 20px;
+}
+
+.command-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+  margin-bottom: 20px;
+  padding: 16px;
+}
+
+.command-search {
+  flex: 1;
+  min-width: 200px;
+}
+
+.command-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+}
+
+.command-card {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.command-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.command-card-header h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.command-category {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
+
+.command-card p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.command-usages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.command-usage {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.command-usage:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.command-usage code {
+  font-family: inherit;
+}
+
+.permission-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.permission-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.permission-list dt {
+  color: var(--text-faint);
+}
+
+.permission-ok {
+  color: var(--success);
+}
+
+.permission-missing {
+  color: var(--danger);
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -1118,7 +1233,8 @@ tbody tr:hover td {
   .two-column,
   .toggle-grid,
   .quick-grid,
-  .status-metrics {
+  .status-metrics,
+  .command-grid {
     grid-template-columns: 1fr;
   }
 

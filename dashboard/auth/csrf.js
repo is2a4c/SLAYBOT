@@ -19,8 +19,8 @@ function verifyCsrfToken(req) {
 function requireCsrf(req, res, next) {
   if (verifyCsrfToken(req)) return next();
   return res.status(403).render("error", {
-    title: "Запрос отклонён",
-    message: "Недействительный или устаревший токен формы. Обновите страницу и попробуйте снова.",
+    title: res.locals.t("errors.csrfTitle"),
+    message: res.locals.t("errors.csrfMessage"),
   });
 }
 

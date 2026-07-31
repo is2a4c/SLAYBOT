@@ -35,8 +35,8 @@ function requireOwner(req, res, next) {
   requireAuth(req, res, () => {
     if (req.client.config.OWNER_IDS.includes(req.session.user.id)) return next();
     return res.status(403).render("error", {
-      title: "Доступ запрещён",
-      message: "Этот раздел доступен только владельцу SLAYBOT.",
+      title: res.locals.t("errors.ownerOnlyTitle"),
+      message: res.locals.t("errors.ownerOnlyMessage"),
     });
   });
 }
@@ -53,8 +53,8 @@ async function requireGuildAccess(req, res, next) {
     const guild = client.guilds.cache.get(req.params.guildId);
     if (!guild) {
       return res.status(404).render("error", {
-        title: "Сервер не найден",
-        message: "Бот не находится на этом сервере (или он ещё не синхронизирован).",
+        title: res.locals.t("errors.guildNotFoundTitle"),
+        message: res.locals.t("errors.guildNotFoundMessage"),
       });
     }
 

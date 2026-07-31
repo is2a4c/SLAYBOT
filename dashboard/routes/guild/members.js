@@ -10,10 +10,10 @@ const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000; // Discord's own cap
 const TIMEOUT_OPTIONS_MIN = { 10: 10, 60: 60, 360: 360, 1440: 1440, 10080: 10080 };
 
 const ERROR_MESSAGES = {
-  MEMBER_PERM: "Вы не можете модерировать этого участника (его роль выше или равна вашей).",
-  BOT_PERM: "У бота недостаточно прав/позиции роли для этого действия.",
-  ALREADY_TIMEOUT: "Участник уже находится в таймауте.",
-  ERROR: "Не удалось выполнить действие. Подробности в логах бота.",
+  MEMBER_PERM: "errorMemberPerm",
+  BOT_PERM: "errorBotPerm",
+  ALREADY_TIMEOUT: "errorAlreadyTimeout",
+  ERROR: "errorGeneric",
 };
 
 async function loadTarget(req, res, next) {
@@ -80,7 +80,7 @@ router.post("/:userId/actions", requireCsrf, loadTarget, async (req, res) => {
   const backTo = `${res.locals.basePath}/g/${guild.id}/members/${userId}`;
 
   if (reason.length < 3) {
-    return res.redirect(`${backTo}?error=${encodeURIComponent("Укажите причину (минимум 3 символа).")}`);
+    return res.redirect(`${backTo}?error=${encodeURIComponent(res.locals.t("member.reasonRequired") + " (min 3)")}`);
   }
 
   // A server manager acts as themselves so Discord's role hierarchy applies
@@ -93,18 +93,18 @@ router.post("/:userId/actions", requireCsrf, loadTarget, async (req, res) => {
   try {
     switch (action) {
       case "warn":
-        if (!req.targetMember) return res.redirect(`${backTo}?error=${encodeURIComponent("Участник покинул сервер.")}`);
+        if (!req.targetMember) return res.redirect(`${backTo}?error=${encodeURIComponent(res.locals.t("errors.userNotFound"))}`);
         result = await ModUtils.warnTarget(issuer, req.targetMember, reason);
         break;
       case "timeout": {
-        if (!req.targetMember) return res.redirect(`${backTo}?error=${encodeURIComponent("Участник покинул сервер.")}`);
+        if (!req.targetMember) return res.redirect(`${backTo}?error=${encodeURIComponent(res.locals.t("errors.userNotFound"))}`);
         const minutes = TIMEOUT_OPTIONS_MIN[req.body.durationMinutes] || 60;
         const ms = Math.min(MAX_TIMEOUT_MS, minutes * 60 * 1000);
         result = await ModUtils.timeoutTarget(issuer, req.targetMember, ms, reason);
         break;
       }
       case "kick":
-        if (!req.targetMember) return res.redirect(`${backTo}?error=${encodeURIComponent("Участник покинул сервер.")}`);
+        if (!req.targetMember) return res.redirect(`${backTo}?error=${encodeURIComponent(res.locals.t("errors.userNotFound"))}`);
         result = await ModUtils.kickTarget(issuer, req.targetMember, reason);
         break;
       case "ban":
@@ -114,15 +114,15 @@ router.post("/:userId/actions", requireCsrf, loadTarget, async (req, res) => {
         result = await ModUtils.unBanTarget(issuer, req.targetUser, reason);
         break;
       default:
-        return res.redirect(`${backTo}?error=${encodeURIComponent("Неизвестное действие.")}`);
+        return res.redirect(`${backTo}?error=${encodeURIComponent(res.locals.t("errors.internalMessage"))}`);
     }
   } catch (ex) {
     req.client.logger.error(`dashboard member action failed (${action})`, ex);
-    return res.redirect(`${backTo}?error=${encodeURIComponent(ERROR_MESSAGES.ERROR)}`);
+    return res.redirect(`${backTo}?error=${encodeURIComponent(res.locals.t("member." + ERROR_MESSAGES.ERROR))}`);
   }
 
   if (result !== true) {
-    return res.redirect(`${backTo}?error=${encodeURIComponent(ERROR_MESSAGES[result] || ERROR_MESSAGES.ERROR)}`);
+    return res.redirect(`${backTo}?error=${encodeURIComponent(res.locals.t("member." + (ERROR_MESSAGES[result] || ERROR_MESSAGES.ERROR)))}`);
   }
 
   await logAudit({

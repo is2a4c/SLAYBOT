@@ -23,7 +23,7 @@ router.post("/", requireCsrf, requirePermission("staff.manage"), async (req, res
 
   if (!SNOWFLAKE.test(discordId) || !STAFF_ROLES.includes(role)) {
     return res.redirect(
-      `${res.locals.basePath}/owner/staff?error=${encodeURIComponent("Укажите корректный Discord ID и роль.")}`
+      `${res.locals.basePath}/owner/staff?error=${encodeURIComponent(res.locals.t("errors.invalidStaffInput"))}`
     );
   }
 

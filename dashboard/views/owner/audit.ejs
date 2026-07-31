@@ -16,7 +16,7 @@
           <td><%= formatDate(e.created_at) %></td>
           <td><%= e.action %></td>
           <td><%= e.actorTag %> (<%= e.actorId %>)</td>
-          <td><%- e.guildId ? `<a href="${basePath}/g/${e.guildId}/audit">${e.guildId}</a>` : t("common.none") %></td>
+          <td><% if (e.guildId && /^\d{17,20}$/.test(e.guildId)) { %><a href="<%= basePath %>/g/<%= e.guildId %>/audit"><%= e.guildId %></a><% } else { %><%= t("common.none") %><% } %></td>
           <td><%= e.targetType || t("common.none") %><% if (e.targetId) { %> · <%= e.targetId %><% } %></td>
           <td><%= e.reason || t("common.none") %></td>
         </tr>

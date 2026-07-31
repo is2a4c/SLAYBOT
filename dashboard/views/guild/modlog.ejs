@@ -10,8 +10,8 @@
     <label for="type"><%= t("common.type") %></label>
     <select id="type" name="type">
       <option value=""><%= t("common.all") %></option>
-      <% validTypes.forEach((t) => { %>
-        <option value="<%= t %>" <%= filterType === t ? "selected" : "" %>><%= t %></option>
+      <% validTypes.forEach((type) => { %>
+        <option value="<%= type %>" <%= filterType === type ? "selected" : "" %>><%= type %></option>
       <% }) %>
     </select>
   </div>

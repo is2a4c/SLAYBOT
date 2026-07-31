@@ -62,9 +62,45 @@
   document.addEventListener("submit", (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || event.defaultPrevented) return;
-    form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((button) => {
+    const buttons = [...form.querySelectorAll('button[type="submit"], input[type="submit"]')];
+    buttons.forEach((button) => {
       button.disabled = true;
       button.setAttribute("aria-busy", "true");
     });
+    const reenable = () => {
+      buttons.forEach((button) => {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+      });
+    };
+    window.addEventListener("pageshow", reenable, { once: true });
+    window.setTimeout(reenable, 8000);
   });
+
+  const commandSearch = document.querySelector("[data-command-search]");
+  const commandCategory = document.querySelector("[data-command-category]");
+  const commandReadiness = document.querySelector("[data-command-readiness]");
+  const commandGrid = document.querySelector("[data-command-grid]");
+  const commandEmpty = document.querySelector("[data-command-empty]");
+  if (commandGrid) {
+    const cards = [...commandGrid.querySelectorAll("[data-command-card]")];
+    const filterCommands = () => {
+      const query = commandSearch?.value.trim().toLocaleLowerCase() || "";
+      const category = commandCategory?.value || "";
+      const readiness = commandReadiness?.value || "";
+      let visible = 0;
+      cards.forEach((card) => {
+        const matchesSearch = !query || card.dataset.searchValue.includes(query);
+        const matchesCategory = !category || card.dataset.category === category;
+        const matchesReadiness = !readiness || card.dataset.readiness === readiness;
+        const show = matchesSearch && matchesCategory && matchesReadiness;
+        card.hidden = !show;
+        if (show) visible += 1;
+      });
+      if (commandEmpty) commandEmpty.hidden = visible !== 0;
+    };
+    commandSearch?.addEventListener("input", filterCommands);
+    commandCategory?.addEventListener("change", filterCommands);
+    commandReadiness?.addEventListener("change", filterCommands);
+  }
 })();

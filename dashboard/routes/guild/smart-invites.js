@@ -12,7 +12,7 @@ const { requireCsrf } = require("../../auth/csrf");
 function getService(client) {
   if (client.smartInvites) return client.smartInvites;
   if (client.config.SMART_INVITES.enabled) {
-    throw new SmartInviteError("SERVICE_UNAVAILABLE", "Smart Invites временно недоступны: HTTP-сервис не запущен.");
+    throw new SmartInviteError("SERVICE_UNAVAILABLE", "SERVICE_UNAVAILABLE");
   }
   return new SmartInviteService(client);
 }
@@ -23,17 +23,32 @@ function actorFromSession(req) {
 
 router.get("/", async (req, res) => {
   const { guild } = req;
-  const service = getService(req.client);
-  const records = await service.listForGuild(guild.id);
+  try {
+    const service = getService(req.client);
+    const records = await service.listForGuild(guild.id);
 
-  res.render("guild/smart-invites", {
-    title: `Smart Invites — ${guild.name}`,
-    guild,
-    records: records.map((r) => ({ ...r, publicUrl: publicInviteURL(service.config, r.slug) })),
-    enabled: req.client.config.SMART_INVITES.enabled,
-    textChannels: [...guild.channels.cache.filter((c) => c.isTextBased() && !c.isThread()).values()],
-    error: typeof req.query.error === "string" ? req.query.error : null,
-  });
+    res.render("guild/smart-invites", {
+      title: `Smart Invites — ${guild.name}`,
+      guild,
+      records: records.map((r) => ({ ...r, publicUrl: publicInviteURL(service.config, r.slug) })),
+      enabled: req.client.config.SMART_INVITES.enabled,
+      textChannels: [...guild.channels.cache.filter((c) => c.isTextBased() && !c.isThread()).values()],
+      error: typeof req.query.error === "string" ? req.query.error : null,
+    });
+  } catch (ex) {
+    const message = ex instanceof SmartInviteError
+      ? res.locals.t("smartInvites.serviceUnavailable")
+      : res.locals.t("smartInvites.serviceUnavailable");
+    if (!(ex instanceof SmartInviteError)) req.client.logger.error("dashboard smart invite list failed", ex);
+    res.render("guild/smart-invites", {
+      title: `Smart Invites — ${guild.name}`,
+      guild,
+      records: [],
+      enabled: false,
+      textChannels: [],
+      error: message,
+    });
+  }
 });
 
 router.post("/", requireCsrf, async (req, res) => {
@@ -60,7 +75,7 @@ router.post("/", requireCsrf, async (req, res) => {
     });
     res.redirect(`${backTo}?notice=created`);
   } catch (ex) {
-    const message = ex instanceof SmartInviteError ? ex.safeMessage : "Не удалось создать Smart Invite.";
+    const message = ex instanceof SmartInviteError ? ex.safeMessage : res.locals.t("smartInvites.createFailed");
     if (!(ex instanceof SmartInviteError)) req.client.logger.error("dashboard smart invite create failed", ex);
     res.redirect(`${backTo}?error=${encodeURIComponent(message)}`);
   }
@@ -83,7 +98,7 @@ router.post("/:slug/refresh", requireCsrf, async (req, res) => {
     });
     res.redirect(`${backTo}?notice=refreshed`);
   } catch (ex) {
-    const message = ex instanceof SmartInviteError ? ex.safeMessage : "Не удалось обновить Smart Invite.";
+    const message = ex instanceof SmartInviteError ? ex.safeMessage : res.locals.t("smartInvites.refreshFailed");
     if (!(ex instanceof SmartInviteError)) req.client.logger.error("dashboard smart invite refresh failed", ex);
     res.redirect(`${backTo}?error=${encodeURIComponent(message)}`);
   }
@@ -106,7 +121,7 @@ router.post("/:slug/delete", requireCsrf, async (req, res) => {
     });
     res.redirect(`${backTo}?notice=deleted`);
   } catch (ex) {
-    const message = ex instanceof SmartInviteError ? ex.safeMessage : "Не удалось удалить Smart Invite.";
+    const message = ex instanceof SmartInviteError ? ex.safeMessage : res.locals.t("smartInvites.deleteFailed");
     if (!(ex instanceof SmartInviteError)) req.client.logger.error("dashboard smart invite delete failed", ex);
     res.redirect(`${backTo}?error=${encodeURIComponent(message)}`);
   }

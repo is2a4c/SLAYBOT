@@ -19,12 +19,12 @@ router.get("/", async (req, res) => {
   const openTickets = guild.channels.cache.filter((c) => c.topic?.startsWith(TICKET_TOPIC_PREFIX)).size;
 
   const attention = [];
-  if (!settings.modlog_channel) attention.push("Не настроен канал журнала модерации.");
-  if (!guild.members.me.permissions.has("ManageMessages")) attention.push("У бота отсутствует право Manage Messages.");
+  if (!settings.modlog_channel) attention.push(res.locals.t("overview.attModlogMissing"));
+  if (!guild.members.me.permissions.has("ManageMessages")) attention.push(res.locals.t("overview.attManageMessages"));
   if (!guild.members.me.permissions.has("ModerateMembers"))
-    attention.push("У бота отсутствует право Moderate Members.");
+    attention.push(res.locals.t("overview.attModerateMembers"));
   if (settings.ticket?.log_channel && !guild.channels.cache.has(settings.ticket.log_channel)) {
-    attention.push("Канал логов тикетов больше не существует.");
+    attention.push(res.locals.t("overview.attTicketLogMissing"));
   }
 
   res.render("guild/overview", {
