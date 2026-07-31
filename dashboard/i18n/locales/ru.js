@@ -64,6 +64,11 @@ module.exports = {
     botNotReadyMessage: "Бот ещё подключается к Discord.",
     invalidUserId: "Некорректный ID пользователя.",
     userNotFound: "Discord-пользователь не найден.",
+    accessDeniedTitle: "Доступ запрещён",
+    guildAccessDenied: "У вас нет доступа к управлению этим сервером.",
+    insufficientPermissionsTitle: "Недостаточно прав",
+    permissionRequired: 'Для этого действия требуется право "{permission}".',
+    permissionCheckFailed: "Не удалось проверить права доступа.",
   },
   overview: {
     idAndMembers: "ID: {id} · Участников: {count}",

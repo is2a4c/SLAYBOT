@@ -21,8 +21,8 @@
 </div>
 
 <div class="btn-row">
-  <a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/config"><%= t("nav.config") %></a>
-  <a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/automod">Automod</a>
-  <a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/diagnostics"><%= t("nav.diagnostics") %></a>
+  <% if (canGuild("config.edit")) { %><a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/config"><%= t("nav.config") %></a><% } %>
+  <% if (canGuild("automod.edit")) { %><a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/automod">Automod</a><% } %>
+  <% if (canGuild("diagnostics.run")) { %><a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/diagnostics"><%= t("nav.diagnostics") %></a><% } %>
 </div>
 <%- include("../partials/foot") %>

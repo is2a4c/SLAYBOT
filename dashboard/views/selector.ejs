@@ -24,7 +24,7 @@
   </div>
 <% } %>
 
-<% if (isOwnerUser) { %>
+<% if (locals.canAccessOwner === true) { %>
   <p><a href="<%= basePath %>/owner"><%= t("selector.ownerLink") %></a></p>
 <% } %>
 <%- include("partials/foot") %>

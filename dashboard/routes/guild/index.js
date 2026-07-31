@@ -1,16 +1,16 @@
 const express = require("express");
 const router = express.Router({ mergeParams: true });
-const { requireGuildAccess } = require("../../auth/middleware");
+const { requireGuildAccess, requireGuildPermission } = require("../../auth/middleware");
 
 router.use(requireGuildAccess);
 
-router.use("/", require("./overview"));
-router.use("/config", require("./config"));
-router.use("/automod", require("./automod"));
-router.use("/modlog", require("./modlog"));
-router.use("/members", require("./members"));
-router.use("/smart-invites", require("./smart-invites"));
-router.use("/diagnostics", require("./diagnostics"));
-router.use("/audit", require("./audit"));
+router.use("/config", requireGuildPermission("config.edit"), require("./config"));
+router.use("/automod", requireGuildPermission("automod.edit"), require("./automod"));
+router.use("/modlog", requireGuildPermission("audit.view"), require("./modlog"));
+router.use("/members", requireGuildPermission("members.moderate"), require("./members"));
+router.use("/smart-invites", requireGuildPermission("smartinvites.manage"), require("./smart-invites"));
+router.use("/diagnostics", requireGuildPermission("diagnostics.run"), require("./diagnostics"));
+router.use("/audit", requireGuildPermission("audit.view"), require("./audit"));
+router.use("/", requireGuildPermission("guilds.view"), require("./overview"));
 
 module.exports = router;

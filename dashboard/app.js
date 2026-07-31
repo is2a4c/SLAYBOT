@@ -6,6 +6,7 @@ const { initializeMongoose } = require("@src/database/mongoose");
 const { createRateLimiter } = require("@src/web/smart-invites/security");
 const { applyDashboardSecurityHeaders } = require("./security");
 const { ensureCsrfToken } = require("./auth/csrf");
+const { loadDashboardActor } = require("./auth/middleware");
 const { localeMiddleware } = require("./i18n");
 
 const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // short-lived on purpose, see plan doc security notes
@@ -26,12 +27,18 @@ const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // short-lived on purpose, see p
  */
 function publicBasePath(baseURL) {
   try {
-    return new URL(baseURL).pathname.replace(/\/$/, "");
+    const pathname = new URL(baseURL).pathname.replace(/\/+$/, "");
+    return pathname === "/" ? "" : pathname;
   } catch {
     return "";
   }
 }
 module.exports.publicBasePath = publicBasePath;
+
+function normalizedBaseURL(baseURL) {
+  return String(baseURL || "").replace(/\/+$/, "");
+}
+module.exports.normalizedBaseURL = normalizedBaseURL;
 
 /**
  * Boots the SLAYBOT dashboard as an Express app running inside the bot's own
@@ -99,16 +106,18 @@ module.exports.launch = async function launch(client) {
     next();
   });
   dashboardRouter.use((req, res, next) => {
-    res.locals.csrfToken = ensureCsrfToken(req);
     res.locals.sessionUser = req.session.user || null;
-    res.locals.isOwnerUser = Boolean(req.session.user && client.config.OWNER_IDS.includes(req.session.user.id));
+    res.locals.csrfToken = res.locals.sessionUser ? ensureCsrfToken(req) : null;
     next();
   });
+  dashboardRouter.use(loadDashboardActor);
 
   dashboardRouter.use(createRateLimiter({ windowMs: 60000, max: 120 }));
   dashboardRouter.use("/auth", createRateLimiter({ windowMs: 60000, max: 20 }), require("./routes/auth"));
   // Public: no session required, carries health only (see routes/status.js)
-  dashboardRouter.use("/status", require("./routes/status"));
+  const statusRouter = require("./routes/status");
+  dashboardRouter.get("/status.json", statusRouter.statusJson);
+  dashboardRouter.use("/status", statusRouter);
   dashboardRouter.use("/", require("./routes/selector"));
   dashboardRouter.use("/g/:guildId", require("./routes/guild"));
   dashboardRouter.use("/owner", require("./routes/owner"));

@@ -10,15 +10,20 @@ const router = express.Router();
  * guild names, ids or member data, so it can be linked from a support server or
  * polled by an uptime monitor.
  */
-router.get("/", (req, res) => {
+function statusPage(req, res) {
   const report = buildStatusReport({ client: req.client });
   res.render("status", { title: res.locals.t("status.title"), report });
-});
+}
 
-router.get("/status.json", (req, res) => {
+function statusJson(req, res) {
   const report = buildStatusReport({ client: req.client });
   res.set("cache-control", "no-store");
   res.status(report.status === "outage" ? 503 : 200).json(report);
-});
+}
+
+router.get("/", statusPage);
+// Kept as a compatibility alias for already published links.
+router.get("/status.json", statusJson);
 
 module.exports = router;
+module.exports.statusJson = statusJson;

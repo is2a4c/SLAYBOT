@@ -74,11 +74,11 @@ router.post("/:userId/actions", requireCsrf, loadTarget, async (req, res) => {
     return res.redirect(`${backTo}?error=${encodeURIComponent("Укажите причину (минимум 3 символа).")}`);
   }
 
-  // The dashboard user acts as themselves when they're a member of this guild
-  // (so Discord's own role-hierarchy rules apply exactly as in slash commands);
-  // otherwise (e.g. a global Owner managing a guild they don't belong to) the
-  // bot's own member acts as issuer for the hierarchy check.
-  const issuer = req.member || guild.members.me;
+  // A server manager acts as themselves so Discord's role hierarchy applies
+  // exactly as it does for slash commands. Global dashboard staff and bot
+  // owners act through the bot member: their dashboard role is deliberately
+  // independent from membership or role position inside each managed guild.
+  const issuer = !req.isOwner && req.guildManager && req.member ? req.member : guild.members.me;
 
   let result;
   try {

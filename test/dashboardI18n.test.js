@@ -162,3 +162,66 @@ test("the status page renders in both languages", () => {
     assert.match(html, /status\.json/);
   }
 });
+
+function renderView(view, locals) {
+  const locale = "en";
+  return ejs.render(
+    fs.readFileSync(path.join(VIEWS_DIR, view), "utf8"),
+    {
+      basePath: "/dashboard",
+      locale,
+      locales: [{ code: locale, label: "English", active: true }],
+      t: (key, vars) => translate(locale, key, vars),
+      formatDate: (value) => new Date(value).toISOString(),
+      csrfToken: "test",
+      sessionUser: { id: "1", username: "staff" },
+      canAccessOwner: true,
+      isOwnerUser: false,
+      ...locals,
+    },
+    { filename: path.join(VIEWS_DIR, view) }
+  );
+}
+
+test("guild navigation only renders links granted by the effective role", () => {
+  const allowed = new Set(["guilds.view", "automod.edit", "diagnostics.run"]);
+  const html = renderView("guild/overview.ejs", {
+    title: "Guild",
+    guild: { id: "100000000000000001", name: "Guild", memberCount: 1 },
+    attention: [],
+    counters: {
+      members: 1,
+      messages24h: 0,
+      automodActions24h: 0,
+      openTickets: 0,
+      activeSmartInvites: 0,
+      errors24h: 0,
+    },
+    canGuild: (permission) => allowed.has(permission),
+    canGlobal: () => false,
+  });
+
+  assert.match(html, /\/automod/);
+  assert.match(html, /\/diagnostics/);
+  assert.doesNotMatch(html, /\/config/);
+  assert.doesNotMatch(html, /\/smart-invites/);
+});
+
+test("owner dashboard hides staff and audit controls without their permissions", () => {
+  const html = renderView("owner/index.ejs", {
+    title: "Owner",
+    periodDays: 1,
+    summary: {
+      counters: { commands: 0, automod_actions: 0, client_errors: 0 },
+      activeUsers: 0,
+      commandLatency: { averageMs: 0 },
+    },
+    guildCount: 0,
+    guilds: [],
+    canGuild: () => false,
+    canGlobal: (permission) => permission === "guilds.view",
+  });
+
+  assert.doesNotMatch(html, /\/owner\/staff/);
+  assert.doesNotMatch(html, /\/owner\/audit/);
+});

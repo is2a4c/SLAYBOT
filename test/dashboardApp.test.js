@@ -65,12 +65,19 @@ test.after(async () => {
 // requests - it silently left req.session undefined instead of erroring,
 // which then crashed on the first `req.session.x` access. Session cookie path
 // must stay "/" here, matching what the app actually receives.
-test("root request is unauthenticated: redirects to the prefixed login URL and sets a Path=/ session cookie", async () => {
+test("root request redirects to the prefixed login URL without creating an anonymous session", async () => {
   const res = await get("/");
   assert.equal(res.statusCode, 302);
   assert.equal(res.headers.location, "/dashboard/auth/login?redirect=%2F");
+  assert.equal(res.headers["set-cookie"], undefined);
+});
 
-  const cookieHeader = res.headers["set-cookie"]?.join(";") || "";
+test("OAuth login creates its state session with a Path=/ cookie", async () => {
+  const res = await get("/auth/login");
+  assert.equal(res.statusCode, 302);
+  assert.match(res.headers.location, /^https:\/\/discord\.com\/api\/v10\/oauth2\/authorize\?/);
+
+  const cookieHeader = res.headers["set-cookie"]?.join(";") ?? "";
   assert.match(cookieHeader, /slaybot_dashboard_sid=/);
   assert.match(cookieHeader, /Path=\//);
   assert.doesNotMatch(cookieHeader, /Path=\/dashboard/);
@@ -79,6 +86,14 @@ test("root request is unauthenticated: redirects to the prefixed login URL and s
 test("static assets are served under the internal (unprefixed) path", async () => {
   const res = await get("/style.css");
   assert.equal(res.statusCode, 200);
+});
+
+test("the machine-readable status endpoint is available at the documented top-level path", async () => {
+  const res = await get("/status.json");
+  assert.equal(res.statusCode, 503);
+  assert.match(res.headers["content-type"], /^application\/json/);
+  assert.equal(JSON.parse(res.body).status, "outage");
+  assert.equal(res.headers["set-cookie"], undefined);
 });
 
 test("an unknown path renders the 404 page instead of throwing", async () => {

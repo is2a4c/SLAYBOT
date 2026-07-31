@@ -64,6 +64,11 @@ module.exports = {
     botNotReadyMessage: "The bot is still connecting to Discord.",
     invalidUserId: "That user id is not valid.",
     userNotFound: "No such Discord user.",
+    accessDeniedTitle: "Access denied",
+    guildAccessDenied: "You do not have access to manage this server.",
+    insufficientPermissionsTitle: "Insufficient permissions",
+    permissionRequired: 'This action requires the "{permission}" permission.',
+    permissionCheckFailed: "Could not verify your access.",
   },
   overview: {
     idAndMembers: "ID: {id} · Members: {count}",

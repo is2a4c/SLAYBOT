@@ -5,8 +5,8 @@
   <a class="btn secondary" href="?period=1"><%= t("owner.period24h") %></a>
   <a class="btn secondary" href="?period=7"><%= t("owner.period7d") %></a>
   <a class="btn secondary" href="?period=30"><%= t("owner.period30d") %></a>
-  <a class="btn secondary" href="<%= basePath %>/owner/staff"><%= t("owner.staffRoles") %></a>
-  <a class="btn secondary" href="<%= basePath %>/owner/audit"><%= t("nav.audit") %></a>
+  <% if (canGlobal("staff.manage")) { %><a class="btn secondary" href="<%= basePath %>/owner/staff"><%= t("owner.staffRoles") %></a><% } %>
+  <% if (canGlobal("audit.view")) { %><a class="btn secondary" href="<%= basePath %>/owner/audit"><%= t("nav.audit") %></a><% } %>
 </div>
 
 <div class="cards">

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="<%= locale %>">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -13,15 +13,15 @@
     <nav>
       <% if (typeof guild !== "undefined" && guild) { %>
         <a href="<%= basePath %>/g/<%= guild.id %>"><%= t("nav.overview") %></a>
-        <a href="<%= basePath %>/g/<%= guild.id %>/config"><%= t("nav.config") %></a>
-        <a href="<%= basePath %>/g/<%= guild.id %>/automod"><%= t("nav.automod") %></a>
-        <a href="<%= basePath %>/g/<%= guild.id %>/modlog"><%= t("nav.modlog") %></a>
-        <a href="<%= basePath %>/g/<%= guild.id %>/smart-invites"><%= t("nav.smartInvites") %></a>
-        <a href="<%= basePath %>/g/<%= guild.id %>/diagnostics"><%= t("nav.diagnostics") %></a>
-        <a href="<%= basePath %>/g/<%= guild.id %>/audit"><%= t("nav.audit") %></a>
+        <% if (typeof canGuild === "function" && canGuild("config.edit")) { %><a href="<%= basePath %>/g/<%= guild.id %>/config"><%= t("nav.config") %></a><% } %>
+        <% if (typeof canGuild === "function" && canGuild("automod.edit")) { %><a href="<%= basePath %>/g/<%= guild.id %>/automod"><%= t("nav.automod") %></a><% } %>
+        <% if (typeof canGuild === "function" && canGuild("audit.view")) { %><a href="<%= basePath %>/g/<%= guild.id %>/modlog"><%= t("nav.modlog") %></a><% } %>
+        <% if (typeof canGuild === "function" && canGuild("smartinvites.manage")) { %><a href="<%= basePath %>/g/<%= guild.id %>/smart-invites"><%= t("nav.smartInvites") %></a><% } %>
+        <% if (typeof canGuild === "function" && canGuild("diagnostics.run")) { %><a href="<%= basePath %>/g/<%= guild.id %>/diagnostics"><%= t("nav.diagnostics") %></a><% } %>
+        <% if (typeof canGuild === "function" && canGuild("audit.view")) { %><a href="<%= basePath %>/g/<%= guild.id %>/audit"><%= t("nav.audit") %></a><% } %>
         <a href="<%= basePath %>/"><%= t("nav.myServers") %></a>
       <% } %>
-      <% if (locals.isOwnerUser) { %>
+      <% if (locals.canAccessOwner === true) { %>
         <a href="<%= basePath %>/owner"><%= t("nav.owner") %></a>
       <% } %>
     </nav>

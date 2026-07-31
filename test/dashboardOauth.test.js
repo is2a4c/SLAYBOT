@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 
 const { buildAuthorizeURL, exchangeCode, fetchDiscordUser, fetchDiscordGuilds } = require("../dashboard/auth/oauth");
 const { createState, consumeState, sanitizeRedirectPath } = require("../dashboard/auth/state");
-const { publicBasePath } = require("../dashboard/app");
+const { normalizedBaseURL, publicBasePath } = require("../dashboard/app");
 
 function fakeSession() {
   return {};
@@ -55,6 +55,11 @@ test("publicBasePath extracts the path portion of the configured baseURL, droppi
   assert.equal(publicBasePath("http://localhost:8080"), "");
   assert.equal(publicBasePath("http://localhost:8080/"), "");
   assert.equal(publicBasePath("not a url"), "");
+});
+
+test("normalizedBaseURL prevents double slashes in OAuth callback URLs", () => {
+  assert.equal(normalizedBaseURL("https://slaybot.example/dashboard/"), "https://slaybot.example/dashboard");
+  assert.equal(normalizedBaseURL("https://slaybot.example/dashboard///"), "https://slaybot.example/dashboard");
 });
 
 test("createState/consumeState round-trips once, rejects a wrong token, and is single-use", () => {

@@ -2,6 +2,29 @@ const { PermissionsBitField } = require("discord.js");
 const { getStaffAccount } = require("@schemas/StaffAccount");
 const { resolveEffectivePermissions } = require("@src/services/dashboard/permissions");
 
+async function loadDashboardActor(req, res, next) {
+  const userId = req.session?.user?.id;
+  const isOwner = Boolean(userId && req.client.config.OWNER_IDS.includes(userId));
+  let staffAccount = null;
+
+  if (userId && !isOwner) {
+    staffAccount = await getStaffAccount(userId).catch((error) => {
+      req.client.logger.error("dashboard staff account lookup failed", error);
+      return null;
+    });
+  }
+
+  const effectivePermissions = resolveEffectivePermissions({ isOwner, staffAccount });
+  req.staffAccount = staffAccount;
+  req.isOwner = isOwner;
+  req.dashboardPermissions = effectivePermissions;
+  res.locals.isOwnerUser = isOwner;
+  res.locals.canAccessOwner = effectivePermissions.has("guilds.view");
+  res.locals.canGlobal = (permission) => effectivePermissions.has(permission);
+  res.locals.canGuild = () => false;
+  next();
+}
+
 function requireAuth(req, res, next) {
   if (req.session?.user?.id) return next();
   const redirect = encodeURIComponent(req.originalUrl || `${res.locals.basePath}/`);
@@ -36,28 +59,47 @@ async function requireGuildAccess(req, res, next) {
     }
 
     const userId = req.session.user.id;
-    if (client.config.OWNER_IDS.includes(userId)) {
+    if (req.isOwner || client.config.OWNER_IDS.includes(userId)) {
       req.guild = guild;
       req.member = guild.members.cache.get(userId) || null;
+      req.guildManager = true;
+      res.locals.canGuild = () => true;
       return next();
     }
 
     try {
       const member = guild.members.cache.get(userId) || (await guild.members.fetch(userId).catch(() => null));
-      if (!member || !member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
+      const guildManager = Boolean(member?.permissions.has(PermissionsBitField.Flags.ManageGuild));
+      const staffViewer = req.dashboardPermissions?.has("guilds.view");
+      if (!guildManager && !staffViewer) {
         return res.status(403).render("error", {
-          title: "Нет доступа",
-          message: "У вас нет прав управления этим сервером.",
+          title: res.locals.t("errors.accessDeniedTitle"),
+          message: res.locals.t("errors.guildAccessDenied"),
         });
       }
       req.guild = guild;
       req.member = member;
+      req.guildManager = guildManager;
+      res.locals.canGuild = (permission) => guildManager || req.dashboardPermissions?.has(permission);
       return next();
     } catch (ex) {
       req.client.logger.error("dashboard requireGuildAccess failed", ex);
-      return res.status(500).render("error", { title: "Ошибка", message: "Не удалось проверить права доступа." });
+      return res.status(500).render("error", {
+        title: res.locals.t("errors.internalTitle"),
+        message: res.locals.t("errors.permissionCheckFailed"),
+      });
     }
   });
+}
+
+function requireGuildPermission(permission) {
+  return (req, res, next) => {
+    if (req.guildManager || req.isOwner || req.dashboardPermissions?.has(permission)) return next();
+    return res.status(403).render("error", {
+      title: res.locals.t("errors.insufficientPermissionsTitle"),
+      message: res.locals.t("errors.permissionRequired", { permission }),
+    });
+  };
 }
 
 /**
@@ -66,25 +108,24 @@ async function requireGuildAccess(req, res, next) {
  * @param {string} permission - one of ATOMIC_PERMISSIONS
  */
 function requirePermission(permission) {
-  return async (req, res, next) => {
-    requireAuth(req, res, async () => {
-      const userId = req.session.user.id;
-      const isOwner = req.client.config.OWNER_IDS.includes(userId);
-      let staffAccount = null;
-      if (!isOwner) staffAccount = await getStaffAccount(userId).catch(() => null);
-
-      const effective = resolveEffectivePermissions({ isOwner, staffAccount });
-      if (!effective.has(permission)) {
+  return (req, res, next) => {
+    requireAuth(req, res, () => {
+      if (!req.dashboardPermissions?.has(permission)) {
         return res.status(403).render("error", {
-          title: "Недостаточно прав",
-          message: `Для этого действия требуется право "${permission}".`,
+          title: res.locals.t("errors.insufficientPermissionsTitle"),
+          message: res.locals.t("errors.permissionRequired", { permission }),
         });
       }
-      req.staffAccount = staffAccount;
-      req.isOwner = isOwner;
       return next();
     });
   };
 }
 
-module.exports = { requireAuth, requireOwner, requireGuildAccess, requirePermission };
+module.exports = {
+  loadDashboardActor,
+  requireAuth,
+  requireOwner,
+  requireGuildAccess,
+  requireGuildPermission,
+  requirePermission,
+};

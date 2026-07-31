@@ -5,32 +5,49 @@ const { requireAuth } = require("../auth/middleware");
 
 router.get("/", requireAuth, (req, res) => {
   const client = req.client;
-  const userId = req.session.user.id;
-  const isOwnerUser = client.config.OWNER_IDS.includes(userId);
+  const canViewAllGuilds = req.dashboardPermissions?.has("guilds.view");
 
-  const guilds = (req.session.user.guilds || [])
-    .map((g) => {
-      let manageable = g.owner;
-      if (!manageable && g.permissions) {
-        try {
-          manageable = new PermissionsBitField(BigInt(g.permissions)).has(PermissionsBitField.Flags.ManageGuild);
-        } catch {
-          manageable = false;
+  const guildsById = new Map(
+    (req.session.user.guilds || [])
+      .map((g) => {
+        let manageable = g.owner;
+        if (!manageable && g.permissions) {
+          try {
+            manageable = new PermissionsBitField(BigInt(g.permissions)).has(PermissionsBitField.Flags.ManageGuild);
+          } catch {
+            manageable = false;
+          }
         }
-      }
-      const botPresent = client.guilds.cache.has(g.id);
-      return {
-        id: g.id,
-        name: g.name,
-        icon: g.icon,
-        manageable,
-        botPresent,
-        inviteUrl: botPresent ? null : `${client.getInvite()}&guild_id=${g.id}`,
-      };
-    })
-    .filter((g) => g.manageable);
+        const botPresent = client.guilds.cache.has(g.id);
+        return {
+          id: g.id,
+          name: g.name,
+          icon: g.icon,
+          manageable,
+          botPresent,
+          inviteUrl: botPresent ? null : `${client.getInvite()}&guild_id=${g.id}`,
+        };
+      })
+      .filter((g) => g.manageable)
+      .map((guild) => [guild.id, guild])
+  );
 
-  res.render("selector", { title: res.locals.t("selector.title"), guilds, isOwnerUser });
+  if (canViewAllGuilds) {
+    for (const guild of client.guilds.cache.values()) {
+      guildsById.set(guild.id, {
+        id: guild.id,
+        name: guild.name,
+        icon: guild.icon,
+        manageable: true,
+        botPresent: true,
+        inviteUrl: null,
+      });
+    }
+  }
+
+  const guilds = [...guildsById.values()].sort((a, b) => a.name.localeCompare(b.name));
+
+  res.render("selector", { title: res.locals.t("selector.title"), guilds });
 });
 
 module.exports = router;

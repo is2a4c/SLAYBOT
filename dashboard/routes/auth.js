@@ -3,6 +3,7 @@ const router = express.Router();
 const { buildAuthorizeURL, exchangeCode, fetchDiscordUser, fetchDiscordGuilds } = require("../auth/oauth");
 const { createState, consumeState } = require("../auth/state");
 const { requireCsrf } = require("../auth/csrf");
+const { normalizedBaseURL } = require("../app");
 
 router.get("/login", (req, res) => {
   if (!req.client.user?.id) {
@@ -18,7 +19,7 @@ router.get("/login", (req, res) => {
   res.redirect(
     buildAuthorizeURL({
       clientId: req.client.user.id,
-      redirectUri: `${config.baseURL}/auth/callback`,
+      redirectUri: `${normalizedBaseURL(config.baseURL)}/auth/callback`,
       state,
     })
   );
@@ -39,7 +40,7 @@ router.get("/callback", async (req, res) => {
       code,
       clientId: req.client.user.id,
       clientSecret: process.env.BOT_SECRET,
-      redirectUri: `${config.baseURL}/auth/callback`,
+      redirectUri: `${normalizedBaseURL(config.baseURL)}/auth/callback`,
     });
     const [profile, guilds] = await Promise.all([
       fetchDiscordUser({ accessToken: token.accessToken }),
