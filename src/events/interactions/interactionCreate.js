@@ -1,5 +1,6 @@
 const { getSettings } = require("@schemas/Guild");
 const {
+  autoroleHandler,
   commandHandler,
   contextHandler,
   controlPanelHandler,
@@ -141,6 +142,11 @@ async function route(client, interaction) {
 
     if (controlPanelHandler.matches(interaction.customId)) {
       return controlPanelHandler.handle(interaction, await getSettings(interaction.guild));
+    }
+
+    // autorole pickers: AUTOROLE:<add|remove>
+    if (autoroleHandler.matches(interaction.customId)) {
+      return autoroleHandler.handleSelect(interaction, await getSettings(interaction.guild));
     }
 
     if (interaction.customId.startsWith(`${selfRoleHandler.SELECT_PREFIX}:`)) {

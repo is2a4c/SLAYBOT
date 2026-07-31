@@ -223,6 +223,26 @@ module.exports = {
     },
   },
 
+  autorole: {
+    title: "Autoroles",
+    current: "New members are given: {roles}",
+    empty: "No autoroles are set — newcomers are given nothing.",
+    pickAdd: "Pick the roles new members should get",
+    pickRemove: "Pick the roles to stop giving",
+    added: "Now given: {roles}",
+    already: "Already given: {roles}",
+    removed: "No longer given: {roles}",
+    nowEmpty: "The list is empty — newcomers are given nothing.",
+    cleared: "Every autorole is gone. Newcomers are given nothing.",
+    overflow: "There is room for {max} autoroles — the rest were not added.",
+    refused: {
+      missing: "The role {role} no longer exists on this server.",
+      everyone: "`@everyone` cannot be an autorole.",
+      managed: "{role} belongs to an integration, so I cannot hand it out.",
+      tooHigh: "{role} sits above me — move my role higher so I can give it.",
+    },
+  },
+
   language: {
     title: "Bot language",
     description: "Pick the language the bot speaks on this server.",
