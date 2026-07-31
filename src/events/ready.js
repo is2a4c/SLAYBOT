@@ -14,6 +14,11 @@ const { FeedWatcher } = require("@src/services/feeds/FeedWatcher");
 module.exports = async (client) => {
   client.logger.success(`Logged in as ${client.user.tag}! (${client.user.id})`);
 
+  // Discord starts delivering interactions the moment the gateway is up, while
+  // everything below is still running. Until it finishes, a click is answered
+  // with "starting up" rather than left to expire.
+  client.startupComplete = false;
+
   // Repair settings saved before they were validated, before anything reads them.
   await runMigrations(client).catch((error) => client.logger.error("Failed to run database migrations", error));
 
@@ -119,4 +124,7 @@ module.exports = async (client) => {
   }
 
   setInterval(() => counterHandler.updateCounterChannels(client), 10 * 60 * 1000);
+
+  client.startupComplete = true;
+  client.logger.success("Startup complete, commands are being served");
 };

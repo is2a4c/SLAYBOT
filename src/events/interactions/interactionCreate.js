@@ -53,6 +53,15 @@ module.exports = async (client, interaction) => {
  * @param {import('discord.js').BaseInteraction} interaction
  */
 async function route(client, interaction) {
+  // A restart keeps the gateway open while caches, panels and command
+  // registration are still being rebuilt. Answering immediately beats letting
+  // the interaction expire into "the application did not respond".
+  if (client.startupComplete === false) {
+    return interaction
+      .reply({ content: "I am still starting up. Try again in a moment.", ephemeral: true })
+      .catch(() => {});
+  }
+
   if (!interaction.guild) {
     return interaction
       .reply({ content: "Command can only be executed in a discord server", ephemeral: true })

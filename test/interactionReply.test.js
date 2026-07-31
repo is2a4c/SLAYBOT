@@ -103,3 +103,27 @@ test("a rejected edit falls back instead of throwing at the command", async () =
   await assert.doesNotReject(() => safeFollowUp.call(interaction, "done"));
   assert.equal(interaction.calls[0].kind, "editReply");
 });
+
+/* -------------------------------------------------------------- startup gate */
+
+const route = require("@src/events/interactions/interactionCreate");
+
+test("a click during startup is answered instead of left to expire", async () => {
+  const replies = [];
+  const interaction = {
+    customId: "TICKET_CREATE",
+    guild: { id: "1" },
+    reply: async (payload) => replies.push(payload),
+    isButton: () => true,
+    isChatInputCommand: () => false,
+    isContextMenuCommand: () => false,
+    isAnySelectMenu: () => false,
+  };
+
+  const client = { startupComplete: false, logger: { warn: () => {} }, telemetry: null };
+  await route(client, interaction);
+
+  assert.equal(replies.length, 1, "the interaction is answered while the bot is still booting");
+  assert.match(replies[0].content, /starting up/i);
+  assert.equal(replies[0].ephemeral, true);
+});
