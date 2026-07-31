@@ -12,6 +12,49 @@ const DEFAULT_IO_MODEL = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8";
 // How many of the prepared regions are transcribed. One is the full frame.
 const OCR_REGIONS = Math.max(1, Number.parseInt(process.env.IMAGE_SPAM_OCR_REGIONS, 10) || 1);
 
+// io.net is not always usable even with a valid key — an account out of credits
+// answers 429 to everything. Retrying it per image would add its latency to
+// every message, so repeated failures park it for a while and moderation falls
+// back to the local model instead of failing outright.
+const IO_FAILURES_BEFORE_PAUSE = 3;
+const IO_PAUSE_MS = 10 * 60_000;
+const ioBreaker = { failures: 0, pausedUntil: 0, reason: "" };
+
+function ioAvailable() {
+  if (!process.env.IO_INTELLIGENCE_API_KEY) return false;
+  return Date.now() >= ioBreaker.pausedUntil;
+}
+
+/**
+ * @param {Error} error
+ * @param {object} [logger]
+ */
+function noteIoFailure(error, logger) {
+  ioBreaker.failures += 1;
+  ioBreaker.reason = error.message;
+
+  if (ioBreaker.failures >= IO_FAILURES_BEFORE_PAUSE && Date.now() >= ioBreaker.pausedUntil) {
+    ioBreaker.pausedUntil = Date.now() + IO_PAUSE_MS;
+    logger?.warn?.(
+      `io.net paused for ${IO_PAUSE_MS / 60000} minutes after ${ioBreaker.failures} failures: ${error.message}`
+    );
+  }
+}
+
+function noteIoSuccess() {
+  ioBreaker.failures = 0;
+  ioBreaker.pausedUntil = 0;
+  ioBreaker.reason = "";
+}
+
+/**
+ * Current state of the io.net breaker, for status output and tests.
+ * @returns {{available: boolean, failures: number, pausedUntil: number, reason: string}}
+ */
+function ioStatus() {
+  return { available: ioAvailable(), ...ioBreaker };
+}
+
 let visionQueue = Promise.resolve();
 let ocrQueue = Promise.resolve();
 let pendingAnalyses = 0;
@@ -71,7 +114,7 @@ function parseOcrResponse(reply) {
  */
 async function runIoOcr(buffer) {
   const apiKey = process.env.IO_INTELLIGENCE_API_KEY;
-  if (!apiKey) return { text: "", confidence: 0 };
+  if (!apiKey || !ioAvailable()) return { text: "", confidence: 0 };
 
   const requestedTimeout = Number.parseInt(process.env.IMAGE_SPAM_OCR_TIMEOUT_MS, 10);
   const timeoutMs = Number.isInteger(requestedTimeout) && requestedTimeout > 0 ? requestedTimeout : 45_000;
@@ -99,13 +142,20 @@ async function runIoOcr(buffer) {
       signal: controller.signal,
     });
 
-    if (!response.ok) throw new Error(`io.net OCR returned HTTP ${response.status}`);
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new Error(`io.net OCR returned HTTP ${response.status} ${detail.slice(0, 120)}`.trim());
+    }
 
     const payload = await response.json();
+    noteIoSuccess();
     return parseOcrResponse(payload?.choices?.[0]?.message?.content);
   } catch (error) {
-    if (error.name === "AbortError") throw new Error(`io.net OCR timed out after ${timeoutMs} ms`);
-    throw error;
+    const failure = error.name === "AbortError" ? new Error(`io.net OCR timed out after ${timeoutMs} ms`) : error;
+    noteIoFailure(failure);
+    // A failed transcription is not fatal: scoring still has the caption and
+    // the visual verdict to work with.
+    return { text: "", confidence: 0 };
   } finally {
     clearTimeout(timeout);
   }
@@ -328,28 +378,37 @@ function selectVisionIndexes(visionImages, candidates, caption) {
 
 async function analyzeVisionImages(visionImages, candidates, caption, engine) {
   const selectedIndexes = selectVisionIndexes(visionImages, candidates, caption);
-  if (!engine && process.env.IO_INTELLIGENCE_API_KEY) {
+  if (!engine && ioAvailable()) {
     const ocrHint = selectedIndexes
       .map((index) => candidates[index])
       .filter((candidate) => candidate && candidate.confidence >= 25 && candidate.text)
       .map((candidate) => candidate.text)
       .join("\n");
-    const result = parseVisionResponse(
-      await runIoVision(
-        selectedIndexes.map((index) => visionImages[index]),
-        caption,
-        ocrHint
-      ),
-      "io.net vision"
-    );
-    const modelName = process.env.IMAGE_SPAM_REMOTE_MODEL || DEFAULT_IO_MODEL;
-    return {
-      ...result,
-      model: `${modelName} (io.net)`,
-      index: selectedIndexes[0],
-      regionsAnalyzed: selectedIndexes.length,
-      regionsAvailable: visionImages.length,
-    };
+
+    try {
+      const result = parseVisionResponse(
+        await runIoVision(
+          selectedIndexes.map((index) => visionImages[index]),
+          caption,
+          ocrHint
+        ),
+        "io.net vision"
+      );
+      noteIoSuccess();
+
+      const modelName = process.env.IMAGE_SPAM_REMOTE_MODEL || DEFAULT_IO_MODEL;
+      return {
+        ...result,
+        model: `${modelName} (io.net)`,
+        index: selectedIndexes[0],
+        regionsAnalyzed: selectedIndexes.length,
+        regionsAvailable: visionImages.length,
+      };
+    } catch (error) {
+      // Out of credits, rate limited or unreachable: fall through to the local
+      // model rather than leaving the image unchecked.
+      noteIoFailure(error);
+    }
   }
 
   const selectedEngine = engine || runLocalVision;
@@ -620,6 +679,9 @@ module.exports = {
   analyzeWithVision,
   analyzeVisionImages,
   combineImageSpamResults,
+  ioAvailable,
+  ioStatus,
+  noteIoSuccess,
   parseOcrResponse,
   parseVisionResponse,
   preloadVisionModel,

@@ -502,3 +502,65 @@ test("a low score still gates the text the way local OCR did", () => {
     "unreliable text alone cannot cross the default threshold"
   );
 });
+
+/* --------------------------------------------------------- io.net fallback */
+
+const classifier = require("../src/services/imageSpamClassifier");
+
+test("io.net failures stop being retried and hand over to the local model", async () => {
+  const previousKey = process.env.IO_INTELLIGENCE_API_KEY;
+  const previousFetch = global.fetch;
+  process.env.IO_INTELLIGENCE_API_KEY = "test-key";
+  classifier.noteIoSuccess();
+
+  let calls = 0;
+  // An account without credits answers this to everything, valid key or not.
+  global.fetch = async () => {
+    calls += 1;
+    return { ok: false, status: 429, text: async () => '{"detail":"Insufficient credits"}' };
+  };
+
+  try {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const result = await classifier.runIoOcr(Buffer.from("png"));
+      assert.deepEqual(result, { text: "", confidence: 0 }, "a failed read is empty, not an exception");
+    }
+
+    assert.equal(calls, 3);
+    assert.equal(classifier.ioStatus().available, false, "io.net is parked after repeated failures");
+    assert.match(classifier.ioStatus().reason, /429/);
+
+    await classifier.runIoOcr(Buffer.from("png"));
+    assert.equal(calls, 3, "further images do not pay for a request that is known to fail");
+  } finally {
+    global.fetch = previousFetch;
+    classifier.noteIoSuccess();
+    if (previousKey === undefined) delete process.env.IO_INTELLIGENCE_API_KEY;
+    else process.env.IO_INTELLIGENCE_API_KEY = previousKey;
+  }
+});
+
+test("a working reply clears the pause", async () => {
+  const previousKey = process.env.IO_INTELLIGENCE_API_KEY;
+  const previousFetch = global.fetch;
+  process.env.IO_INTELLIGENCE_API_KEY = "test-key";
+
+  global.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ choices: [{ message: { content: '{"text":"Claim reward","confidence":90}' } }] }),
+  });
+
+  try {
+    const result = await classifier.runIoOcr(Buffer.from("png"));
+
+    assert.equal(result.text, "Claim reward");
+    assert.equal(classifier.ioStatus().failures, 0);
+    assert.equal(classifier.ioStatus().available, true);
+  } finally {
+    global.fetch = previousFetch;
+    classifier.noteIoSuccess();
+    if (previousKey === undefined) delete process.env.IO_INTELLIGENCE_API_KEY;
+    else process.env.IO_INTELLIGENCE_API_KEY = previousKey;
+  }
+});
