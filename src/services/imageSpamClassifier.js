@@ -1,10 +1,6 @@
 const sharp = require("sharp");
-const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { createWorker, PSM } = require("tesseract.js");
-
-const OCR_LANGS = ["eng", "rus"];
 
 const DEFAULT_THRESHOLD = 70;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -14,7 +10,9 @@ const IMAGE_EXTENSIONS = /\.(?:avif|gif|jpe?g|png|webp)$/i;
 const IO_API_URL = "https://api.intelligence.io.solutions/api/v1/chat/completions";
 const DEFAULT_IO_MODEL = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8";
 
-let workerPromise;
+// How many of the prepared regions are transcribed. One is the full frame.
+const OCR_REGIONS = Math.max(1, Number.parseInt(process.env.IMAGE_SPAM_OCR_REGIONS, 10) || 1);
+
 let localVisionPromise;
 let visionQueue = Promise.resolve();
 let ocrQueue = Promise.resolve();
@@ -24,53 +22,105 @@ function isImageAttachment(attachment) {
   return attachment.contentType?.toLowerCase().startsWith("image/") || IMAGE_EXTENSIONS.test(attachment.name || "");
 }
 
-// Tesseract needs every requested language's traineddata in a single langPath
-// directory, so gather them from their per-package folders into one cache dir.
-function prepareLangPath() {
-  const cacheRoot = process.env.IMAGE_SPAM_MODEL_CACHE || path.join(process.cwd(), ".cache", "image-spam");
-  const langPath = path.join(cacheRoot, "tessdata");
-  fs.mkdirSync(langPath, { recursive: true });
-  for (const code of OCR_LANGS) {
-    const pkg = require(`@tesseract.js-data/${code}`);
-    const file = `${code}.traineddata.gz`;
-    const dest = path.join(langPath, file);
-    if (!fs.existsSync(dest)) fs.copyFileSync(path.join(pkg.langPath, file), dest);
+const OCR_PROMPT = [
+  "Transcribe every piece of text visible in this image, exactly as written, keeping line breaks.",
+  "Text may be in Russian or English. Do not translate, summarise or explain it.",
+  'Answer with JSON only: {"text": "<the transcription>", "confidence": <0-100>}.',
+  "confidence is how legible the text was. Use an empty string and 0 when there is no readable text.",
+].join(" ");
+
+/**
+ * Read the transcription out of a chat completion.
+ *
+ * The model is asked for JSON but sometimes wraps it in prose or a code fence,
+ * so the object is dug out rather than parsed off the whole reply. Anything
+ * unparseable counts as "nothing read", which downstream already handles.
+ *
+ * @param {string} reply
+ * @returns {{text: string, confidence: number}}
+ */
+function parseOcrResponse(reply) {
+  const empty = { text: "", confidence: 0 };
+  if (typeof reply !== "string") return empty;
+
+  const json = reply.match(/\{[\s\S]*\}/)?.[0];
+  if (!json) return empty;
+
+  let parsed;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return empty;
   }
-  return langPath;
+
+  const text = typeof parsed.text === "string" ? parsed.text.trim() : "";
+  if (!text) return empty;
+
+  const confidence = Number(parsed.confidence);
+  return {
+    text,
+    // A transcription with no usable score is treated as readable; an explicit
+    // low score still gates the text downstream.
+    confidence: Number.isFinite(confidence) ? Math.min(100, Math.max(0, confidence)) : 100,
+  };
 }
 
-async function getWorker() {
-  if (!workerPromise) {
-    const langPath = prepareLangPath();
-    // Russian is bundled alongside English: the bot's audience is Russian-speaking,
-    // and English-only OCR turned Cyrillic scam text into unusable noise.
-    workerPromise = createWorker(OCR_LANGS, 1, {
-      langPath,
-      gzip: true,
-      cacheMethod: "none",
-      logger: () => {},
-    })
-      .then(async (worker) => {
-        await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
-        return worker;
-      })
-      .catch((error) => {
-        workerPromise = undefined;
-        throw error;
-      });
+/**
+ * Read the text in an image with io.net.
+ *
+ * @param {Buffer} buffer PNG bytes
+ * @returns {Promise<{text: string, confidence: number}>}
+ */
+async function runIoOcr(buffer) {
+  const apiKey = process.env.IO_INTELLIGENCE_API_KEY;
+  if (!apiKey) return { text: "", confidence: 0 };
+
+  const requestedTimeout = Number.parseInt(process.env.IMAGE_SPAM_OCR_TIMEOUT_MS, 10);
+  const timeoutMs = Number.isInteger(requestedTimeout) && requestedTimeout > 0 ? requestedTimeout : 45_000;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(IO_API_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: process.env.IMAGE_SPAM_OCR_MODEL || DEFAULT_IO_MODEL,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: OCR_PROMPT },
+              { type: "image_url", image_url: { url: `data:image/png;base64,${buffer.toString("base64")}` } },
+            ],
+          },
+        ],
+        temperature: 0,
+        max_tokens: 1024,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) throw new Error(`io.net OCR returned HTTP ${response.status}`);
+
+    const payload = await response.json();
+    return parseOcrResponse(payload?.choices?.[0]?.message?.content);
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error(`io.net OCR timed out after ${timeoutMs} ms`);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return workerPromise;
 }
 
+/**
+ * @param {Buffer} buffer
+ * @returns {Promise<{text: string, confidence: number}>}
+ */
 async function recognize(buffer) {
-  const job = ocrQueue.then(async () => {
-    const worker = await getWorker();
-    const result = await worker.recognize(buffer);
-    return {
-      text: result.data.text || "",
-      confidence: Number(result.data.confidence) || 0,
-    };
-  });
+  // Kept serial: several attachments on one message would otherwise fire off
+  // that many concurrent requests against the same rate limit.
+  const job = ocrQueue.then(() => runIoOcr(buffer));
   ocrQueue = job.catch(() => {});
   return job;
 }
@@ -567,7 +617,10 @@ async function classifyImageBuffer({
       if (distributed) return distributed;
     }
     const { ocrImages, visionImages, visual } = await prepareImage(buffer);
-    const ocr = await recognizeAll(ocrImages);
+    // The tiles existed because local OCR could not read small text in a
+    // downscaled frame. A vision model reads the full frame, so transcribing
+    // every region as well would be four extra API calls for the same words.
+    const ocr = await recognizeAll(ocrImages.slice(0, OCR_REGIONS));
     const selected = selectVisionCandidate(ocr, visionImages, caption, visual);
     // Analyze every prepared region. The full image keeps overall context, while
     // the enlarged regions make each small collage panel readable to the model.
@@ -615,10 +668,12 @@ module.exports = {
   analyzeWithVision,
   analyzeVisionImages,
   combineImageSpamResults,
+  parseOcrResponse,
   parseVisionResponse,
   preloadVisionModel,
   prepareImage,
   recognizeAll,
+  runIoOcr,
   runIoVision,
   selectVisionCandidate,
 };

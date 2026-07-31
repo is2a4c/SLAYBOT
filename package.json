@@ -44,8 +44,6 @@
     "@lavaclient/queue": "^2.1.1",
     "@lavaclient/spotify": "^3.1.0",
     "@lavaclient/types": "^2.1.1",
-    "@tesseract.js-data/eng": "^1.0.0",
-    "@tesseract.js-data/rus": "^1.0.0",
     "@vitalets/google-translate-api": "^9.2.1",
     "ascii-table": "0.0.9",
     "btoa": "^1.2.1",
@@ -79,7 +77,6 @@
     "sourcebin_js": "^0.0.3-ignore",
     "string-progressbar": "^1.0.4",
     "table": "^6.9.0",
-    "tesseract.js": "^7.0.0",
     "timestamp-to-date": "^1.1.0",
     "twemoji-parser": "^14.0.0"
   },

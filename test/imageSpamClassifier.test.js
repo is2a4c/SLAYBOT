@@ -452,3 +452,53 @@ test("image moderation fails open when the vision service errors", async () => {
   assert.equal(result.strikes, 0);
   assert.match(warning, /skipped attachment 1\/1/);
 });
+
+/* ---------------------------------------------------------------- io.net OCR */
+
+const { parseOcrResponse } = require("../src/services/imageSpamClassifier");
+
+test("a transcription is read out of the model's reply", () => {
+  assert.deepEqual(parseOcrResponse('{"text":"$4600.00 Reward","confidence":92}'), {
+    text: "$4600.00 Reward",
+    confidence: 92,
+  });
+
+  // Models routinely wrap the object in a fence or a sentence.
+  assert.deepEqual(parseOcrResponse('```json\n{"text":"Claim now","confidence":70}\n```'), {
+    text: "Claim now",
+    confidence: 70,
+  });
+  assert.equal(parseOcrResponse('Here is the text: {"text":"Вывод средств","confidence":80}').text, "Вывод средств");
+});
+
+test("a reply with nothing usable in it reads as nothing seen", () => {
+  for (const reply of [
+    "",
+    "I cannot read this image",
+    '{"text":"","confidence":0}',
+    '{"text":"   "}',
+    "{broken",
+    null,
+  ]) {
+    assert.deepEqual(parseOcrResponse(reply), { text: "", confidence: 0 }, `${JSON.stringify(reply)} should be empty`);
+  }
+});
+
+test("a missing score counts as legible, and scores are clamped", () => {
+  // Downstream drops text below 25, so a transcription with no score must not
+  // silently land under the threshold.
+  assert.equal(parseOcrResponse('{"text":"Withdrawal successful"}').confidence, 100);
+  assert.equal(parseOcrResponse('{"text":"a","confidence":"nonsense"}').confidence, 100);
+  assert.equal(parseOcrResponse('{"text":"a","confidence":150}').confidence, 100);
+  assert.equal(parseOcrResponse('{"text":"a","confidence":-5}').confidence, 0);
+});
+
+test("a low score still gates the text the way local OCR did", () => {
+  const { confidence } = parseOcrResponse('{"text":"$9000 withdrawal successful crypto wallet","confidence":10}');
+
+  assert.ok(confidence < 25, "the reader is unsure, so the transcription must not be trusted on its own");
+  assert.ok(
+    scoreImageSpam({ caption: "", ocrText: "$9000 withdrawal successful crypto wallet", confidence }).score < 70,
+    "unreliable text alone cannot cross the default threshold"
+  );
+});
