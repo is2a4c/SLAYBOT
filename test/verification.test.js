@@ -111,3 +111,73 @@ test("the panel carries the verify button and explains the active mode", () => {
   assert.equal(custom.embeds[0].data.description, "Read #rules first.");
   assert.equal(custom.components[0].components[0].data.label, "Let me in");
 });
+
+/* ------------------------------------------------------------ answer timing */
+
+const mongoose = require("mongoose");
+const { MongoMemoryServer } = require("mongodb-memory-server");
+const { handleVerifyButton } = require("../src/handlers/verification");
+
+/**
+ * Records the order the interaction was answered in, so slow work — the
+ * database write and the image encoder — cannot creep back in front of the
+ * acknowledgement and blow the three second deadline.
+ *
+ * @param {{held?: string[]}} [options]
+ */
+function fakeInteraction({ held = [] } = {}) {
+  const calls = [];
+  const roles = {
+    cache: { has: (id) => held.includes(id), map: (fn) => held.map((id) => fn({ id })) },
+    add: async () => calls.push("roles.add"),
+  };
+
+  const guild = {
+    id: GUILD_ID,
+    roles: { cache: new Map([[VERIFIED_ROLE, { id: VERIFIED_ROLE, position: 1, managed: false }]]) },
+    members: { me: { roles: { highest: { position: 10 } } } },
+    channels: { cache: new Map() },
+  };
+
+  return {
+    calls,
+    guild,
+    guildId: GUILD_ID,
+    user: { id: "888888888888888888" },
+    client: { logger: { error: () => {} } },
+    member: { id: "888888888888888888", guild, roles },
+    deferReply: async () => calls.push("deferReply"),
+    editReply: async () => calls.push("editReply"),
+    reply: async () => calls.push("reply"),
+  };
+}
+
+test("a captcha challenge acknowledges the click before building anything", async () => {
+  const mongo = await MongoMemoryServer.create();
+  await mongoose.connect(mongo.getUri());
+
+  try {
+    const interaction = fakeInteraction();
+
+    await handleVerifyButton(interaction, {
+      verification: { enabled: true, mode: "CAPTCHA", role_id: VERIFIED_ROLE, captcha_length: 6 },
+    });
+
+    assert.equal(interaction.calls[0], "deferReply", "the challenge is built after the click is acknowledged");
+    assert.ok(interaction.calls.includes("editReply"), "the image replaces the placeholder");
+    assert.ok(!interaction.calls.includes("reply"), "a bare reply would race the deadline");
+  } finally {
+    await mongoose.disconnect();
+    await mongo.stop();
+  }
+});
+
+test("an ineligible member is answered in one message, without a placeholder", async () => {
+  const interaction = fakeInteraction({ held: [VERIFIED_ROLE] });
+
+  await handleVerifyButton(interaction, {
+    verification: { enabled: true, mode: "BUTTON", role_id: VERIFIED_ROLE },
+  });
+
+  assert.deepEqual(interaction.calls, ["reply"], "a refusal needs no placeholder");
+});

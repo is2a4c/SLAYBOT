@@ -1,4 +1,8 @@
 .env
+# Deploys leave copies of the environment behind (.env.bak.<stamp>, .env.backup-*);
+# they hold the same secrets as .env, so only the example is ever tracked.
+.env.*
+!.env.example
 node_modules/
 logs/*
 /config.js
@@ -32,3 +36,7 @@ ss-proxy.js
 
 # Docker
 *.log
+
+# Archives left by deploy and hotfix scripts
+*.tgz
+*.bak

@@ -87,12 +87,14 @@ async function grantAccess(member, config) {
     }
   }
 
-  await clearChallenge(member.guild.id, member.id).catch(() => {});
+  // Housekeeping the member is not waiting on: cleared and logged in the
+  // background so the reply lands as soon as the role is on.
+  clearChallenge(member.guild.id, member.id).catch(() => {});
 
   if (config.log_channel) {
     const channel = member.guild.channels.cache.get(config.log_channel);
     if (channel?.isTextBased()) {
-      await channel
+      channel
         .send({
           embeds: [
             new EmbedBuilder()
@@ -134,8 +136,11 @@ module.exports = {
 
     if (!eligibility.ok) return interaction.reply({ content: eligibility.reason, ephemeral: true });
 
+    // Everything past here talks to the database, Discord or the image encoder,
+    // so the click is acknowledged first rather than after all of it.
+    await interaction.deferReply({ ephemeral: true });
+
     if (config.mode !== "CAPTCHA") {
-      await interaction.deferReply({ ephemeral: true });
       try {
         await grantAccess(interaction.member, config);
       } catch (ex) {
@@ -154,7 +159,7 @@ module.exports = {
     });
 
     const image = await renderCaptchaImage(code);
-    await interaction.reply({
+    await interaction.editReply({
       content: "Read the code from the image, then press **Enter code** and type it in. It expires in 10 minutes.",
       files: [image],
       components: [
@@ -162,7 +167,6 @@ module.exports = {
           new ButtonBuilder().setCustomId(MODAL_ID).setLabel("Enter code").setStyle(ButtonStyle.Primary)
         ),
       ],
-      ephemeral: true,
     });
   },
 

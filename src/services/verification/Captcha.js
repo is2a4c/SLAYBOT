@@ -1,5 +1,15 @@
 const crypto = require("crypto");
 
+// Loading sharp is slow enough to be felt on the first captcha of a restart, so
+// it is paid for at startup instead. It is optional: without it the challenge
+// falls back to the SVG.
+let sharp = null;
+try {
+  sharp = require("sharp");
+} catch {
+  sharp = null;
+}
+
 // Ambiguous glyphs (0/O, 1/I/l) are left out so a correct reading is never rejected.
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const DEFAULT_LENGTH = 6;
@@ -107,9 +117,9 @@ function renderCaptchaSvg(code) {
  */
 async function renderCaptchaImage(code) {
   const svg = renderCaptchaSvg(code);
+  if (!sharp) return { attachment: Buffer.from(svg), name: "captcha.svg" };
 
   try {
-    const sharp = require("sharp");
     const png = await sharp(Buffer.from(svg)).png().toBuffer();
     return { attachment: png, name: "captcha.png" };
   } catch {
