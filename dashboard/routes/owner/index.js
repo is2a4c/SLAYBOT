@@ -2,12 +2,13 @@ const express = require("express");
 const router = express.Router();
 const { getSettings } = require("@schemas/Guild");
 const { requirePermission } = require("../../auth/middleware");
+const { getDashboardTelemetrySummary } = require("@src/services/dashboard/telemetry");
 
 router.get("/", requirePermission("guilds.view"), async (req, res) => {
   const client = req.client;
   const periodDays = [1, 7, 30].includes(Number(req.query.period)) ? Number(req.query.period) : 1;
 
-  const globalSummary = await client.telemetry.getSummary({ scope: "global", periodDays });
+  const globalSummary = await getDashboardTelemetrySummary(client, { scope: "global", periodDays });
 
   const guilds = await Promise.all(
     [...client.guilds.cache.values()].map(async (guild) => {

@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { getSettings } = require("@schemas/Guild");
 const SmartInvite = require("@schemas/SmartInvite");
+const { getDashboardTelemetrySummary } = require("@src/services/dashboard/telemetry");
 
 const TICKET_TOPIC_PREFIX = "tіcket|"; // matches src/helpers/TicketPermissions.js getTicketMetadata
 
@@ -11,7 +12,7 @@ router.get("/", async (req, res) => {
   const settings = await getSettings(guild);
 
   const [dailySummary, activeSmartInvites] = await Promise.all([
-    client.telemetry.getSummary({ scope: "guild", guildId: guild.id, periodDays: 1 }),
+    getDashboardTelemetrySummary(client, { scope: "guild", guildId: guild.id, periodDays: 1 }),
     SmartInvite.countDocuments({ guildId: guild.id, status: { $in: ["active", "degraded"] } }),
   ]);
 
