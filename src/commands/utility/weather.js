@@ -39,7 +39,7 @@ module.exports = {
   async interactionRun(interaction) {
     const place = interaction.options.getString("place");
     const response = await weather(place);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

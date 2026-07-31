@@ -51,7 +51,7 @@ module.exports = {
     const user = interaction.options.getUser("user");
     const amount = interaction.options.getInteger("invites");
     const response = await addInvites(interaction, user, amount);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

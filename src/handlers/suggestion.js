@@ -286,7 +286,7 @@ async function handleApproveModal(modal) {
   await modal.deferReply({ ephemeral: true });
   const reason = modal.fields.getTextInputValue("reason");
   const response = await approveSuggestion(modal.member, modal.channel, modal.message.id, reason);
-  await modal.followUp(response);
+  await modal.safeFollowUp(response);
 }
 
 /**
@@ -317,7 +317,7 @@ async function handleRejectModal(modal) {
   await modal.deferReply({ ephemeral: true });
   const reason = modal.fields.getTextInputValue("reason");
   const response = await rejectSuggestion(modal.member, modal.channel, modal.message.id, reason);
-  await modal.followUp(response);
+  await modal.safeFollowUp(response);
 }
 
 /**
@@ -348,7 +348,7 @@ async function handleDeleteModal(modal) {
   await modal.deferReply({ ephemeral: true });
   const reason = modal.fields.getTextInputValue("reason");
   const response = await deleteSuggestion(modal.member, modal.channel, modal.message.id, reason);
-  await modal.followUp({ content: response, ephemeral: true });
+  await modal.safeFollowUp({ content: response, ephemeral: true });
 }
 
 module.exports = {

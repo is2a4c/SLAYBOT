@@ -22,7 +22,7 @@ module.exports = {
   },
 
   async interactionRun(interaction) {
-    await interaction.followUp("**Starting Snake Game**");
+    await interaction.safeFollowUp("**Starting Snake Game**");
     await startSnakeGame(interaction);
   },
 };

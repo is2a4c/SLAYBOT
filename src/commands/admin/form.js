@@ -207,7 +207,7 @@ module.exports = {
 
     // list
     else if (sub === "list") {
-      return interaction.followUp({ embeds: [await listForms(interaction.guild)] });
+      return interaction.safeFollowUp({ embeds: [await listForms(interaction.guild)] });
     }
 
     // status
@@ -229,7 +229,7 @@ module.exports = {
       response = await removeForm(interaction.guild, formId);
     }
 
-    if (response) await interaction.followUp(response);
+    if (response) await interaction.safeFollowUp(response);
   },
 };
 

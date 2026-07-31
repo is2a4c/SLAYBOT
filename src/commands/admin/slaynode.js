@@ -136,7 +136,7 @@ module.exports = {
   },
   async interactionRun(interaction) {
     if (!interaction.client.config.SLAYNODE?.enabled)
-      return interaction.followUp({
+      return interaction.safeFollowUp({
         embeds: [note(EMBED_COLORS.WARNING, "🛰️ SlayNode Partner is disabled by the operator.")],
       });
 
@@ -153,7 +153,8 @@ module.exports = {
     // Remaining subcommands act on a specific node owned by this guild.
     const nodeId = interaction.options.getString("node_id");
     const node = await models.Node.findOne({ nodeId, guildIds: guildId });
-    if (!node) return interaction.followUp({ embeds: [note(EMBED_COLORS.ERROR, "❌ Node not found in this server.")] });
+    if (!node)
+      return interaction.safeFollowUp({ embeds: [note(EMBED_COLORS.ERROR, "❌ Node not found in this server.")] });
     if (sub === "revoke") return handleRevoke(interaction, node);
     if (sub === "rename") return handleRename(interaction, node);
     if (sub === "configure") return handleConfigure(interaction, node);
@@ -182,7 +183,7 @@ async function handleEnroll(interaction, guildId) {
       value: `\`\`\`bash\nSLAYNODE_ENROLLMENT_TOKEN=<token> \\\nSLAYNODE_CONTROL_URL=https://your-control-host \\\nnpm run slaynode:enroll\n\`\`\``,
     })
     .setFooter({ text: "Expires in 15 minutes · shown once · keep it secret" });
-  return interaction.followUp({ embeds: [embed] });
+  return interaction.safeFollowUp({ embeds: [embed] });
 }
 
 async function handleStatus(interaction, guildId, tiers) {
@@ -235,7 +236,7 @@ async function handleStatus(interaction, guildId, tiers) {
       }
     )
     .setFooter({ text: `Tier score ${scored.score.toFixed(1)}/100 · rolling 30-day window` });
-  return interaction.followUp({ embeds: [embed] });
+  return interaction.safeFollowUp({ embeds: [embed] });
 }
 
 async function handleLeaderboard(interaction, guildId) {
@@ -268,7 +269,7 @@ async function handleLeaderboard(interaction, guildId) {
         .join("\n")
     );
   }
-  return interaction.followUp({ embeds: [embed] });
+  return interaction.safeFollowUp({ embeds: [embed] });
 }
 
 async function handlePrivacy(interaction, guildId) {
@@ -308,7 +309,7 @@ async function handlePrivacy(interaction, guildId) {
         inline: false,
       }
     );
-  return interaction.followUp({ embeds: [embed] });
+  return interaction.safeFollowUp({ embeds: [embed] });
 }
 
 async function handleAudit(interaction, guildId) {
@@ -324,7 +325,7 @@ async function handleAudit(interaction, guildId) {
           .join("\n")
       : "No audit events recorded yet."
   );
-  return interaction.followUp({ embeds: [embed] });
+  return interaction.safeFollowUp({ embeds: [embed] });
 }
 
 async function handleRevoke(interaction, node) {
@@ -332,7 +333,7 @@ async function handleRevoke(interaction, node) {
   node.revokedAt = new Date();
   node.credentialEncrypted = undefined;
   await node.save();
-  return interaction.followUp({
+  return interaction.safeFollowUp({
     embeds: [note(EMBED_COLORS.ERROR, `⛔ Node **${node.name}** (\`${node.nodeId}\`) has been permanently revoked.`)],
   });
 }
@@ -343,14 +344,14 @@ async function handleRename(interaction, node) {
     .replace(/[^\w .-]/g, "")
     .slice(0, 64);
   await node.save();
-  return interaction.followUp({ embeds: [note(EMBED_COLORS.SUCCESS, `✏️ Node renamed to **${node.name}**.`)] });
+  return interaction.safeFollowUp({ embeds: [note(EMBED_COLORS.SUCCESS, `✏️ Node renamed to **${node.name}**.`)] });
 }
 
 async function handleConfigure(interaction, node) {
   const start = interaction.options.getInteger("start_utc");
   const end = interaction.options.getInteger("end_utc");
   if ((start === null) !== (end === null))
-    return interaction.followUp({
+    return interaction.safeFollowUp({
       embeds: [note(EMBED_COLORS.WARNING, "⚠️ Provide both start_utc and end_utc, or neither.")],
     });
   node.limits = { ...node.limits, parallelism: interaction.options.getInteger("parallelism") };
@@ -362,7 +363,7 @@ async function handleConfigure(interaction, node) {
       { name: "Parallelism", value: `${node.limits.parallelism} concurrent jobs`, inline: true },
       { name: "Schedule (UTC)", value: start === null ? "Always on" : `${start}:00 – ${end}:00`, inline: true }
     );
-  return interaction.followUp({ embeds: [embed] });
+  return interaction.safeFollowUp({ embeds: [embed] });
 }
 
 async function handleRotate(interaction, node) {
@@ -371,7 +372,7 @@ async function handleRotate(interaction, node) {
     .setTitle("🔑 New node secret")
     .setDescription(`\`\`\`\n${secret}\n\`\`\``)
     .setFooter({ text: "Shown once · update SLAYNODE_SECRET on the worker and restart it" });
-  return interaction.followUp({ embeds: [embed] });
+  return interaction.safeFollowUp({ embeds: [embed] });
 }
 
 // Sum credits per node for a guild, optionally within a rolling window (days).

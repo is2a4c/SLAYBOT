@@ -93,7 +93,7 @@ module.exports = {
     else if (sub === "channel") response = await setChannel(interaction.options.getChannel("channel"), data.settings);
     else response = "Invalid subcommand";
 
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

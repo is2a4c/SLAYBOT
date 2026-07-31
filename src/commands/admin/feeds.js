@@ -169,7 +169,7 @@ module.exports = {
 
     try {
       if (sub === "add") {
-        return interaction.followUp(
+        return interaction.safeFollowUp(
           await add(interaction.guild, {
             type: interaction.options.getString("type"),
             target: interaction.options.getString("target"),
@@ -182,7 +182,7 @@ module.exports = {
       }
 
       if (sub === "remove") {
-        return interaction.followUp(
+        return interaction.safeFollowUp(
           await remove(interaction.guild, {
             type: interaction.options.getString("type"),
             target: interaction.options.getString("target"),
@@ -191,19 +191,19 @@ module.exports = {
         );
       }
 
-      if (sub === "list") return interaction.followUp(await renderList(interaction.guild));
+      if (sub === "list") return interaction.safeFollowUp(await renderList(interaction.guild));
 
       if (sub === "test") {
-        return interaction.followUp(
+        return interaction.safeFollowUp(
           await testSource(interaction.options.getString("type"), interaction.options.getString("target"))
         );
       }
     } catch (ex) {
-      if (ex instanceof FeedError) return interaction.followUp(ex.message);
+      if (ex instanceof FeedError) return interaction.safeFollowUp(ex.message);
       throw ex;
     }
 
-    return interaction.followUp("Invalid subcommand");
+    return interaction.safeFollowUp("Invalid subcommand");
   },
 };
 

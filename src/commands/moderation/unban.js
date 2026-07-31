@@ -53,7 +53,7 @@ module.exports = {
     const reason = interaction.options.getString("reason");
 
     const response = await getMatchingBans(interaction.guild, match);
-    const sent = await interaction.followUp(response);
+    const sent = await interaction.safeFollowUp(response);
     if (typeof response !== "string") await waitForBan(interaction.member, reason, sent);
   },
 };

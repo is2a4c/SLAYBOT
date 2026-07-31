@@ -54,7 +54,7 @@ module.exports = {
     } catch (ex) {
       response = buildErrorResponse(ex);
     }
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

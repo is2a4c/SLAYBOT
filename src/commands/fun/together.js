@@ -61,7 +61,7 @@ module.exports = {
   async interactionRun(interaction) {
     const choice = interaction.options.getString("type");
     const response = await getTogetherInvite(interaction.member, choice);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

@@ -44,7 +44,7 @@ module.exports = {
     const title = interaction.options.getString("title");
     const content = interaction.options.getString("content");
     const response = await paste(content, title);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

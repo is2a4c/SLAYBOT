@@ -566,17 +566,17 @@ module.exports = {
     const sub = interaction.options.getSubcommand();
 
     try {
-      if (group === "self") return interaction.followUp(await runSelf(interaction, sub, data.settings));
-      if (group === "temp") return interaction.followUp(await runTemp(interaction, sub));
-      if (group === "voice") return interaction.followUp(await runVoice(interaction, sub, data.settings));
-      if (group === "restore") return interaction.followUp(await runRestore(interaction, sub, data.settings));
-      if (group === "reaction") return interaction.followUp(await runReaction(interaction, sub));
+      if (group === "self") return interaction.safeFollowUp(await runSelf(interaction, sub, data.settings));
+      if (group === "temp") return interaction.safeFollowUp(await runTemp(interaction, sub));
+      if (group === "voice") return interaction.safeFollowUp(await runVoice(interaction, sub, data.settings));
+      if (group === "restore") return interaction.safeFollowUp(await runRestore(interaction, sub, data.settings));
+      if (group === "reaction") return interaction.safeFollowUp(await runReaction(interaction, sub));
     } catch (ex) {
-      if (ex instanceof SelfRoleError || ex instanceof TempRoleError) return interaction.followUp(ex.message);
+      if (ex instanceof SelfRoleError || ex instanceof TempRoleError) return interaction.safeFollowUp(ex.message);
       throw ex;
     }
 
-    return interaction.followUp("Invalid subcommand");
+    return interaction.safeFollowUp("Invalid subcommand");
   },
 };
 

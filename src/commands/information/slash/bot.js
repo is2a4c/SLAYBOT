@@ -43,28 +43,28 @@ module.exports = {
 
   async interactionRun(interaction) {
     const sub = interaction.options.getSubcommand();
-    if (!sub) return interaction.followUp("Not a valid subcommand");
+    if (!sub) return interaction.safeFollowUp("Not a valid subcommand");
 
     // Invite
     if (sub === "invite") {
       const response = botInvite(interaction.client);
       try {
         await interaction.user.send(response);
-        return interaction.followUp("Check your DM for my information! :envelope_with_arrow:");
+        return interaction.safeFollowUp("Check your DM for my information! :envelope_with_arrow:");
       } catch (ex) {
-        return interaction.followUp("I cannot send you my information! Is your DM open?");
+        return interaction.safeFollowUp("I cannot send you my information! Is your DM open?");
       }
     }
 
     // Stats
     else if (sub === "stats") {
       const response = botstats(interaction.client);
-      return interaction.followUp(response);
+      return interaction.safeFollowUp(response);
     }
 
     // Uptime
     else if (sub === "uptime") {
-      await interaction.followUp(`My Uptime: \`${timeformat(process.uptime())}\``);
+      await interaction.safeFollowUp(`My Uptime: \`${timeformat(process.uptime())}\``);
     }
   },
 };

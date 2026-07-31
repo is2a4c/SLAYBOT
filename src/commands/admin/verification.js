@@ -162,7 +162,7 @@ module.exports = {
     const settings = data.settings;
 
     if (sub === "setup") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await setup(interaction.guild, settings, {
           channel: interaction.options.getChannel("channel"),
           role: interaction.options.getRole("role"),
@@ -175,7 +175,7 @@ module.exports = {
     }
 
     if (sub === "config") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await configure(interaction.guild, settings, {
           mode: interaction.options.getString("mode"),
           captchaLength: interaction.options.getInteger("captcha_length"),
@@ -187,11 +187,11 @@ module.exports = {
       );
     }
 
-    if (sub === "status") return interaction.followUp({ embeds: [statusEmbed(interaction.guild, settings)] });
+    if (sub === "status") return interaction.safeFollowUp({ embeds: [statusEmbed(interaction.guild, settings)] });
 
-    if (sub === "off") return interaction.followUp(await disable(settings));
+    if (sub === "off") return interaction.safeFollowUp(await disable(settings));
 
-    return interaction.followUp("Invalid subcommand");
+    return interaction.safeFollowUp("Invalid subcommand");
   },
 };
 

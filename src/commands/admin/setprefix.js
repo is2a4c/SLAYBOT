@@ -34,7 +34,7 @@ module.exports = {
 
   async interactionRun(interaction, data) {
     const response = await setNewPrefix(interaction.options.getString("newprefix"), data.settings);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

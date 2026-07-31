@@ -123,7 +123,7 @@ module.exports = {
     const sub = interaction.options.getSubcommand();
 
     if (sub === "set") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await setSticky(
           interaction.guild,
           interaction.options.getChannel("channel"),
@@ -140,12 +140,12 @@ module.exports = {
     }
 
     if (sub === "remove") {
-      return interaction.followUp(await removeSticky(interaction.guild, interaction.options.getChannel("channel")));
+      return interaction.safeFollowUp(await removeSticky(interaction.guild, interaction.options.getChannel("channel")));
     }
 
-    if (sub === "list") return interaction.followUp(await listAll(interaction.guild));
+    if (sub === "list") return interaction.safeFollowUp(await listAll(interaction.guild));
 
-    return interaction.followUp("Invalid subcommand");
+    return interaction.safeFollowUp("Invalid subcommand");
   },
 };
 

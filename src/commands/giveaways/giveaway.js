@@ -298,7 +298,7 @@ module.exports = {
           : null,
       };
 
-      await interaction.followUp("Starting Giveaway system...");
+      await interaction.safeFollowUp("Starting Giveaway system...");
       return await runModalSetup(interaction, channel, requirements);
     }
 
@@ -336,7 +336,7 @@ module.exports = {
       const messageId = interaction.options.getString("message_id");
       const addDur = interaction.options.getInteger("add_duration");
       if (addDur !== null && addDur <= 0) {
-        return interaction.followUp("Not a valid duration");
+        return interaction.safeFollowUp("Not a valid duration");
       }
       const addDurationMs = addDur ? addDur * 60 * 1000 : null;
       const newPrize = interaction.options.getString("new_prize");
@@ -347,7 +347,7 @@ module.exports = {
     //
     else response = "Invalid subcommand";
 
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

@@ -46,7 +46,7 @@ module.exports = {
 
   async interactionRun(interaction) {
     const type = interaction.options.getString("type");
-    await interaction.followUp("Fetching proxies... Please wait");
+    await interaction.safeFollowUp("Fetching proxies... Please wait");
     const response = await getProxies(type);
     await interaction.editReply(response);
   },

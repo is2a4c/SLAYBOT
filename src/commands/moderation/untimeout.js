@@ -48,7 +48,7 @@ module.exports = {
     const target = await interaction.guild.members.fetch(user.id);
 
     const response = await untimeout(interaction.member, target, reason);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

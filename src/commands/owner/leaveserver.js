@@ -33,7 +33,7 @@ module.exports = {
 
   async interactionRun(interaction) {
     const response = await leaveServer(interaction.client, interaction.options.getString("server-id"));
-    return interaction.followUp(response);
+    return interaction.safeFollowUp(response);
   },
 };
 

@@ -158,8 +158,8 @@ module.exports = {
     const channel = options.getChannel("channel");
     const amount = options.getInteger("amount") || 99;
 
-    if (amount < 1) return interaction.followUp("Amount must be greater than 0");
-    if (amount > 99) return interaction.followUp("The max amount of messages that I can delete is 99");
+    if (amount < 1) return interaction.safeFollowUp("Amount must be greater than 0");
+    if (amount > 99) return interaction.safeFollowUp("The max amount of messages that I can delete is 99");
 
     let response;
     switch (sub) {
@@ -192,34 +192,36 @@ module.exports = {
       }
 
       default:
-        return interaction.followUp("Oops! Not a valid command selection");
+        return interaction.safeFollowUp("Oops! Not a valid command selection");
     }
 
     // Success
     if (typeof response === "number") {
-      return interaction.followUp(`Successfully cleaned ${response} messages in ${channel}`);
+      return interaction.safeFollowUp(`Successfully cleaned ${response} messages in ${channel}`);
     }
 
     // Member missing permissions
     else if (response === "MEMBER_PERM") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         `You do not have permissions to Read Message History & Manage Messages in ${channel}`
       );
     }
 
     // Bot missing permissions
     else if (response === "BOT_PERM") {
-      return interaction.followUp(`I do not have permissions to Read Message History & Manage Messages in ${channel}`);
+      return interaction.safeFollowUp(
+        `I do not have permissions to Read Message History & Manage Messages in ${channel}`
+      );
     }
 
     // No messages
     else if (response === "NO_MESSAGES") {
-      return interaction.followUp("Found no messages that can be cleaned");
+      return interaction.safeFollowUp("Found no messages that can be cleaned");
     }
 
     // Remaining
     else {
-      return interaction.followUp("Failed to clean messages");
+      return interaction.safeFollowUp("Failed to clean messages");
     }
   },
 };

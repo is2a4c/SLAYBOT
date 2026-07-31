@@ -44,7 +44,7 @@ module.exports = {
   async interactionRun(interaction, data) {
     const channel = interaction.options.getChannel("channel");
     const response = await setChannel(channel, data.settings);
-    return interaction.followUp(response);
+    return interaction.safeFollowUp(response);
   },
 };
 

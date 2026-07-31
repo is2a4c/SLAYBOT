@@ -290,7 +290,7 @@ module.exports = {
 
     //
     else response = "Invalid subcommand";
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

@@ -65,8 +65,8 @@ module.exports = {
   async interactionRun(interaction, data) {
     const question = interaction.options.getString("question").trim().slice(0, 2000);
     const result = await answerQuestion(interaction.guildId, question, data.settings);
-    if (result.error) return interaction.followUp(result.error);
-    return interaction.followUp({ embeds: [answerEmbed(question, result)] });
+    if (result.error) return interaction.safeFollowUp(result.error);
+    return interaction.safeFollowUp({ embeds: [answerEmbed(question, result)] });
   },
 
   answerQuestion,

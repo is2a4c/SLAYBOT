@@ -48,7 +48,7 @@ module.exports = {
       content = `Guild \`${guildId}\` ${blocked ? "заблокирован" : "разблокирован"}.`;
     } else if (action === "status") {
       const found = await service.findBySlug(slug);
-      if (!found) return interaction.followUp("Smart Invite не найден.");
+      if (!found) return interaction.safeFollowUp("Smart Invite не найден.");
       const record = found.record;
       const embed = new EmbedBuilder()
         .setColor(interaction.client.config.EMBED_COLORS.BOT_EMBED)
@@ -68,9 +68,9 @@ module.exports = {
             value: `clicks=${record.clickCount}, regenerations=${record.regenerationCount}, failures=${record.failedRedirectCount}`,
           }
         );
-      return interaction.followUp({ embeds: [embed] });
+      return interaction.safeFollowUp({ embeds: [embed] });
     }
-    return interaction.followUp(content);
+    return interaction.safeFollowUp(content);
   },
 };
 

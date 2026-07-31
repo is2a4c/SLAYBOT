@@ -90,7 +90,7 @@ module.exports = {
     const target = await interaction.guild.members.fetch(interaction.options.getUser("user"));
 
     const response = await nickname(interaction, target, name);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

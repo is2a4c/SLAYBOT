@@ -68,10 +68,10 @@ module.exports = {
       let role = interaction.options.getRole("role");
       if (!role) {
         const role_id = interaction.options.getString("role_id");
-        if (!role_id) return interaction.followUp("Please provide a role or role id");
+        if (!role_id) return interaction.safeFollowUp("Please provide a role or role id");
 
         const roles = interaction.guild.findMatchingRoles(role_id);
-        if (roles.length === 0) return interaction.followUp("No matching roles found matching your query");
+        if (roles.length === 0) return interaction.safeFollowUp("No matching roles found matching your query");
         role = roles[0];
       }
 
@@ -86,7 +86,7 @@ module.exports = {
     // default
     else response = "Invalid subcommand";
 
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

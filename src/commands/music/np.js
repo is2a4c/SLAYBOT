@@ -26,7 +26,7 @@ module.exports = {
 
   async interactionRun(interaction) {
     const response = nowPlaying(interaction);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

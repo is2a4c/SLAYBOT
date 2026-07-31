@@ -162,7 +162,7 @@ module.exports = {
     const channel = interaction.options.getChannel("channel");
 
     if (sub === "create") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await create(
           interaction.guild,
           channel,
@@ -173,12 +173,12 @@ module.exports = {
       );
     }
 
-    if (sub === "list") return interaction.followUp(await list(interaction.guild, channel));
+    if (sub === "list") return interaction.safeFollowUp(await list(interaction.guild, channel));
 
-    if (sub === "delete") return interaction.followUp(await remove(channel, interaction.options.getString("name")));
+    if (sub === "delete") return interaction.safeFollowUp(await remove(channel, interaction.options.getString("name")));
 
     if (sub === "send") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await send(channel, interaction.options.getString("name"), interaction.options.getString("message"), {
           embed: interaction.options.getBoolean("embed"),
           username: interaction.options.getString("username"),
@@ -186,7 +186,7 @@ module.exports = {
       );
     }
 
-    return interaction.followUp("Invalid subcommand");
+    return interaction.safeFollowUp("Invalid subcommand");
   },
 };
 

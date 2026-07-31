@@ -47,7 +47,7 @@ module.exports = {
     const reason = interaction.options.getString("reason");
 
     const response = await ban(interaction.member, target, reason);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

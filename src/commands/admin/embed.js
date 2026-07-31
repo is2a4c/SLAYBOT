@@ -110,16 +110,16 @@ module.exports = {
 
     if (sub === "branding") {
       if (!interaction.member.permissions.has("ManageGuild")) {
-        return interaction.followUp("You need the `Manage Server` permission to change branding");
+        return interaction.safeFollowUp("You need the `Manage Server` permission to change branding");
       }
-      return interaction.followUp(await runBranding(interaction, data.settings));
+      return interaction.safeFollowUp(await runBranding(interaction, data.settings));
     }
 
     const channel = interaction.options.getChannel("channel");
     if (!channel.canSendEmbeds()) {
-      return interaction.followUp("I don't have permission to send embeds in that channel");
+      return interaction.safeFollowUp("I don't have permission to send embeds in that channel");
     }
-    interaction.followUp(`Embed setup started in ${channel}`);
+    interaction.safeFollowUp(`Embed setup started in ${channel}`);
     await embedSetup(channel, interaction.member);
   },
 };

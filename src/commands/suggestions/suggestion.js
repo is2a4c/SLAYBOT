@@ -355,7 +355,7 @@ module.exports = {
 
     // else
     else response = "Not a valid subcommand";
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

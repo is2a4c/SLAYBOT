@@ -102,7 +102,7 @@ module.exports = {
       response = await setAction(interaction.guild, interaction.options.getString("action"), data.settings);
     }
 
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

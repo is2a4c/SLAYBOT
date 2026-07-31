@@ -65,7 +65,7 @@ module.exports = {
     const name = interaction.options.getString("name");
 
     const response = await setupCounter(interaction.guild, type.toUpperCase(), name, data.settings);
-    return interaction.followUp(response);
+    return interaction.safeFollowUp(response);
   },
 };
 

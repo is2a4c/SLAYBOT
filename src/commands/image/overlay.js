@@ -92,7 +92,7 @@ module.exports = {
       },
     });
 
-    if (!response.success) return interaction.followUp("Failed to generate image overlay");
+    if (!response.success) return interaction.safeFollowUp("Failed to generate image overlay");
 
     const attachment = new AttachmentBuilder(response.buffer, { name: "attachment.png" });
     const embed = new EmbedBuilder()
@@ -100,7 +100,7 @@ module.exports = {
       .setImage("attachment://attachment.png")
       .setFooter({ text: `Requested by: ${author.username}` });
 
-    await interaction.followUp({ embeds: [embed], files: [attachment] });
+    await interaction.safeFollowUp({ embeds: [embed], files: [attachment] });
   },
 };
 

@@ -47,7 +47,7 @@ module.exports = {
   async interactionRun(interaction) {
     const type = interaction.options.getString("type") || "track";
     const response = toggleLoop(interaction, type);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

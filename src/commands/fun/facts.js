@@ -45,7 +45,7 @@ module.exports = {
   async interactionRun(interaction) {
     const choice = interaction.options.getString("name");
     const response = await getFact(interaction.user, choice);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

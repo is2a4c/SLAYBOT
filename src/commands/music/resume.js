@@ -22,7 +22,7 @@ module.exports = {
 
   async interactionRun(interaction) {
     const response = await resumePlayer(interaction);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

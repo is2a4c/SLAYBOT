@@ -264,7 +264,7 @@ module.exports = {
       response = "Server knowledge cleared.";
     }
 
-    return interaction.followUp(response);
+    return interaction.safeFollowUp(response);
   },
 
   ensureAiSettings,

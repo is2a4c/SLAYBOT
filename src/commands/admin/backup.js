@@ -118,22 +118,23 @@ module.exports = {
     const sub = interaction.options.getSubcommand();
 
     if (sub === "create") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await create(interaction.guild, interaction.user.id, interaction.options.getString("name"))
       );
     }
-    if (sub === "list") return interaction.followUp(await list(interaction.guild));
-    if (sub === "info") return interaction.followUp(await info(interaction.guild, interaction.options.getString("id")));
+    if (sub === "list") return interaction.safeFollowUp(await list(interaction.guild));
+    if (sub === "info")
+      return interaction.safeFollowUp(await info(interaction.guild, interaction.options.getString("id")));
     if (sub === "load") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await load(interaction.guild, interaction.options.getString("id"), interaction.options.getBoolean("confirm"))
       );
     }
     if (sub === "delete") {
-      return interaction.followUp(await remove(interaction.guild, interaction.options.getString("id")));
+      return interaction.safeFollowUp(await remove(interaction.guild, interaction.options.getString("id")));
     }
 
-    return interaction.followUp("Invalid subcommand");
+    return interaction.safeFollowUp("Invalid subcommand");
   },
 };
 

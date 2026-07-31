@@ -46,7 +46,7 @@ module.exports = {
   async interactionRun(interaction) {
     const choice = interaction.options.getString("category");
     const embed = await genReaction(choice, interaction.user);
-    await interaction.followUp({ embeds: [embed] });
+    await interaction.safeFollowUp({ embeds: [embed] });
   },
 };
 

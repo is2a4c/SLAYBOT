@@ -23,7 +23,7 @@ module.exports = {
 
   async interactionRun(interaction) {
     const response = await stop(interaction);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

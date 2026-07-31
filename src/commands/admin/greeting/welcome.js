@@ -279,7 +279,7 @@ module.exports = {
         response = "Invalid subcommand";
     }
 
-    return interaction.followUp(response);
+    return interaction.safeFollowUp(response);
   },
 };
 

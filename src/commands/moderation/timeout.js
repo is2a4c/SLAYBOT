@@ -58,13 +58,13 @@ module.exports = {
 
     const duration = interaction.options.getString("duration");
     const ms = ems(duration);
-    if (!ms) return interaction.followUp("Please provide a valid duration. Example: 1d/1h/1m/1s");
+    if (!ms) return interaction.safeFollowUp("Please provide a valid duration. Example: 1d/1h/1m/1s");
 
     const reason = interaction.options.getString("reason");
     const target = await interaction.guild.members.fetch(user.id);
 
     const response = await timeout(interaction.member, target, ms, reason);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

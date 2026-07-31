@@ -37,7 +37,7 @@ module.exports = {
   async interactionRun(interaction) {
     const emoji = interaction.options.getString("emoji");
     const response = getEmoji(interaction.user, emoji);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

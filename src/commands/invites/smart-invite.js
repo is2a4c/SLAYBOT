@@ -147,7 +147,7 @@ module.exports = {
         description: interaction.options.getString("description"),
         actor: interaction.user,
       });
-      return interaction.followUp({
+      return interaction.safeFollowUp({
         embeds: [recordEmbed(interaction, service, record, "Smart Invite создан")],
       });
     }
@@ -170,7 +170,7 @@ module.exports = {
                 ].join("\n");
               })
               .join("\n\n");
-      return interaction.followUp({
+      return interaction.safeFollowUp({
         embeds: [
           new EmbedBuilder()
             .setColor(interaction.client.config.EMBED_COLORS.BOT_EMBED)
@@ -182,14 +182,14 @@ module.exports = {
 
     if (subcommand === "info") {
       record = (await service.findOwned(interaction.guild.id, slug)).record;
-      return interaction.followUp({
+      return interaction.safeFollowUp({
         embeds: [recordEmbed(interaction, service, record, "Информация о Smart Invite", true)],
       });
     }
 
     if (subcommand === "refresh") {
       record = await service.refresh(interaction.guild.id, slug, interaction.user);
-      return interaction.followUp({
+      return interaction.safeFollowUp({
         embeds: [recordEmbed(interaction, service, record, "Внутренний инвайт обновлён")],
       });
     }
@@ -197,28 +197,28 @@ module.exports = {
     if (subcommand === "set-channel") {
       const channel = interaction.options.getChannel("channel");
       record = await service.setChannel(interaction.guild.id, slug, channel.id, interaction.user);
-      return interaction.followUp({
+      return interaction.safeFollowUp({
         embeds: [recordEmbed(interaction, service, record, "Канал Smart Invite изменён")],
       });
     }
 
     if (subcommand === "set-description") {
       record = await service.setDescription(interaction.guild.id, slug, interaction.options.getString("description"));
-      return interaction.followUp({
+      return interaction.safeFollowUp({
         embeds: [recordEmbed(interaction, service, record, "Описание обновлено")],
       });
     }
 
     if (subcommand === "remove-description") {
       record = await service.setDescription(interaction.guild.id, slug, null);
-      return interaction.followUp({
+      return interaction.safeFollowUp({
         embeds: [recordEmbed(interaction, service, record, "Используется стандартное описание")],
       });
     }
 
     if (subcommand === "rename") {
       record = await service.rename(interaction.guild.id, slug, interaction.options.getString("new-slug"));
-      return interaction.followUp({
+      return interaction.safeFollowUp({
         embeds: [recordEmbed(interaction, service, record, "Smart Invite переименован")],
       });
     }
@@ -235,7 +235,7 @@ module.exports = {
           .setLabel("Отмена")
           .setStyle(ButtonStyle.Secondary)
       );
-      return interaction.followUp({
+      return interaction.safeFollowUp({
         content: `Подтвердите удаление \`${record.slug}\`. Адрес будет удерживаться за сервером до ${formatDate(
           new Date(Date.now() + service.config.deletedSlugRetentionMs)
         )}.`,

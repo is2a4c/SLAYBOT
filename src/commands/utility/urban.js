@@ -38,7 +38,7 @@ module.exports = {
   async interactionRun(interaction) {
     const word = interaction.options.getString("word");
     const response = await urban(word);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

@@ -168,6 +168,6 @@ module.exports = {
       response = await transfer(interaction.user, user, coins);
     }
 
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };

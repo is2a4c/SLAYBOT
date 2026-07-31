@@ -72,7 +72,7 @@ module.exports = {
     const role = interaction.options.getRole("role");
 
     const response = await addRR(interaction.guild, targetChannel, messageId, reaction, role);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

@@ -103,7 +103,7 @@ module.exports = {
       response = await giveReputation(interaction.user, target);
     }
 
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

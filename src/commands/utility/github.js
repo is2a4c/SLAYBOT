@@ -39,7 +39,7 @@ module.exports = {
   async interactionRun(interaction) {
     const username = interaction.options.getString("username");
     const response = await getGithubUser(username, interaction.user);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

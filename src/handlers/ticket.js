@@ -164,19 +164,19 @@ async function handleTicketOpen(interaction) {
   const { guild, user } = interaction;
 
   if (!guild.members.me.permissions.has(OPEN_PERMS))
-    return interaction.followUp(
+    return interaction.safeFollowUp(
       "Cannot create ticket channel, missing `Manage Channel` permission. Contact server manager for help!"
     );
 
   const alreadyExists = getExistingTicketChannel(guild, user.id);
-  if (alreadyExists) return interaction.followUp(`You already have an open ticket`);
+  if (alreadyExists) return interaction.safeFollowUp(`You already have an open ticket`);
 
   const settings = await getSettings(guild);
 
   // limit check
   const existing = getTicketChannels(guild).size;
   if (existing >= settings.ticket.limit)
-    return interaction.followUp("There are too many open tickets. Try again later");
+    return interaction.safeFollowUp("There are too many open tickets. Try again later");
 
   // check categories
   let catName = null;
@@ -308,14 +308,14 @@ async function handleTicketClose(interaction) {
   await interaction.deferReply({ ephemeral: true });
   const settings = await getSettings(interaction.guild);
   if (!canCloseTicket(interaction.member, interaction.user.id, settings, interaction.channel)) {
-    return interaction.followUp("Only the ticket owner or configured support staff can close this ticket.");
+    return interaction.safeFollowUp("Only the ticket owner or configured support staff can close this ticket.");
   }
 
   const status = await closeTicket(interaction.channel, interaction.user);
   if (status === "MISSING_PERMISSIONS") {
-    return interaction.followUp("Cannot close the ticket, missing permissions. Contact server manager for help!");
+    return interaction.safeFollowUp("Cannot close the ticket, missing permissions. Contact server manager for help!");
   } else if (status == "ERROR") {
-    return interaction.followUp("Failed to close the ticket, an error occurred!");
+    return interaction.safeFollowUp("Failed to close the ticket, an error occurred!");
   }
 }
 

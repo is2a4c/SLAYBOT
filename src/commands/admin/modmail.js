@@ -188,14 +188,14 @@ module.exports = {
     const isStaff = isStaffMember(interaction.member, settings);
 
     if (["setup", "off"].includes(sub) && !interaction.member.permissions.has("ManageGuild")) {
-      return interaction.followUp("You need the `Manage Server` permission for this subcommand");
+      return interaction.safeFollowUp("You need the `Manage Server` permission for this subcommand");
     }
     if (["reply", "close", "block", "unblock", "list"].includes(sub) && !isStaff) {
-      return interaction.followUp("Only modmail staff can use this subcommand");
+      return interaction.safeFollowUp("Only modmail staff can use this subcommand");
     }
 
     if (sub === "setup") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await setup(interaction.guild, settings, {
           channel: interaction.options.getChannel("channel"),
           staffRole: interaction.options.getRole("staff_role"),
@@ -205,33 +205,33 @@ module.exports = {
       );
     }
 
-    if (sub === "status") return interaction.followUp({ embeds: [statusEmbed(interaction.guild, settings)] });
+    if (sub === "status") return interaction.safeFollowUp({ embeds: [statusEmbed(interaction.guild, settings)] });
 
-    if (sub === "off") return interaction.followUp(await disable(settings));
+    if (sub === "off") return interaction.safeFollowUp(await disable(settings));
 
     if (sub === "contact") {
-      return interaction.followUp(await contact(interaction, settings, interaction.options.getString("message")));
+      return interaction.safeFollowUp(await contact(interaction, settings, interaction.options.getString("message")));
     }
 
     if (sub === "reply") {
-      return interaction.followUp(await reply(interaction, settings, interaction.options.getString("message")));
+      return interaction.safeFollowUp(await reply(interaction, settings, interaction.options.getString("message")));
     }
 
     if (sub === "close") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await close(interaction, interaction.options.getString("reason"), interaction.user.id)
       );
     }
 
     if (sub === "block" || sub === "unblock") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await block(interaction.guildId, interaction.options.getUser("user"), sub === "block")
       );
     }
 
-    if (sub === "list") return interaction.followUp(await listThreads(interaction.guild));
+    if (sub === "list") return interaction.safeFollowUp(await listThreads(interaction.guild));
 
-    return interaction.followUp("Invalid subcommand");
+    return interaction.safeFollowUp("Invalid subcommand");
   },
 };
 

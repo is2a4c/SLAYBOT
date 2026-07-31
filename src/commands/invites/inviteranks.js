@@ -24,7 +24,7 @@ module.exports = {
 
   async interactionRun(interaction, data) {
     const response = await getInviteRanks(interaction, data.settings);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

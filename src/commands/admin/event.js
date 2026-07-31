@@ -130,16 +130,16 @@ module.exports = {
     const sub = interaction.options.getSubcommand();
 
     try {
-      if (sub === "create") return interaction.followUp(await create(interaction));
-      if (sub === "list") return interaction.followUp(await list(interaction.guild));
+      if (sub === "create") return interaction.safeFollowUp(await create(interaction));
+      if (sub === "list") return interaction.safeFollowUp(await list(interaction.guild));
       if (sub === "cancel")
-        return interaction.followUp(await cancel(interaction.guild, interaction.options.getString("event_id")));
+        return interaction.safeFollowUp(await cancel(interaction.guild, interaction.options.getString("event_id")));
     } catch (ex) {
-      if (ex instanceof EventError) return interaction.followUp(ex.message);
+      if (ex instanceof EventError) return interaction.safeFollowUp(ex.message);
       throw ex;
     }
 
-    return interaction.followUp("Invalid subcommand");
+    return interaction.safeFollowUp("Invalid subcommand");
   },
 };
 

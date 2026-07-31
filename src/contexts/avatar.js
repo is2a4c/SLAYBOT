@@ -14,7 +14,7 @@ module.exports = {
   async run(interaction) {
     const user = await interaction.client.users.fetch(interaction.targetId);
     const response = getAvatar(user);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

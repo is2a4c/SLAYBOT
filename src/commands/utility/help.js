@@ -66,7 +66,7 @@ module.exports = {
     // !help
     if (!cmdName) {
       const response = await getHelpMenu(interaction);
-      const sentMsg = await interaction.followUp(response);
+      const sentMsg = await interaction.safeFollowUp(response);
       return waiter(sentMsg, interaction.user.id);
     }
 
@@ -74,11 +74,11 @@ module.exports = {
     const cmd = interaction.client.slashCommands.get(cmdName);
     if (cmd) {
       const embed = getSlashUsage(cmd);
-      return interaction.followUp({ embeds: [embed] });
+      return interaction.safeFollowUp({ embeds: [embed] });
     }
 
     // No matching command/category found
-    await interaction.followUp("No matching command found");
+    await interaction.safeFollowUp("No matching command found");
   },
 };
 

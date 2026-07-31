@@ -34,7 +34,7 @@ module.exports = {
   async interactionRun(interaction) {
     const page = interaction.options.getInteger("page");
     const response = getQueue(interaction, page);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

@@ -34,7 +34,7 @@ module.exports = {
   async interactionRun(interaction) {
     const amount = interaction.options.getInteger("amount");
     const response = await volume(interaction, amount);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

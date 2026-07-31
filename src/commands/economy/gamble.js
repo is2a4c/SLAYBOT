@@ -39,7 +39,7 @@ module.exports = {
   async interactionRun(interaction) {
     const betAmount = interaction.options.getInteger("coins");
     const response = await gamble(interaction.user, betAmount);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

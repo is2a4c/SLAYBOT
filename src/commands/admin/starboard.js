@@ -184,15 +184,15 @@ module.exports = {
     const settings = data.settings;
 
     if (sub === "channel") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await setChannel(interaction.guild, settings, interaction.options.getChannel("channel"))
       );
     }
 
-    if (sub === "off") return interaction.followUp(await disable(settings));
+    if (sub === "off") return interaction.safeFollowUp(await disable(settings));
 
     if (sub === "config") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await configure(settings, {
           emoji: interaction.options.getString("emoji"),
           threshold: interaction.options.getInteger("threshold"),
@@ -205,21 +205,21 @@ module.exports = {
     }
 
     if (sub === "ignore" || sub === "unignore") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await toggleIgnored(settings, interaction.options.getChannel("channel"), sub === "ignore")
       );
     }
 
-    if (sub === "status") return interaction.followUp({ embeds: [statusEmbed(interaction.guild, settings)] });
+    if (sub === "status") return interaction.safeFollowUp({ embeds: [statusEmbed(interaction.guild, settings)] });
 
-    if (sub === "top") return interaction.followUp(await topStarred(interaction.guild));
+    if (sub === "top") return interaction.safeFollowUp(await topStarred(interaction.guild));
 
     if (sub === "purge") {
       const result = await deleteGuildEntries(interaction.guildId);
-      return interaction.followUp(`Forgot ${result.deletedCount || 0} starboard entr(ies).`);
+      return interaction.safeFollowUp(`Forgot ${result.deletedCount || 0} starboard entr(ies).`);
     }
 
-    return interaction.followUp("Invalid subcommand");
+    return interaction.safeFollowUp("Invalid subcommand");
   },
 };
 

@@ -82,7 +82,7 @@ module.exports = {
       user: interaction.user,
       client: interaction.client,
     });
-    return interaction.followUp(response);
+    return interaction.safeFollowUp(response);
   },
 };
 

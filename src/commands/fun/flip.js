@@ -87,7 +87,7 @@ module.exports = {
     if (sub === "coin") {
       const items = ["HEAD", "TAIL"];
       const toss = items[Math.floor(Math.random() * items.length)];
-      await interaction.followUp({ embeds: [firstEmbed(interaction.user)] });
+      await interaction.safeFollowUp({ embeds: [firstEmbed(interaction.user)] });
 
       setTimeout(() => {
         interaction.editReply({ embeds: [secondEmbed()] }).catch(() => {});
@@ -101,7 +101,7 @@ module.exports = {
     else if (sub === "text") {
       const input = interaction.options.getString("input");
       const response = await flipText(input);
-      await interaction.followUp(response);
+      await interaction.safeFollowUp(response);
     }
   },
 };

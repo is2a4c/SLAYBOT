@@ -22,7 +22,7 @@ module.exports = {
 
   async interactionRun(interaction) {
     const response = shuffle(interaction);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

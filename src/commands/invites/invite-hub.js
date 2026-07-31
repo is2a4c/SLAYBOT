@@ -142,26 +142,26 @@ module.exports = {
     // Management subcommands stay behind Manage Server, the read-only ones do not.
     const managed = ["rank-add", "rank-remove", "add", "reset", "import", "tracker"];
     if (managed.includes(sub) && !interaction.member.permissions.has("ManageGuild")) {
-      return interaction.followUp("You need the `Manage Server` permission for this subcommand");
+      return interaction.safeFollowUp("You need the `Manage Server` permission for this subcommand");
     }
 
     const target = interaction.options.getUser("user");
 
     switch (sub) {
       case "count":
-        return interaction.followUp(await getInvites(interaction, target || interaction.user, settings));
+        return interaction.safeFollowUp(await getInvites(interaction, target || interaction.user, settings));
 
       case "codes":
-        return interaction.followUp(await getInviteCodes(interaction, target || interaction.user));
+        return interaction.safeFollowUp(await getInviteCodes(interaction, target || interaction.user));
 
       case "inviter":
-        return interaction.followUp(await getInviter(interaction, target || interaction.user, settings));
+        return interaction.safeFollowUp(await getInviter(interaction, target || interaction.user, settings));
 
       case "ranks":
-        return interaction.followUp(await getInviteRanks(interaction, settings));
+        return interaction.safeFollowUp(await getInviteRanks(interaction, settings));
 
       case "rank-add":
-        return interaction.followUp(
+        return interaction.safeFollowUp(
           await addInviteRank(
             interaction,
             interaction.options.getRole("role"),
@@ -171,22 +171,28 @@ module.exports = {
         );
 
       case "rank-remove":
-        return interaction.followUp(await removeInviteRank(interaction, interaction.options.getRole("role"), settings));
+        return interaction.safeFollowUp(
+          await removeInviteRank(interaction, interaction.options.getRole("role"), settings)
+        );
 
       case "add":
-        return interaction.followUp(await addInvites(interaction, target, interaction.options.getInteger("invites")));
+        return interaction.safeFollowUp(
+          await addInvites(interaction, target, interaction.options.getInteger("invites"))
+        );
 
       case "reset":
-        return interaction.followUp(await clearInvites(interaction, target));
+        return interaction.safeFollowUp(await clearInvites(interaction, target));
 
       case "import":
-        return interaction.followUp(await importInvites(interaction, target));
+        return interaction.safeFollowUp(await importInvites(interaction, target));
 
       case "tracker":
-        return interaction.followUp(await setStatus(interaction, interaction.options.getString("status"), settings));
+        return interaction.safeFollowUp(
+          await setStatus(interaction, interaction.options.getString("status"), settings)
+        );
 
       default:
-        return interaction.followUp("Invalid subcommand");
+        return interaction.safeFollowUp("Invalid subcommand");
     }
   },
 };

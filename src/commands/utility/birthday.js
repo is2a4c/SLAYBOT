@@ -188,7 +188,7 @@ module.exports = {
     const sub = interaction.options.getSubcommand();
 
     if (sub === "set") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await save(
           interaction.guildId,
           interaction.user.id,
@@ -201,23 +201,23 @@ module.exports = {
 
     if (sub === "remove") {
       await removeBirthday(interaction.guildId, interaction.user.id);
-      return interaction.followUp("Your birthday was deleted.");
+      return interaction.safeFollowUp("Your birthday was deleted.");
     }
 
     if (sub === "show") {
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await show(interaction.guildId, interaction.options.getUser("user") || interaction.user)
       );
     }
 
-    if (sub === "list") return interaction.followUp(await list(interaction.guild));
+    if (sub === "list") return interaction.safeFollowUp(await list(interaction.guild));
 
     if (sub === "config") {
       if (!interaction.member.permissions.has("ManageGuild")) {
-        return interaction.followUp("You need the `Manage Server` permission for this subcommand");
+        return interaction.safeFollowUp("You need the `Manage Server` permission for this subcommand");
       }
 
-      return interaction.followUp(
+      return interaction.safeFollowUp(
         await configure(interaction.guild, data.settings, {
           enabled: interaction.options.getString("status") === "ON",
           channel: interaction.options.getChannel("channel"),
@@ -229,7 +229,7 @@ module.exports = {
       );
     }
 
-    return interaction.followUp("Invalid subcommand");
+    return interaction.safeFollowUp("Invalid subcommand");
   },
 };
 

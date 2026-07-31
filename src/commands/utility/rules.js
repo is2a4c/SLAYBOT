@@ -12,7 +12,7 @@ module.exports = {
   },
 
   async interactionRun(interaction) {
-    await interaction.followUp({ embeds: buildRulesEmbeds() });
+    await interaction.safeFollowUp({ embeds: buildRulesEmbeds() });
   },
 };
 

@@ -25,7 +25,7 @@ module.exports = {
 
   async interactionRun(interaction) {
     const response = await beg(interaction.user);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

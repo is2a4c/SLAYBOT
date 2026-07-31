@@ -74,7 +74,7 @@ module.exports = {
       default:
         response = "Invalid Leaderboard type. Choose either `xp`, `invite`or `rep`";
     }
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

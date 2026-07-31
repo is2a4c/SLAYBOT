@@ -149,22 +149,22 @@ module.exports = {
           durationMs: duration ? ems(duration) : null,
         });
 
-        return interaction.followUp(reply);
+        return interaction.safeFollowUp(reply);
       }
 
-      if (sub === "list") return interaction.followUp(await renderOpenPolls(interaction.guild));
+      if (sub === "list") return interaction.safeFollowUp(await renderOpenPolls(interaction.guild));
 
       if (sub === "close") {
-        return interaction.followUp(
+        return interaction.safeFollowUp(
           await close(interaction, interaction.options.getString("message_id"), interaction.user.id)
         );
       }
     } catch (ex) {
-      if (ex instanceof PollError) return interaction.followUp(ex.message);
+      if (ex instanceof PollError) return interaction.safeFollowUp(ex.message);
       throw ex;
     }
 
-    return interaction.followUp("Invalid subcommand");
+    return interaction.safeFollowUp("Invalid subcommand");
   },
 };
 

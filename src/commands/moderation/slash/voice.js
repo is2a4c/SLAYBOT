@@ -164,6 +164,6 @@ module.exports = {
       response = await move(interaction, target, reason, channel);
     }
 
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };

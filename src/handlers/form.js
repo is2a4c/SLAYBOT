@@ -185,11 +185,11 @@ async function handleFormModal(interaction) {
 
   try {
     const form = await findForm(interaction.guildId, formId);
-    if (!form) return interaction.followUp("This form no longer exists");
-    if (!form.enabled) return interaction.followUp("This form is closed and no longer accepts responses");
+    if (!form) return interaction.safeFollowUp("This form no longer exists");
+    if (!form.enabled) return interaction.safeFollowUp("This form is closed and no longer accepts responses");
 
     if (!form.allow_multiple && (await hasResponded(interaction.guildId, formId, interaction.user.id))) {
-      return interaction.followUp("You have already submitted a response to this form");
+      return interaction.safeFollowUp("You have already submitted a response to this form");
     }
 
     const answers = form.questions.map((question, i) => ({
@@ -202,14 +202,14 @@ async function handleFormModal(interaction) {
     const analysis = await analyzeFormResponseSafely(interaction, form, answers, settings);
     const delivered = await sendResponseToChannel(interaction.guild, form, interaction.user, answers, analysis);
 
-    return interaction.followUp(
+    return interaction.safeFollowUp(
       delivered
         ? "Your response has been recorded. Thank you!"
         : "Your response has been recorded, but I could not post it in the responses channel. Please inform a moderator"
     );
   } catch (ex) {
     error("handleFormModal", ex);
-    return interaction.followUp("Failed to save your response, an error occurred!");
+    return interaction.safeFollowUp("Failed to save your response, an error occurred!");
   }
 }
 

@@ -42,7 +42,7 @@ module.exports = {
   async interactionRun(interaction) {
     const choice = interaction.options.getString("query");
     const response = await getLyric(interaction.user, choice);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

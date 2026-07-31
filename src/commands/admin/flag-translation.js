@@ -47,7 +47,7 @@ module.exports = {
 
   async interactionRun(interaction, data) {
     const response = await setFlagTranslation(interaction.options.getString("status"), data.settings);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

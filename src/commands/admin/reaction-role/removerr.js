@@ -53,7 +53,7 @@ module.exports = {
     const messageId = interaction.options.getString("message_id");
 
     const response = await removeRR(interaction.guild, targetChannel, messageId);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

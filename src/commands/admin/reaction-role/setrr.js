@@ -60,7 +60,7 @@ module.exports = {
       interaction.options.getString("message_id"),
       interaction.options.getString("pairs")
     );
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

@@ -103,7 +103,7 @@ module.exports = {
       response = `Invalid subcommand ${sub}`;
     }
 
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

@@ -93,7 +93,7 @@ module.exports = {
       client: interaction.client,
       requester: interaction.user,
     });
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

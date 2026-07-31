@@ -19,6 +19,6 @@ module.exports = {
   },
 
   async interactionRun(interaction) {
-    await interaction.followUp(`🏓 Pong : \`${Math.floor(interaction.client.ws.ping)}ms\``);
+    await interaction.safeFollowUp(`🏓 Pong : \`${Math.floor(interaction.client.ws.ping)}ms\``);
   },
 };

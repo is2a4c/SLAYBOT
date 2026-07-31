@@ -45,8 +45,8 @@ module.exports = {
   async interactionRun(interaction, data) {
     const suggestion = interaction.options.getString("suggestion");
     const response = await suggest(interaction.member, suggestion, data.settings);
-    if (typeof response === "boolean") interaction.followUp("Your suggestion has been submitted!");
-    else await interaction.followUp(response);
+    if (typeof response === "boolean") interaction.safeFollowUp("Your suggestion has been submitted!");
+    else await interaction.safeFollowUp(response);
   },
 };
 

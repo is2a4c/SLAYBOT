@@ -36,7 +36,7 @@ module.exports = {
   async interactionRun(interaction) {
     const time = interaction.options.getString("time");
     const response = await seekTo(interaction, time);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

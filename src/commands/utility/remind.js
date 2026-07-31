@@ -133,13 +133,13 @@ module.exports = {
           dm: interaction.options.getBoolean("dm") || false,
         });
 
-        return interaction.followUp(
+        return interaction.safeFollowUp(
           `Got it. I will remind you ${time(remindAt, "R")}${repeat ? `, then every ${repeat}` : ""}.`
         );
       }
 
       if (sub === "list") {
-        return interaction.followUp(await renderList(interaction.guildId, interaction.user.id));
+        return interaction.safeFollowUp(await renderList(interaction.guildId, interaction.user.id));
       }
 
       if (sub === "cancel") {
@@ -148,14 +148,14 @@ module.exports = {
           userId: interaction.user.id,
           index: interaction.options.getInteger("number"),
         });
-        return interaction.followUp(`Cancelled: ${cancelled.payload.content.slice(0, 100)}`);
+        return interaction.safeFollowUp(`Cancelled: ${cancelled.payload.content.slice(0, 100)}`);
       }
     } catch (ex) {
-      if (ex instanceof ReminderError) return interaction.followUp(ex.message);
+      if (ex instanceof ReminderError) return interaction.safeFollowUp(ex.message);
       throw ex;
     }
 
-    return interaction.followUp("Invalid subcommand");
+    return interaction.safeFollowUp("Invalid subcommand");
   },
 };
 

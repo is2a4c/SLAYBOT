@@ -101,14 +101,14 @@ module.exports = {
       const invites = interaction.options.getInteger("invites");
 
       const response = await addInviteRank(interaction, role, invites, data.settings);
-      await interaction.followUp(response);
+      await interaction.safeFollowUp(response);
     }
 
     //
     else if (sub === "remove") {
       const role = interaction.options.getRole("role");
       const response = await removeInviteRank(interaction, role, data.settings);
-      await interaction.followUp(response);
+      await interaction.safeFollowUp(response);
     }
   },
 };

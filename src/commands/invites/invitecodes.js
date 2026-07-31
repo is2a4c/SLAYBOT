@@ -35,7 +35,7 @@ module.exports = {
   async interactionRun(interaction) {
     const user = interaction.options.getUser("user") || interaction.user;
     const response = await getInviteCodes(interaction, user);
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
 

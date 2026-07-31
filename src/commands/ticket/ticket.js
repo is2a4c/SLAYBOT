@@ -308,11 +308,11 @@ module.exports = {
     let response;
 
     if (ADMIN_SUBCOMMANDS.has(sub) && !memberHasPermission(interaction.member, "ManageGuild")) {
-      return interaction.followUp("You need the `Manage Server` permission to configure tickets.");
+      return interaction.safeFollowUp("You need the `Manage Server` permission to configure tickets.");
     }
 
     if (STAFF_SUBCOMMANDS.has(sub) && !isTicketStaff(interaction.member, data.settings, interaction.channel)) {
-      return interaction.followUp("Only configured support staff can manage ticket participants.");
+      return interaction.safeFollowUp("Only configured support staff can manage ticket participants.");
     }
 
     // setup
@@ -320,7 +320,7 @@ module.exports = {
       const channel = interaction.options.getChannel("channel");
 
       if (!interaction.guild.members.me.permissions.has("ManageChannels")) {
-        return interaction.followUp("I am missing `Manage Channels` to create ticket channels");
+        return interaction.safeFollowUp("I am missing `Manage Channels` to create ticket channels");
       }
 
       await interaction.deleteReply();
@@ -383,7 +383,7 @@ module.exports = {
       response = listStaffRoles(data.settings);
     }
 
-    if (response) await interaction.followUp(response);
+    if (response) await interaction.safeFollowUp(response);
   },
 };
 

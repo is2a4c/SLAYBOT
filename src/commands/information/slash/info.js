@@ -87,7 +87,7 @@ module.exports = {
 
   async interactionRun(interaction) {
     const sub = interaction.options.getSubcommand();
-    if (!sub) return interaction.followUp("Not a valid subcommand");
+    if (!sub) return interaction.safeFollowUp("Not a valid subcommand");
     let response;
 
     // user
@@ -134,6 +134,6 @@ module.exports = {
       response = "Incorrect subcommand";
     }
 
-    await interaction.followUp(response);
+    await interaction.safeFollowUp(response);
   },
 };
