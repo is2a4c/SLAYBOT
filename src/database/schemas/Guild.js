@@ -267,6 +267,9 @@ Schema.pre("validate", function (next) {
 const Model = mongoose.models["guild"] ? mongoose.model("guild") : mongoose.model("guild", Schema);
 
 module.exports = {
+  model: Model,
+  cache,
+
   /**
    * @param {import('discord.js').Guild} guild
    */

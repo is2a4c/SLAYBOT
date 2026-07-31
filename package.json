@@ -20,6 +20,7 @@
     "docker:stop": "docker compose down",
     "debug:load": "node --trace-warnings scripts/debug-load.js",
     "runtime:check": "node scripts/check-runtime-config.js",
+    "db:fix-appearance": "node scripts/fix-appearance-settings.js",
     "image-spam:check": "node scripts/check-image-spam.js",
     "image-spam:model:download": "node scripts/download-image-spam-model.js",
     "image-spam:e2e": "node scripts/check-image-spam-e2e.js",

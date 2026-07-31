@@ -4,6 +4,7 @@ const { cacheSelfRolePanels } = require("@schemas/SelfRolePanel");
 const { cacheStickyMessages } = require("@schemas/StickyMessage");
 const { getSettings } = require("@schemas/Guild");
 const { getActiveBlock } = require("@src/services/blockedServers");
+const { runMigrations } = require("@src/database/migrations");
 const { startScheduler } = require("@src/services/scheduler/runtime");
 const { FeedWatcher } = require("@src/services/feeds/FeedWatcher");
 
@@ -12,6 +13,9 @@ const { FeedWatcher } = require("@src/services/feeds/FeedWatcher");
  */
 module.exports = async (client) => {
   client.logger.success(`Logged in as ${client.user.tag}! (${client.user.id})`);
+
+  // Repair settings saved before they were validated, before anything reads them.
+  await runMigrations(client).catch((error) => client.logger.error("Failed to run database migrations", error));
 
   // Update Bot Presence (before music init to ensure it runs even if music crashes)
   if (client.config.PRESENCE.enabled) {

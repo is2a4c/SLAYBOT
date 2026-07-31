@@ -80,6 +80,24 @@ deleted on their own, including after a restart.
 join-to-create channel if none is given. `/vc` opens a private copy of the panel
 for anybody who does not want to scroll back to it.
 
+## Colours and images
+
+Fields the bot has to hand to Discord are checked before they are stored: a
+colour must be hex (`#A855F7`, or `a855f7` — the hash is filled in), an image
+must be an `https` link. Discord throws on anything else, which would break the
+message at send time rather than at setup.
+
+Servers configured before this check existed may still hold an unusable value.
+The bot clears those on startup, setting them back to the default, and logs what
+it changed. To run it against a database without starting the bot:
+
+```bash
+npm run db:fix-appearance -- --dry-run
+```
+
+Drop `--dry-run` to apply it. It is safe to run repeatedly — a second pass finds
+nothing to do.
+
 ## Language
 
 ```
