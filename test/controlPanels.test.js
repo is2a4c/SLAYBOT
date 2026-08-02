@@ -36,21 +36,40 @@ function makeSettings(overrides = {}) {
  * @param {{customId: string, values?: string[], text?: string, manageGuild?: boolean}} input
  */
 function makeInteraction({ customId, values, text, manageGuild = true }) {
-  const seen = { update: [], reply: [], modal: [] };
+  const seen = { update: [], reply: [], modal: [], defer: 0 };
 
-  return {
+  const interaction = {
     customId,
     values,
     seen,
+    deferred: false,
+    replied: false,
     client: {},
+    user: { id: "1" },
     guild: { preferredLocale: "ru" },
     member: { permissions: { has: () => manageGuild } },
     fields: { getTextInputValue: () => text },
     isFromMessage: () => true,
-    update: async (payload) => seen.update.push(payload),
-    reply: async (payload) => seen.reply.push(payload),
+    // Both ways of drawing land in the same place: what matters is what the
+    // message ended up showing.
+    update: async (payload) => {
+      interaction.replied = true;
+      seen.update.push(payload);
+    },
+    editReply: async (payload) => seen.update.push(payload),
+    deferUpdate: async () => {
+      interaction.deferred = true;
+      seen.defer += 1;
+    },
+    reply: async (payload) => {
+      interaction.replied = true;
+      seen.reply.push(payload);
+    },
+    followUp: async (payload) => seen.reply.push(payload),
     showModal: async (modal) => seen.modal.push(modal),
   };
+
+  return interaction;
 }
 
 const router = { matches, handle };

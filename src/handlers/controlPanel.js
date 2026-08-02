@@ -3,6 +3,7 @@ const { EMBED_COLORS } = require("@root/config");
 const { applyBranding, resolveBranding } = require("@helpers/Branding");
 const { guildTranslator } = require("@src/i18n");
 const { HOME_ID, PANELS, SYSTEM_ICONS, SYSTEM_IDS } = require("@src/services/panels/registry");
+const { redraw, slowRedraw, warn } = require("@src/services/panels/reply");
 
 const HUB_PREFIX = "PANELHUB";
 const OPEN = "open";
@@ -132,12 +133,14 @@ module.exports = {
 
     // Settings are server-wide, so the panels stay behind Manage Server.
     if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-      await interaction.reply({ content: t("panels.common.forbidden"), ephemeral: true });
+      await warn(interaction, t("panels.common.forbidden"));
       return true;
     }
 
     if (customId === HOME_ID) {
-      await interaction.update(await buildHub(t, settings, interaction.client, interaction.guild));
+      // The hub asks each list system how much it holds, so the click is
+      // acknowledged before any of that starts.
+      await slowRedraw(interaction, () => buildHub(t, settings, interaction.client, interaction.guild));
       return true;
     }
 
@@ -146,7 +149,14 @@ module.exports = {
       const panel = PANELS[name];
       if (!panel) return true;
 
-      await interaction.update(await panel.open(t, settings, interaction));
+      // A settings panel is drawn from what is already in memory and answers in
+      // one round-trip; a list panel has to read its entries first.
+      if (panel.kind === "collection") {
+        await slowRedraw(interaction, () => panel.open(t, settings, interaction));
+        return true;
+      }
+
+      await redraw(interaction, await panel.open(t, settings, interaction));
       return true;
     }
 

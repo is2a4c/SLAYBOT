@@ -11,6 +11,7 @@ const {
   TextInputStyle,
 } = require("discord.js");
 const { definePanel } = require("./definePanel");
+const { redraw, warn } = require("./reply");
 
 /**
  * A settings screen made of icon buttons.
@@ -337,7 +338,7 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
     if (!panel.matches(interaction.customId)) return false;
 
     const parsed = panel.parse(interaction.customId);
-    const redraw = () => interaction.update(build(t, settings, interaction.client));
+    const draw = () => redraw(interaction, build(t, settings, interaction.client));
 
     /**
      * Redraw and store at the same time. The panel already holds the new value,
@@ -351,14 +352,14 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
         interaction.client?.logger?.error("panel: failed to save settings", error);
       });
 
-      await redraw();
+      await draw();
       await saving;
       // Some settings do something once stored, such as posting a public panel.
       await field.after?.(interaction, settings, t);
     }
 
     if (parsed.action === BACK) {
-      await redraw();
+      await draw();
       return true;
     }
 
@@ -383,7 +384,8 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
         return true;
       }
 
-      await interaction.update(
+      await redraw(
+        interaction,
         buildPicker(t, settings, field, { client: interaction.client, guild: interaction.guild })
       );
       return true;
@@ -409,7 +411,7 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
       const max = field.max ?? 99;
 
       if (!/^-?\d+$/.test(raw) || parsedNumber < min || parsedNumber > max) {
-        await interaction.reply({ content: t("common.numberRange", { min, max }), ephemeral: true });
+        await warn(interaction, t("common.numberRange", { min, max }));
         return true;
       }
       value = parsedNumber;
@@ -423,7 +425,7 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
     if (value !== null && field.validate) {
       const checked = field.validate(value);
       if (!checked.ok) {
-        await interaction.reply({ content: t(checked.reason), ephemeral: true });
+        await warn(interaction, t(checked.reason));
         return true;
       }
       value = checked.value ?? value;
@@ -438,7 +440,7 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
 
     await settings.save();
     await field.after?.(interaction, settings, t);
-    await interaction.reply({ content: t("common.saved"), ephemeral: true });
+    await warn(interaction, t("common.saved"));
 
     return true;
   }

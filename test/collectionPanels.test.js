@@ -61,12 +61,14 @@ function makePanel(overrides = {}) {
  * @param {{customId: string, values?: string[], text?: string}} input
  */
 function makeInteraction({ customId, values, text }) {
-  const seen = { update: [], reply: [], modal: [], edit: [], followUp: [], defer: 0 };
+  const seen = { drawn: [], update: [], reply: [], modal: [], edit: [], followUp: [], defer: 0 };
 
-  return {
+  const interaction = {
     customId,
     values,
     seen,
+    deferred: false,
+    replied: false,
     user: { id: USER },
     member: { permissions: { has: () => true } },
     client: { user: { username: "SLAYBOT" } },
@@ -77,13 +79,28 @@ function makeInteraction({ customId, values, text }) {
       roles: { cache: new Map() },
     },
     fields: { getTextInputValue: () => text },
-    update: async (payload) => seen.update.push(payload),
-    reply: async (payload) => seen.reply.push(payload),
+    update: async (payload) => {
+      interaction.replied = true;
+      seen.update.push(payload);
+      seen.drawn.push(payload);
+    },
+    reply: async (payload) => {
+      interaction.replied = true;
+      seen.reply.push(payload);
+    },
     showModal: async (modal) => seen.modal.push(modal),
-    deferUpdate: async () => (seen.defer += 1),
-    editReply: async (payload) => seen.edit.push(payload),
+    deferUpdate: async () => {
+      interaction.deferred = true;
+      seen.defer += 1;
+    },
+    editReply: async (payload) => {
+      seen.edit.push(payload);
+      seen.drawn.push(payload);
+    },
     followUp: async (payload) => seen.followUp.push(payload),
   };
+
+  return interaction;
 }
 
 test.beforeEach(() => draft.reset());
@@ -96,7 +113,7 @@ test("the list names what the server has and offers to add another", async () =>
 
   await panel.handle(interaction, {}, t);
 
-  const [payload] = interaction.seen.update;
+  const [payload] = interaction.seen.drawn;
   assert.match(payload.embeds[0].data.description, /первая/);
 
   const menu = payload.components[0].components[0].toJSON();
@@ -117,7 +134,7 @@ test("a full list cannot be added to", async () => {
   const interaction = makeInteraction({ customId: "TESTCOL:list" });
   await panel.handle(interaction, {}, t);
 
-  const add = interaction.seen.update[0].components[1].components[0].data;
+  const add = interaction.seen.drawn[0].components[1].components[0].data;
   assert.equal(add.disabled, true, "the limit is shown, not discovered on save");
 });
 
@@ -127,7 +144,7 @@ test("opening an entry fills the form with what is stored", async () => {
 
   await panel.handle(interaction, {}, t);
 
-  const description = interaction.seen.update[0].embeds[0].data.description;
+  const description = interaction.seen.drawn[0].embeds[0].data.description;
   assert.match(description, /`первая`/);
   assert.match(description, new RegExp(`<#${CHANNEL}>`));
   assert.deepEqual(draft.read(USER, "TESTCOL|a").name, "первая");
@@ -139,7 +156,7 @@ test("a new entry starts empty, with its defaults, and cannot be created yet", a
 
   await panel.handle(interaction, {}, t);
 
-  const [payload] = interaction.seen.update;
+  const [payload] = interaction.seen.drawn;
   assert.match(payload.embeds[0].data.description, /⚠️/, "what is missing is flagged");
   assert.equal(draft.read(USER, "TESTCOL|+").enabled, true, "a default is filled in for you");
 
@@ -162,7 +179,7 @@ test("filling the fields unlocks creating, and creating stores what was filled i
   assert.deepEqual(calls.create, [{ enabled: true, name: "вторая", channel: CHANNEL }]);
   assert.equal(run.seen.defer, 1, "saving talks to Discord, so the click is acknowledged first");
   assert.deepEqual(run.seen.followUp[0].content, "создано");
-  assert.match(run.seen.edit[0].embeds[0].data.description, /вторая/, "the list comes back with it");
+  assert.match(run.seen.drawn[0].embeds[0].data.description, /вторая/, "the list comes back with it");
   assert.deepEqual(draft.read(USER, "TESTCOL|+"), {}, "the draft does not linger into the next entry");
 });
 
@@ -174,7 +191,7 @@ test("a half-filled entry is refused instead of half-created", async () => {
   await panel.handle(run, {}, t);
 
   assert.deepEqual(calls.create, []);
-  assert.match(run.seen.reply[0].content, /Сначала заполни/);
+  assert.match((run.seen.reply[0] || run.seen.followUp[0]).content, /Сначала заполни/);
 });
 
 test("editing an entry saves it under its own key", async () => {
@@ -198,7 +215,7 @@ test("a toggle flips in place and colours its button", async () => {
 
   assert.equal(draft.read(USER, "TESTCOL|a").enabled, false);
 
-  const button = flip.seen.update[0].components
+  const button = flip.seen.drawn[0].components
     .flatMap((row) => row.components)
     .find((entry) => entry.data.custom_id === "TESTCOL:field:a|enabled");
   assert.equal(button.data.style, ButtonStyle.Secondary);
@@ -220,7 +237,7 @@ test("an entry that vanished sends you back to the list rather than to an empty 
 
   await panel.handle(interaction, {}, t);
 
-  assert.match(interaction.seen.update[0].embeds[0].data.title, /Ленты/);
+  assert.match(interaction.seen.drawn[0].embeds[0].data.title, /Ленты/);
 });
 
 test("a number outside its range is refused without touching the draft", async () => {

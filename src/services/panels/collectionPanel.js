@@ -3,6 +3,7 @@ const { EMBED_COLORS } = require("@root/config");
 const { applyBranding, resolveBranding } = require("@helpers/Branding");
 const draft = require("./draft");
 const editor = require("./fieldEditor");
+const { ack, redraw, slowRedraw, warn } = require("./reply");
 
 /**
  * A settings panel for things a server has several of.
@@ -303,7 +304,7 @@ function defineCollectionPanel(definition) {
     if (!parsed) return false;
 
     const context = { guild: interaction.guild, settings, user: interaction.user, client: interaction.client, t };
-    const showList = async () => interaction.update(await buildList(t, settings, interaction));
+    const showList = () => slowRedraw(interaction, () => buildList(t, settings, interaction));
 
     if (parsed.action === "list") {
       await showList();
@@ -315,18 +316,21 @@ function defineCollectionPanel(definition) {
       for (const field of fields) {
         if (field.default !== undefined) draft.write(interaction.user.id, draftPath(NEW), field.id, field.default);
       }
-      await interaction.update(buildEntry(t, settings, interaction, NEW));
+      await redraw(interaction, buildEntry(t, settings, interaction, NEW));
       return true;
     }
 
     if (parsed.action === "open" || (parsed.kind === "select" && parsed.action === "open")) {
       const key = parsed.kind === "select" ? interaction.values[0] : parsed.ref;
+      // Reading the entry back is a database round-trip of its own.
+      await ack(interaction);
+
       if (!(await adopt(interaction, settings, key))) {
         await showList();
         return true;
       }
 
-      await interaction.update(buildEntry(t, settings, interaction, key));
+      await redraw(interaction, buildEntry(t, settings, interaction, key));
       return true;
     }
 
@@ -343,27 +347,24 @@ function defineCollectionPanel(definition) {
       if (parsed.kind === "modal") {
         const parsedValue = editor.parseInput(field, interaction.fields.getTextInputValue("value"));
         if (!parsedValue.ok) {
-          await interaction.reply({
-            content: t(parsedValue.reason, { min: field.min ?? 0, max: field.max ?? 99 }),
-            ephemeral: true,
-          });
+          await warn(interaction, t(parsedValue.reason, { min: field.min ?? 0, max: field.max ?? 99 }));
           return true;
         }
 
         draft.write(interaction.user.id, draftPath(key), fieldId, parsedValue.value);
-        await interaction.update(buildEntry(t, settings, interaction, key));
+        await redraw(interaction, buildEntry(t, settings, interaction, key));
         return true;
       }
 
       if (parsed.kind === "select") {
         draft.write(interaction.user.id, draftPath(key), fieldId, interaction.values[0] ?? null);
-        await interaction.update(buildEntry(t, settings, interaction, key));
+        await redraw(interaction, buildEntry(t, settings, interaction, key));
         return true;
       }
 
       if (field.type === "toggle") {
         draft.write(interaction.user.id, draftPath(key), fieldId, !values[fieldId]);
-        await interaction.update(buildEntry(t, settings, interaction, key));
+        await redraw(interaction, buildEntry(t, settings, interaction, key));
         return true;
       }
 
@@ -374,7 +375,7 @@ function defineCollectionPanel(definition) {
         return true;
       }
 
-      await interaction.update(buildPicker(t, settings, interaction, key, field));
+      await redraw(interaction, buildPicker(t, settings, interaction, key, field));
       return true;
     }
 
@@ -384,32 +385,32 @@ function defineCollectionPanel(definition) {
       const gaps = editor.missing(fields, values);
 
       if (gaps.length) {
-        await interaction.reply({
-          content: t("collections.missing", { names: gaps.map((field) => editor.label(field, t)).join(", ") }),
-          ephemeral: true,
-        });
+        await warn(
+          interaction,
+          t("collections.missing", { names: gaps.map((field) => editor.label(field, t)).join(", ") })
+        );
         return true;
       }
 
       // Saving talks to Discord and to the source being watched, which is slower
       // than the three seconds a click may take.
-      await interaction.deferUpdate();
+      await ack(interaction);
       const result =
         key === NEW ? await create({ ...context, values }) : await update({ ...context, key, values, previous: key });
 
       if (result.ok) draft.clear(interaction.user.id, draftPath(key === NEW ? NEW : key));
 
-      await interaction.editReply(await buildList(t, settings, interaction));
+      await redraw(interaction, await buildList(t, settings, interaction));
       await interaction.followUp({ content: result.message, ephemeral: true });
       return true;
     }
 
     if (parsed.action === "del") {
-      await interaction.deferUpdate();
+      await ack(interaction);
       const result = await remove({ ...context, key: parsed.ref });
 
       draft.clear(interaction.user.id, draftPath(parsed.ref));
-      await interaction.editReply(await buildList(t, settings, interaction));
+      await redraw(interaction, await buildList(t, settings, interaction));
       await interaction.followUp({ content: result.message, ephemeral: true });
       return true;
     }

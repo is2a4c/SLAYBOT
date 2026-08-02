@@ -8,6 +8,7 @@ const draft = require("@src/services/panels/draft");
 const { asCommandInteraction, buildOptions } = require("@src/services/commands/proxy");
 const { asMessage } = require("@src/services/commands/message");
 const editor = require("@src/services/panels/fieldEditor");
+const { redraw: draw, warn } = require("@src/services/panels/reply");
 
 /**
  * Every command of the bot, as a panel.
@@ -369,15 +370,12 @@ async function run(interaction, { command, leaf }, t, settings) {
       guild: interaction.guild,
     }) || commandHandler.cooldownProblem(command, interaction.user.id);
 
-  if (problem) return interaction.reply({ content: problem, ephemeral: true });
+  if (problem) return warn(interaction, problem);
 
   const values = draft.read(interaction.user.id, leaf.path);
   const stillMissing = leaf.options.filter((option) => option.required && values[option.id] === undefined);
   if (stillMissing.length) {
-    return interaction.reply({
-      content: t("commands.missing", { names: stillMissing.map((option) => option.name).join(", ") }),
-      ephemeral: true,
-    });
+    return warn(interaction, t("commands.missing", { names: stillMissing.map((option) => option.name).join(", ") }));
   }
 
   const startedAt = Date.now();
@@ -495,7 +493,7 @@ module.exports = {
     if (!parsed) return false;
 
     const t = guildTranslator(settings, interaction.guild);
-    const redraw = (payload) => interaction.update(payload);
+    const redraw = (payload) => draw(interaction, payload);
 
     if (parsed.action === "home") {
       await redraw(buildCatalog(t, interaction, settings));

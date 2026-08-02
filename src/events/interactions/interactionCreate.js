@@ -17,6 +17,7 @@ const {
   ticketHandler,
 } = require("@src/handlers");
 const { InteractionType } = require("discord.js");
+const { ackIfSlow, expired } = require("@src/services/panels/reply");
 
 // Discord gives three seconds to answer a click before it gives up on us, so
 // anything approaching that is worth having in the log with its custom id.
@@ -33,6 +34,16 @@ function describe(interaction) {
 }
 
 /**
+ * The guild settings a panel needs, acknowledging the click if reading them takes
+ * long enough to put Discord's three-second window at risk.
+ *
+ * @param {import('discord.js').MessageComponentInteraction} interaction
+ */
+function panelSettings(interaction) {
+  return ackIfSlow(interaction, getSettings(interaction.guild));
+}
+
+/**
  * @param {import('@src/structures').BotClient} client
  * @param {import('discord.js').BaseInteraction} interaction
  */
@@ -41,6 +52,11 @@ module.exports = async (client, interaction) => {
 
   try {
     return await route(client, interaction);
+  } catch (error) {
+    // A click Discord has given up on cannot be answered, and saying so in full
+    // buries the errors that are worth reading.
+    if (expired(error)) client.logger.debug?.(`Interaction expired: ${describe(interaction)}`);
+    else client.logger.error(`interaction ${describe(interaction)}`, error);
   } finally {
     const elapsed = Date.now() - startedAt;
     if (elapsed >= SLOW_INTERACTION_MS) {
@@ -89,12 +105,12 @@ async function route(client, interaction) {
 
     // Every command of the bot, as a panel.
     if (commandPanelHandler.matches(interaction.customId)) {
-      return commandPanelHandler.handle(interaction, await getSettings(interaction.guild));
+      return commandPanelHandler.handle(interaction, await panelSettings(interaction));
     }
 
     // The settings panels: the hub and every system inside it.
     if (controlPanelHandler.matches(interaction.customId)) {
-      return controlPanelHandler.handle(interaction, await getSettings(interaction.guild));
+      return controlPanelHandler.handle(interaction, await panelSettings(interaction));
     }
 
     if (tempVoiceHandler.matchesButton(interaction.customId)) {
@@ -156,11 +172,11 @@ async function route(client, interaction) {
     }
 
     if (commandPanelHandler.matches(interaction.customId)) {
-      return commandPanelHandler.handle(interaction, await getSettings(interaction.guild));
+      return commandPanelHandler.handle(interaction, await panelSettings(interaction));
     }
 
     if (controlPanelHandler.matches(interaction.customId)) {
-      return controlPanelHandler.handle(interaction, await getSettings(interaction.guild));
+      return controlPanelHandler.handle(interaction, await panelSettings(interaction));
     }
 
     // autorole pickers: AUTOROLE:<add|remove>
