@@ -2,6 +2,7 @@ const { getSettings } = require("@schemas/Guild");
 const {
   autoroleHandler,
   commandHandler,
+  commandPanelHandler,
   contextHandler,
   controlPanelHandler,
   formHandler,
@@ -86,6 +87,11 @@ async function route(client, interaction) {
   else if (interaction.isButton()) {
     if (await smartInvitesHandler.handleButton(interaction)) return;
 
+    // Every command of the bot, as a panel.
+    if (commandPanelHandler.matches(interaction.customId)) {
+      return commandPanelHandler.handle(interaction, await getSettings(interaction.guild));
+    }
+
     // The settings panels: the hub and every system inside it.
     if (controlPanelHandler.matches(interaction.customId)) {
       return controlPanelHandler.handle(interaction, await getSettings(interaction.guild));
@@ -149,6 +155,10 @@ async function route(client, interaction) {
       return tempVoiceHandler.handleSelect(interaction, await getSettings(interaction.guild));
     }
 
+    if (commandPanelHandler.matches(interaction.customId)) {
+      return commandPanelHandler.handle(interaction, await getSettings(interaction.guild));
+    }
+
     if (controlPanelHandler.matches(interaction.customId)) {
       return controlPanelHandler.handle(interaction, await getSettings(interaction.guild));
     }
@@ -178,6 +188,10 @@ async function route(client, interaction) {
     // temp voice modals carry the channel: TV~MOD:<action>:<channelId>
     if (tempVoiceHandler.matchesModal(interaction.customId)) {
       return tempVoiceHandler.handleModal(interaction, await getSettings(interaction.guild));
+    }
+
+    if (commandPanelHandler.matches(interaction.customId)) {
+      return commandPanelHandler.handle(interaction, await getSettings(interaction.guild));
     }
 
     if (controlPanelHandler.matches(interaction.customId)) {

@@ -62,6 +62,13 @@ module.exports = {
 
   getReactionRoles: (guildId, channelId, messageId) => rrCache.get(getKey(guildId, channelId, messageId)) || [],
 
+  /**
+   * Every configured message of one server, for the panel that lists them.
+   *
+   * @param {string} guildId
+   */
+  listGuildReactionRoles: (guildId) => Model.find({ guild_id: guildId }).sort({ created_at: 1 }).lean(),
+
   addReactionRole: async (guildId, channelId, messageId, emote, roleId) => {
     const filter = { guild_id: guildId, channel_id: channelId, message_id: messageId };
 

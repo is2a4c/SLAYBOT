@@ -3,9 +3,10 @@ const { EMBED_COLORS } = require("@root/config");
 const { applyBranding, resolveBranding } = require("@helpers/Branding");
 
 /**
- * Every control surface in the bot is the same shape: an embed that names what
- * the icons do, and rows of icon buttons underneath. This builds one from a
- * declaration so the systems stay consistent and only differ in their actions.
+ * Every control surface in the bot is the same shape: an embed naming what the
+ * icons do — with what each one is currently set to, where there is something to
+ * show — and rows of icon buttons underneath. This builds one from a declaration
+ * so the systems stay consistent and only differ in their actions.
  *
  * Custom ids are namespaced per panel:
  *   `TICKET:close`            a button
@@ -19,6 +20,19 @@ const { applyBranding, resolveBranding } = require("@helpers/Branding");
 const SELECT_MARK = "~SEL";
 const MODAL_MARK = "~MOD";
 
+// Discord refuses an embed longer than this, and refusing it at send time would
+// lose the whole panel rather than the tail of one setting.
+const MAX_TITLE = 256;
+const MAX_DESCRIPTION = 4096;
+
+/**
+ * @param {string} text
+ * @param {number} limit
+ */
+function fit(text, limit) {
+  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+}
+
 /**
  * @typedef {Object} PanelAction
  * @property {string} id action name, also the translation key under `actionsKey`
@@ -30,12 +44,13 @@ const MODAL_MARK = "~MOD";
  * @param {Object} definition
  * @param {string} definition.id custom id namespace, uppercase
  * @param {string} definition.titleKey
+ * @param {string} [definition.icon] emoji shown before the title
  * @param {string} definition.descriptionKey
  * @param {string} definition.actionsKey translation prefix for the action names
  * @param {string} [definition.hintKey] closing line under the legend
  * @param {PanelAction[][]} definition.rows up to five rows of up to five actions
  */
-function definePanel({ id, titleKey, descriptionKey, actionsKey, hintKey, rows }) {
+function definePanel({ id, titleKey, icon, descriptionKey, actionsKey, hintKey, rows }) {
   const actions = rows.flat();
   const actionIds = actions.map((action) => action.id);
   const byId = new Map(actions.map((action) => [action.id, action]));
@@ -69,26 +84,61 @@ function definePanel({ id, titleKey, descriptionKey, actionsKey, hintKey, rows }
   }
 
   /**
+   * The legend under the description.
+   *
+   * With values to show, every action gets a line of its own carrying the icon of
+   * its button and what that setting currently is, grouped exactly like the rows
+   * of buttons below it — so a line and its button are always found together.
+   * Without values there is nothing to line up, so a row stays one compact line.
+   *
+   * @param {(key: string, vars?: object) => string} t
+   * @param {Record<string, string>|null} values
+   * @param {string|null} focus action the panel is currently asking about
+   * @returns {string}
+   */
+  function legend(t, values, focus) {
+    const name = (action) => t(`${actionsKey}.${action.id}`);
+
+    if (!values) {
+      return rows.map((row) => row.map((action) => `${action.emoji} ${name(action)}`).join("  ·  ")).join("\n");
+    }
+
+    return rows
+      .map((row) =>
+        row
+          .map((action) => {
+            // The one being edited is underlined, so a picker says what it is for.
+            const label = action.id === focus ? `__${name(action)}__` : name(action);
+            const value = values[action.id];
+            return value ? `${action.emoji} **${label}:** ${value}` : `${action.emoji} **${label}**`;
+          })
+          .join("\n")
+      )
+      .join("\n\n");
+  }
+
+  /**
    * @param {(key: string, vars?: object) => string} t translator
    * @param {Object} [context]
    * @param {object} [context.settings] guild settings, for branding
    * @param {import('discord.js').Client} [context.client]
-   * @param {string[]} [context.status] lines describing the current configuration
+   * @param {Record<string, string>} [context.values] what each setting currently is
    * @param {string[]} [context.disabled] actions to render greyed out
+   * @param {Record<string, number>} [context.styles] button styles overriding the declared ones
+   * @param {string} [context.focus] action the panel is currently asking about
    * @returns {{embeds: EmbedBuilder[], components: ActionRowBuilder[]}}
    */
-  function build(t, { settings, client, status = [], disabled = [] } = {}) {
-    const legend = rows
-      .map((row) => row.map((action) => `${action.emoji} ${t(`${actionsKey}.${action.id}`)}`).join("  ·  "))
-      .join("\n");
+  function build(t, { settings, client, values = null, disabled = [], styles = {}, focus = null } = {}) {
+    const description = [t(descriptionKey), "", legend(t, values, focus)];
+    // Subtext keeps the hint readable without competing with the settings above it.
+    if (hintKey) description.push("", `-# ${t(hintKey)}`);
 
-    const description = [t(descriptionKey), "", ...(status.length ? [...status, ""] : []), legend];
-    if (hintKey) description.push("", t(hintKey));
+    const title = icon ? `${icon} ${t(titleKey)}` : t(titleKey);
 
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLORS.BOT_EMBED)
-      .setTitle(t(titleKey))
-      .setDescription(description.join("\n"));
+      .setTitle(fit(title, MAX_TITLE))
+      .setDescription(fit(description.join("\n"), MAX_DESCRIPTION));
 
     applyBranding(embed, resolveBranding(settings, client), { force: true });
 
@@ -99,7 +149,7 @@ function definePanel({ id, titleKey, descriptionKey, actionsKey, hintKey, rows }
           new ButtonBuilder()
             .setCustomId(buttonId(action.id))
             .setEmoji(action.emoji)
-            .setStyle(action.style)
+            .setStyle(styles[action.id] ?? action.style)
             .setDisabled(off.has(action.id))
         )
       )
@@ -110,6 +160,7 @@ function definePanel({ id, titleKey, descriptionKey, actionsKey, hintKey, rows }
 
   return {
     id,
+    icon,
     rows,
     actions,
     actionIds,
@@ -126,4 +177,4 @@ function definePanel({ id, titleKey, descriptionKey, actionsKey, hintKey, rows }
   };
 }
 
-module.exports = { MODAL_MARK, SELECT_MARK, definePanel };
+module.exports = { MAX_DESCRIPTION, MAX_TITLE, MODAL_MARK, SELECT_MARK, definePanel, fit };

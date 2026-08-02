@@ -32,6 +32,7 @@ const ACTION_ROWS = [
 const panel = definePanel({
   id: "TV",
   titleKey: "tempvoice.panel.title",
+  icon: "🎙️",
   descriptionKey: "tempvoice.panel.description",
   hintKey: "tempvoice.panel.hint",
   actionsKey: "tempvoice.actions",

@@ -28,6 +28,35 @@ function createModels({ docs = [], actors = [] } = {}) {
   return { bucketModel, actorModel, writes };
 }
 
+test("a command run from the panel is counted as its own way of running one", async () => {
+  const { bucketModel, actorModel, writes } = createModels();
+  const service = new TelemetryService({
+    config: { enabled: true, retentionDays: 30 },
+    bucketModel,
+    actorModel,
+    hashSecret: "test-secret",
+    now: () => NOW,
+    logger: { warn: () => {} },
+  });
+
+  service.recordCommand({
+    guildId: GUILD_ID,
+    userId: USER_ID,
+    commandName: "ban",
+    source: "panel",
+    success: true,
+    durationMs: 10,
+  });
+  await service.flush();
+
+  const update = writes.buckets.find((operation) => operation.updateOne.filter._id.includes(":global:")).updateOne
+    .update;
+
+  assert.equal(update.$inc["counters.panel_commands"], 1);
+  assert.equal(update.$inc["counters.prefix_commands"], undefined, "it is not passed off as a typed command");
+  assert.equal(update.$inc["counters.commands"], 1);
+});
+
 test("telemetry batches global and guild aggregates without storing raw actor IDs", async () => {
   const { bucketModel, actorModel, writes } = createModels();
   const service = new TelemetryService({

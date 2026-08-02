@@ -2,6 +2,7 @@ module.exports = {
   automodHandler: require("./automod"),
   autoroleHandler: require("./autorole"),
   commandHandler: require("./command"),
+  commandPanelHandler: require("./commandPanel"),
   contextHandler: require("./context"),
   controlPanelHandler: require("./controlPanel"),
   counterHandler: require("./counter"),
