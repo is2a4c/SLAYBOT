@@ -8,7 +8,7 @@ const draft = require("@src/services/panels/draft");
 const { asCommandInteraction, buildOptions } = require("@src/services/commands/proxy");
 const { asMessage } = require("@src/services/commands/message");
 const editor = require("@src/services/panels/fieldEditor");
-const { redraw: draw, warn } = require("@src/services/panels/reply");
+const { guard, redraw: draw, warn } = require("@src/services/panels/reply");
 
 /**
  * Every command of the bot, as a panel.
@@ -184,7 +184,8 @@ function buildCategory(t, interaction, settings, category, page = 0) {
       [
         t("commands.pickCommand"),
         "",
-        shown.map((command) => `\`/${command.name}\` — ${fit(command.description, 70)}`).join("\n"),
+        shown.map((command) => `\`/${command.name}\` — ${fit(command.description, 70)}`).join("\n") ||
+          t("commands.emptyCatalog"),
         "",
         `-# ${pages > 1 ? t("commands.page", { page: current + 1, pages }) : t("commands.hint")}`,
       ].join("\n")
@@ -192,16 +193,18 @@ function buildCategory(t, interaction, settings, category, page = 0) {
 
   brand(interaction, embed, settings);
 
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId(selectId("cmd", category))
-    .setPlaceholder(t("commands.pickCommand"))
-    .addOptions(
-      shown.map((command) => ({
-        value: command.name,
-        label: fit(`/${command.name}`, 100),
-        description: fit(command.description, 100) || undefined,
-      }))
-    );
+  const menu = shown.length
+    ? new StringSelectMenuBuilder()
+        .setCustomId(selectId("cmd", category))
+        .setPlaceholder(t("commands.pickCommand"))
+        .addOptions(
+          shown.map((command) => ({
+            value: command.name,
+            label: fit(`/${command.name}`, 100),
+            description: fit(command.description, 100) || undefined,
+          }))
+        )
+    : null;
 
   const paging =
     pages > 1
@@ -221,7 +224,7 @@ function buildCategory(t, interaction, settings, category, page = 0) {
 
   return {
     embeds: [embed],
-    components: [new ActionRowBuilder().addComponents(menu), navigationRow(t, HOME, paging)],
+    components: [...(menu ? [new ActionRowBuilder().addComponents(menu)] : []), navigationRow(t, HOME, paging)],
   };
 }
 
@@ -466,113 +469,120 @@ function openCommand(t, interaction, settings, path) {
   return leaves[0] ? buildForm(t, interaction, settings, { command, leaf: leaves[0] }) : null;
 }
 
-module.exports = {
-  HOME,
-  PREFIX,
-  buildCatalog,
-  buildCategory,
-  buildForm,
-  buildPicker,
-  parse,
+/**
+ * @param {string} customId
+ * @returns {boolean}
+ */
+function matches(customId) {
+  return parse(customId) !== null;
+}
 
-  /**
-   * @param {string} customId
-   * @returns {boolean}
-   */
-  matches(customId) {
-    return parse(customId) !== null;
-  },
+/**
+ * @param {import('discord.js').Interaction} interaction
+ * @param {object} settings guild settings document
+ * @returns {Promise<boolean>} whether the interaction belonged here
+ */
+async function handle(interaction, settings) {
+  const parsed = parse(interaction.customId);
+  if (!parsed) return false;
 
-  /**
-   * @param {import('discord.js').Interaction} interaction
-   * @param {object} settings guild settings document
-   * @returns {Promise<boolean>} whether the interaction belonged here
-   */
-  async handle(interaction, settings) {
-    const parsed = parse(interaction.customId);
-    if (!parsed) return false;
+  const t = guildTranslator(settings, interaction.guild);
 
-    const t = guildTranslator(settings, interaction.guild);
-    const redraw = (payload) => draw(interaction, payload);
+  return guard(interaction, () => route(interaction, settings, t, parsed), {
+    message: t("commands.failed"),
+    logger: interaction.client?.logger,
+    label: "command panel",
+  });
+}
 
-    if (parsed.action === "home") {
+/**
+ * @param {import('discord.js').Interaction} interaction
+ * @param {object} settings guild settings document
+ * @param {(key: string, vars?: object) => string} t
+ * @param {{kind: string, action: string, ref: string}} parsed
+ */
+async function route(interaction, settings, t, parsed) {
+  const redraw = (payload) => draw(interaction, payload);
+
+  if (parsed.action === "home") {
+    await redraw(buildCatalog(t, interaction, settings));
+    return true;
+  }
+
+  if (parsed.action === "cat") {
+    const [category, page] = parsed.ref.split(":");
+    await redraw(buildCategory(t, interaction, settings, category, Number.parseInt(page, 10) || 0));
+    return true;
+  }
+
+  // The commands menu of a category, and the subcommand menu of a command.
+  if (parsed.kind === "select" && (parsed.action === "cmd" || parsed.action === "leaf")) {
+    const screen = openCommand(t, interaction, settings, interaction.values[0]);
+    await redraw(screen || buildCatalog(t, interaction, settings));
+    return true;
+  }
+
+  if (parsed.action === "cmd") {
+    const screen = openCommand(t, interaction, settings, parsed.ref);
+    await redraw(screen || buildCatalog(t, interaction, settings));
+    return true;
+  }
+
+  if (parsed.action === "run") {
+    const target = catalog.resolve(interaction.client, interaction.member, parsed.ref);
+    if (!target) {
       await redraw(buildCatalog(t, interaction, settings));
       return true;
     }
 
-    if (parsed.action === "cat") {
-      const [category, page] = parsed.ref.split(":");
-      await redraw(buildCategory(t, interaction, settings, category, Number.parseInt(page, 10) || 0));
-      return true;
-    }
-
-    // The commands menu of a category, and the subcommand menu of a command.
-    if (parsed.kind === "select" && (parsed.action === "cmd" || parsed.action === "leaf")) {
-      const screen = openCommand(t, interaction, settings, interaction.values[0]);
-      await redraw(screen || buildCatalog(t, interaction, settings));
-      return true;
-    }
-
-    if (parsed.action === "cmd") {
-      const screen = openCommand(t, interaction, settings, parsed.ref);
-      await redraw(screen || buildCatalog(t, interaction, settings));
-      return true;
-    }
-
-    if (parsed.action === "run") {
-      const target = catalog.resolve(interaction.client, interaction.member, parsed.ref);
-      if (!target) {
-        await redraw(buildCatalog(t, interaction, settings));
-        return true;
-      }
-
-      await run(interaction, target, t, settings);
-      return true;
-    }
-
-    if (parsed.action === "opt") {
-      const [path, optionId] = parsed.ref.split("|");
-      const target = catalog.resolve(interaction.client, interaction.member, path);
-      const option = target?.leaf.options.find((entry) => entry.id === optionId);
-
-      if (!option) {
-        await redraw(buildCatalog(t, interaction, settings));
-        return true;
-      }
-
-      const values = draft.read(interaction.user.id, path);
-
-      if (parsed.kind === "modal") {
-        const raw = interaction.fields.getTextInputValue("value").trim();
-        draft.write(interaction.user.id, path, optionId, parseValue(option, raw));
-        await redraw(buildForm(t, interaction, settings, target));
-        return true;
-      }
-
-      if (parsed.kind === "select") {
-        draft.write(interaction.user.id, path, optionId, interaction.values[0] ?? null);
-        await redraw(buildForm(t, interaction, settings, target));
-        return true;
-      }
-
-      if (option.type === "toggle") {
-        draft.write(interaction.user.id, path, optionId, !values[optionId]);
-        await redraw(buildForm(t, interaction, settings, target));
-        return true;
-      }
-
-      if (option.type === "text" || option.type === "number") {
-        await interaction.showModal(buildModal(option, values[optionId] ?? null, path, t));
-        return true;
-      }
-
-      await redraw(buildPicker(t, interaction, settings, target, option));
-      return true;
-    }
-
+    await run(interaction, target, t, settings);
     return true;
-  },
-};
+  }
+
+  if (parsed.action === "opt") {
+    const [path, optionId] = parsed.ref.split("|");
+    const target = catalog.resolve(interaction.client, interaction.member, path);
+    const option = target?.leaf.options.find((entry) => entry.id === optionId);
+
+    if (!option) {
+      await redraw(buildCatalog(t, interaction, settings));
+      return true;
+    }
+
+    const values = draft.read(interaction.user.id, path);
+
+    if (parsed.kind === "modal") {
+      const raw = interaction.fields.getTextInputValue("value").trim();
+      draft.write(interaction.user.id, path, optionId, parseValue(option, raw));
+      await redraw(buildForm(t, interaction, settings, target));
+      return true;
+    }
+
+    if (parsed.kind === "select") {
+      draft.write(interaction.user.id, path, optionId, interaction.values[0] ?? null);
+      await redraw(buildForm(t, interaction, settings, target));
+      return true;
+    }
+
+    if (option.type === "toggle") {
+      draft.write(interaction.user.id, path, optionId, !values[optionId]);
+      await redraw(buildForm(t, interaction, settings, target));
+      return true;
+    }
+
+    if (option.type === "text" || option.type === "number") {
+      await interaction.showModal(buildModal(option, values[optionId] ?? null, path, t));
+      return true;
+    }
+
+    await redraw(buildPicker(t, interaction, settings, target, option));
+    return true;
+  }
+
+  return true;
+}
+
+module.exports = { HOME, PREFIX, buildCatalog, buildCategory, buildForm, buildPicker, handle, matches, parse };
 
 /**
  * Turn what somebody typed into what the command expects to be given.

@@ -4,7 +4,7 @@ require("module-alias/register");
 
 const { ack, ackIfSlow, expired, redraw, warn } = require("@src/services/panels/reply");
 const { defineCollectionPanel } = require("@src/services/panels/collectionPanel");
-const { buildHub, handle, matches } = require("@src/handlers/controlPanel");
+const controlPanel = require("@src/handlers/controlPanel");
 const draft = require("@src/services/panels/draft");
 const { translate } = require("@src/i18n");
 
@@ -187,7 +187,7 @@ test("the hub acknowledges the click before counting what each system holds", as
   PANELS.feeds.isActive = () => counting.promise;
 
   try {
-    const handled = handle.call({ matches, handle }, interaction, settings);
+    const handled = controlPanel.handle(interaction, settings);
     await new Promise((resolve) => setImmediate(resolve));
 
     assert.equal(interaction.seen.defer, 1, "the hub does not wait on the database to answer the click");
@@ -209,7 +209,7 @@ test("the hub gives up on a system that will not answer, and still opens", async
   PANELS.feeds.isActive = () => new Promise(() => {});
 
   try {
-    const hub = await buildHub(t, settings, {}, { id: "9" });
+    const hub = await controlPanel.buildHub(t, settings, {}, { id: "9" });
     const [running, idle] = hub.embeds[0].data.fields;
 
     assert.match(`${running.value}\n${idle.value}`, /Ленты/, "the system is still listed");
@@ -217,4 +217,85 @@ test("the hub gives up on a system that will not answer, and still opens", async
   } finally {
     PANELS.feeds.isActive = original;
   }
+});
+
+/* ------------------------------------------------------------- broken input */
+
+test("a panel that throws says so instead of leaving the click unanswered", async () => {
+  const panel = makeSlowPanel(() => {
+    throw new TypeError("stored data from an older shape");
+  });
+
+  const interaction = makeInteraction({ customId: "TIMING:list" });
+  const settings = { counters: [], save: async () => {} };
+  const logged = [];
+
+  const { guard } = require("@src/services/panels/reply");
+  await guard(interaction, () => panel.handle(interaction, settings, t), {
+    message: "не получилось",
+    logger: { error: (...args) => logged.push(args) },
+  });
+
+  assert.equal(interaction.seen.reply[0]?.content || interaction.seen.followUp[0]?.content, "не получилось");
+  assert.equal(logged.length, 1, "and the reason is in the log rather than lost");
+});
+
+test("one unreadable entry costs its own line, not the list", async () => {
+  const panel = makeSlowPanel(async () => [{ id: "a" }, { id: null }]);
+  const interaction = makeInteraction({ customId: "TIMING:list" });
+
+  // The second entry has no id, so describing it the usual way throws.
+  const broken = defineCollectionPanel({
+    id: "BROKEN",
+    icon: "🧪",
+    titleKey: "panels.feeds.title",
+    descriptionKey: "panels.feeds.description",
+    emptyKey: "panels.feeds.empty",
+    hintKey: "panels.feeds.hint",
+    fields: [{ id: "name", nameKey: "panels.counters.fields.name", emoji: "✏️", type: "text", required: true }],
+    list: async () => [{ id: "a" }, { id: null }],
+    keyOf: (entry) => entry.id || "?",
+    summarise: (entry) => entry.id.toUpperCase(),
+    describe: (entry) => entry.id.toUpperCase(),
+    toValues: (entry) => ({ name: entry.id }),
+    create: async () => ({ ok: true, message: "ok" }),
+    update: async () => ({ ok: true, message: "ok" }),
+    remove: async () => ({ ok: true, message: "ok" }),
+  });
+
+  const click = makeInteraction({ customId: "BROKEN:list" });
+  await broken.handle(click, {}, t);
+
+  const description = click.seen.drawn[0].payload.embeds[0].data.description;
+  assert.match(description, /A/, "the entry that reads fine is still shown");
+  assert.match(description, /⚠️/, "and the one that does not is flagged");
+
+  assert.ok(panel && interaction, "the slow panel above is untouched by this");
+});
+
+test("a counter stored without its kind does not break the list", async () => {
+  const { PANELS } = require("@src/services/panels/registry");
+  const settings = { counters: [{ name: "Сломанный", channel_id: "555" }], save: async () => {} };
+  const interaction = makeInteraction({ customId: "PANELHUB:open:counters" });
+
+  await controlPanel.handle(interaction, settings);
+
+  assert.equal(interaction.seen.drawn.length, 1, "the panel still opens");
+  assert.ok(PANELS.counters.fields.length);
+});
+
+test("a category with nothing left in it opens without an empty menu", async () => {
+  const commandPanel = require("@src/handlers/commandPanel");
+  const interaction = makeInteraction({ customId: "CMDP:cat:MUSIC" });
+  // Nobody may run anything here any more.
+  interaction.client.slashCommands = new Map();
+  interaction.client.commands = [];
+  interaction.member.id = "1";
+
+  await commandPanel.handle(interaction, {});
+
+  const menus = interaction.seen.drawn[0].payload.components.flatMap((row) =>
+    row.components.filter((component) => component.options)
+  );
+  assert.equal(menus.length, 0, "Discord refuses a select menu with no rows");
 });

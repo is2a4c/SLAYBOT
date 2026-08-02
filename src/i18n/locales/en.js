@@ -20,6 +20,7 @@ module.exports = {
       hint: "Use the buttons below — the panel updates as you go.",
       range: "between {min} and {max}",
       forbidden: "Only someone with **Manage Server** can change these settings.",
+      failed: "The panel could not be opened. Try again — what went wrong is in the log.",
       badColor: "Use a hex colour such as `#A855F7`. Leave it empty to fall back to the default.",
       badUrl: "Use a link starting with `https://`. Leave it empty to drop the image.",
     },
@@ -323,6 +324,7 @@ module.exports = {
     missing: "Fill in first: {names}",
     count: "{count} of {max} entries",
     gone: "That entry is already gone.",
+    broken: "This entry is unreadable — open it and save it again.",
   },
 
   commands: {

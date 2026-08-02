@@ -3,7 +3,7 @@ const { EMBED_COLORS } = require("@root/config");
 const { applyBranding, resolveBranding } = require("@helpers/Branding");
 const { guildTranslator } = require("@src/i18n");
 const { HOME_ID, PANELS, SYSTEM_ICONS, SYSTEM_IDS } = require("@src/services/panels/registry");
-const { redraw, slowRedraw, warn } = require("@src/services/panels/reply");
+const { guard, redraw, slowRedraw, warn } = require("@src/services/panels/reply");
 
 const HUB_PREFIX = "PANELHUB";
 const OPEN = "open";
@@ -104,66 +104,77 @@ async function buildHub(t, settings, client, guild) {
   return { embeds: [embed], components };
 }
 
-module.exports = {
-  HUB_PREFIX,
-  buildHub,
+/**
+ * @param {string} customId
+ * @returns {boolean}
+ */
+function matches(customId) {
+  return (
+    String(customId).startsWith(`${HUB_PREFIX}:`) || SYSTEM_IDS.some((name) => PANELS[name].matches(String(customId)))
+  );
+}
 
-  /**
-   * @param {string} customId
-   * @returns {boolean}
-   */
-  matches(customId) {
-    return (
-      String(customId).startsWith(`${HUB_PREFIX}:`) || SYSTEM_IDS.some((name) => PANELS[name].matches(String(customId)))
-    );
-  },
+/**
+ * Route a click, a picked value or a submitted modal to whichever panel owns it.
+ *
+ * @param {import('discord.js').Interaction} interaction
+ * @param {object} settings guild settings document
+ * @returns {Promise<boolean>} whether the interaction belonged to a panel
+ */
+async function handle(interaction, settings) {
+  if (!matches(interaction.customId)) return false;
 
-  /**
-   * Route a click, a picked value or a submitted modal to whichever panel owns it.
-   *
-   * @param {import('discord.js').Interaction} interaction
-   * @param {object} settings guild settings document
-   * @returns {Promise<boolean>} whether the interaction belonged to a panel
-   */
-  async handle(interaction, settings) {
-    const customId = interaction.customId;
-    if (!this.matches(customId)) return false;
+  const t = guildTranslator(settings, interaction.guild);
 
-    const t = guildTranslator(settings, interaction.guild);
+  return guard(interaction, () => route(interaction, settings, t), {
+    message: t("panels.common.failed"),
+    logger: interaction.client?.logger,
+    label: "control panel",
+  });
+}
 
-    // Settings are server-wide, so the panels stay behind Manage Server.
-    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-      await warn(interaction, t("panels.common.forbidden"));
-      return true;
-    }
+/**
+ * @param {import('discord.js').Interaction} interaction
+ * @param {object} settings guild settings document
+ * @param {(key: string, vars?: object) => string} t
+ */
+async function route(interaction, settings, t) {
+  const customId = interaction.customId;
 
-    if (customId === HOME_ID) {
-      // The hub asks each list system how much it holds, so the click is
-      // acknowledged before any of that starts.
-      await slowRedraw(interaction, () => buildHub(t, settings, interaction.client, interaction.guild));
-      return true;
-    }
-
-    if (customId.startsWith(`${HUB_PREFIX}:${OPEN}:`)) {
-      const name = customId.slice(`${HUB_PREFIX}:${OPEN}:`.length);
-      const panel = PANELS[name];
-      if (!panel) return true;
-
-      // A settings panel is drawn from what is already in memory and answers in
-      // one round-trip; a list panel has to read its entries first.
-      if (panel.kind === "collection") {
-        await slowRedraw(interaction, () => panel.open(t, settings, interaction));
-        return true;
-      }
-
-      await redraw(interaction, await panel.open(t, settings, interaction));
-      return true;
-    }
-
-    for (const name of SYSTEM_IDS) {
-      if (await PANELS[name].handle(interaction, settings, t)) return true;
-    }
-
+  // Settings are server-wide, so the panels stay behind Manage Server.
+  if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+    await warn(interaction, t("panels.common.forbidden"));
     return true;
-  },
-};
+  }
+
+  if (customId === HOME_ID) {
+    // The hub asks each list system how much it holds, so the click is
+    // acknowledged before any of that starts.
+    await slowRedraw(interaction, () => buildHub(t, settings, interaction.client, interaction.guild));
+    return true;
+  }
+
+  if (customId.startsWith(`${HUB_PREFIX}:${OPEN}:`)) {
+    const name = customId.slice(`${HUB_PREFIX}:${OPEN}:`.length);
+    const panel = PANELS[name];
+    if (!panel) return true;
+
+    // A settings panel is drawn from what is already in memory and answers in one
+    // round-trip; a list panel has to read its entries first.
+    if (panel.kind === "collection") {
+      await slowRedraw(interaction, () => panel.open(t, settings, interaction));
+      return true;
+    }
+
+    await redraw(interaction, await panel.open(t, settings, interaction));
+    return true;
+  }
+
+  for (const name of SYSTEM_IDS) {
+    if (await PANELS[name].handle(interaction, settings, t)) return true;
+  }
+
+  return true;
+}
+
+module.exports = { HUB_PREFIX, buildHub, handle, matches };

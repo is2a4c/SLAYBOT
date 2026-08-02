@@ -88,6 +88,36 @@ function warn(interaction, content) {
 }
 
 /**
+ * Run a panel and make sure the click is answered either way.
+ *
+ * A panel reads whatever a server has stored, and stored data can be older than
+ * the code reading it. Left alone, one unexpected value throws, nothing answers,
+ * and the member is told the application did not respond — which says nothing
+ * about what happened and looks like the button is broken. Saying so plainly, and
+ * putting the reason in the log, is better on both counts.
+ *
+ * @param {import('discord.js').MessageComponentInteraction} interaction
+ * @param {() => Promise<boolean>} work
+ * @param {{message: string, logger?: object, label?: string}} context
+ * @returns {Promise<boolean>}
+ */
+async function guard(interaction, work, { message, logger, label = "panel" }) {
+  try {
+    return await work();
+  } catch (error) {
+    // A click Discord has already given up on cannot be answered at all.
+    if (expired(error)) {
+      logger?.debug?.(`${label}: interaction expired (${interaction.customId})`);
+      return true;
+    }
+
+    logger?.error?.(`${label}: ${interaction.customId}`, error);
+    await warn(interaction, message).catch(() => {});
+    return true;
+  }
+}
+
+/**
  * Whether an error means the interaction is gone rather than that we did
  * something wrong: it expired, or it was already answered.
  *
@@ -98,4 +128,4 @@ function expired(error) {
   return error?.code === 10062 || error?.code === 40060 || error?.code === "InteractionAlreadyReplied";
 }
 
-module.exports = { PATIENCE_MS, ack, ackIfSlow, expired, redraw, slowRedraw, warn };
+module.exports = { PATIENCE_MS, ack, ackIfSlow, expired, guard, redraw, slowRedraw, warn };

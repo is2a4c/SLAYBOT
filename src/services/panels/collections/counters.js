@@ -46,6 +46,15 @@ const fields = [
  * @param {string} name
  * @param {number[]} stats [all, bots, members]
  */
+/**
+ * The kind a stored counter counts, whatever shape it was written in.
+ *
+ * @param {object} counter
+ */
+function kindOf(counter) {
+  return String(counter?.counter_type || "").toUpperCase();
+}
+
 function channelName(type, name, stats) {
   const [all, bots, members] = stats;
   const count = type === "USERS" ? all : type === "BOTS" ? bots : members;
@@ -64,14 +73,14 @@ module.exports = defineCollectionPanel({
   fields,
 
   list: async (guild, settings) => settings.counters || [],
-  keyOf: (counter) => counter.counter_type.toUpperCase(),
-  summarise: (counter) => `${counter.counter_type.toLowerCase()} · ${counter.name}`,
+  keyOf: (counter) => kindOf(counter),
+  summarise: (counter) => `${kindOf(counter).toLowerCase()} · ${counter.name || "—"}`,
 
   describe: (counter) =>
-    `${TYPE_ICONS[counter.counter_type.toUpperCase()] || "🔢"} **${counter.counter_type.toLowerCase()}** ` +
-    `\`${counter.name}\` → <#${counter.channel_id}>`,
+    `${TYPE_ICONS[kindOf(counter)] || "🔢"} **${kindOf(counter).toLowerCase()}** ` +
+    `\`${counter.name || "—"}\` → <#${counter.channel_id}>`,
 
-  toValues: (counter) => ({ type: counter.counter_type.toUpperCase(), name: counter.name }),
+  toValues: (counter) => ({ type: TYPES.includes(kindOf(counter)) ? kindOf(counter) : null, name: counter.name }),
 
   async create({ guild, settings, values, t }) {
     const type = values.type;

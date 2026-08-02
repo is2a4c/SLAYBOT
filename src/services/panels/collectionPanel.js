@@ -29,6 +29,19 @@ const SELECT_MARK = "~SEL";
 const MODAL_MARK = "~MOD";
 
 /**
+ * @param {() => string} read
+ * @param {string} fallback
+ */
+function safely(read, fallback) {
+  try {
+    const value = read();
+    return value === undefined || value === null || value === "" ? fallback : value;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
  * @param {Object} definition
  * @param {string} definition.id custom id namespace, uppercase
  * @param {string} definition.icon
@@ -152,6 +165,20 @@ function defineCollectionPanel(definition) {
    * @param {object} settings guild settings document
    * @param {import('discord.js').Interaction} interaction
    */
+  /**
+   * One entry as a line, or a placeholder when the entry cannot be read.
+   *
+   * Settings outlive the code that wrote them, and a value from an older shape
+   * should cost the line it belongs to rather than the panel.
+   */
+  function line(entry, t, guild) {
+    try {
+      return describe(entry, t, guild);
+    } catch {
+      return `⚠️ ${t("collections.broken")}`;
+    }
+  }
+
   async function buildList(t, settings, interaction) {
     const entries = await list(interaction.guild, settings);
 
@@ -162,7 +189,7 @@ function defineCollectionPanel(definition) {
         [
           t(descriptionKey),
           "",
-          entries.length ? entries.map((entry) => describe(entry, t, interaction.guild)).join("\n\n") : t(emptyKey),
+          entries.length ? entries.map((entry) => line(entry, t, interaction.guild)).join("\n\n") : t(emptyKey),
           "",
           `-# ${entries.length ? t("collections.count", { count: entries.length, max }) : t(hintKey)}`,
         ]
@@ -172,17 +199,25 @@ function defineCollectionPanel(definition) {
 
     brand(interaction, embed, settings);
 
+    // An entry the panel cannot identify has nothing to put in a menu row, and
+    // Discord rejects the whole menu over one empty value — it stays listed above
+    // as unreadable instead.
+    const openable = entries.map((entry) => ({ entry, key: safely(() => keyOf(entry), "") })).filter((row) => row.key);
+
     const components = [];
-    if (entries.length) {
+    if (openable.length) {
       components.push(
         new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder()
             .setCustomId(selectId("open"))
             .setPlaceholder(t("collections.pick"))
             .addOptions(
-              entries.slice(0, 25).map((entry) => ({
-                value: editor.fit(keyOf(entry), 100),
-                label: editor.fit(summarise(entry, t, interaction.guild), 100),
+              openable.slice(0, 25).map(({ entry, key }) => ({
+                value: editor.fit(key, 100),
+                label: editor.fit(
+                  safely(() => summarise(entry, t, interaction.guild), key),
+                  100
+                ),
               }))
             )
         )

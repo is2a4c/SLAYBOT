@@ -72,8 +72,7 @@ function makeInteraction({ customId, values, text, manageGuild = true }) {
   return interaction;
 }
 
-const router = { matches, handle };
-const route = (interaction, settings) => router.handle.call(router, interaction, settings);
+const route = (interaction, settings) => handle(interaction, settings);
 
 /* --------------------------------------------------------------- structure */
 
