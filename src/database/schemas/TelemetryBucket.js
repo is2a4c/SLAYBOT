@@ -8,6 +8,7 @@ const counterFields = {
   command_failures: { type: Number, default: 0 },
   slash_commands: { type: Number, default: 0 },
   prefix_commands: { type: Number, default: 0 },
+  panel_commands: { type: Number, default: 0 },
   context_commands: { type: Number, default: 0 },
   button_interactions: { type: Number, default: 0 },
   modal_interactions: { type: Number, default: 0 },

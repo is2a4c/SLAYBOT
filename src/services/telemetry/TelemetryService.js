@@ -11,6 +11,7 @@ const VALID_COUNTERS = new Set([
   "command_failures",
   "slash_commands",
   "prefix_commands",
+  "panel_commands",
   "context_commands",
   "button_interactions",
   "modal_interactions",
@@ -27,6 +28,13 @@ const VALID_COUNTERS = new Set([
   "client_errors",
   "client_warnings",
 ]);
+
+// Where a command was run from, and the counter that answers "how".
+const COMMAND_SOURCES = {
+  slash: "slash_commands",
+  prefix: "prefix_commands",
+  panel: "panel_commands",
+};
 
 function utcDay(value = new Date()) {
   const date = new Date(value);
@@ -139,7 +147,9 @@ class TelemetryService {
     if (!this.config.enabled) return;
     const data = { guildId, userId, at };
     this.record("commands", data);
-    this.record(source === "slash" ? "slash_commands" : "prefix_commands", data);
+    // A command run from the panel is neither typed nor slashed; counting it as
+    // one of those would hide whether the panel is used at all.
+    this.record(COMMAND_SOURCES[source] || "prefix_commands", data);
     this.record(success ? "command_successes" : "command_failures", data);
 
     for (const [scope, scopedGuildId] of this.scopes(guildId)) {

@@ -54,13 +54,22 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLORS.BOT_EMBED)
-      .setAuthor({ name: config.panel_title || t("panels.ticket.title") })
-      .setDescription(config.panel_description || "");
+      // The server's own icon, so the panel reads as part of the server rather
+      // than as something a bot dropped into the channel.
+      .setAuthor({
+        name: config.panel_title || t("ticket.panel.title"),
+        iconURL: interaction.guild.iconURL() || undefined,
+      })
+      .setDescription(config.panel_description || t("ticket.panel.body"));
 
     applyBranding(embed, resolveBranding(settings, interaction.client), { force: true });
 
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("TICKET_CREATE").setLabel(t("panels.ticket.open")).setStyle(ButtonStyle.Success)
+      new ButtonBuilder()
+        .setCustomId("TICKET_CREATE")
+        .setEmoji("🎫")
+        .setLabel(t("panels.ticket.open"))
+        .setStyle(ButtonStyle.Success)
     );
 
     const message = await channel.send({ embeds: [embed], components: [row] }).catch(() => null);
@@ -84,7 +93,11 @@ module.exports = {
     await removePrevious(interaction.guild, config.channel_id, config.message_id);
 
     const { verificationHandler } = require("@src/handlers");
-    const panel = verificationHandler.buildPanel(config, { settings, client: interaction.client });
+    const panel = verificationHandler.buildPanel(config, {
+      settings,
+      client: interaction.client,
+      guild: interaction.guild,
+    });
 
     const message = await channel.send(panel).catch(() => null);
     if (!message) return;

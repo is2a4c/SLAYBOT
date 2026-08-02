@@ -1,9 +1,22 @@
 # 🎛 Control Panels
 
-Every system in SLAYBOT is configured the same way: an embed that names what each
-icon does, and rows of icon buttons under it. Nothing has to be typed as command
-options, and the panel redraws itself after every change so the current state is
-always on screen.
+Every system in SLAYBOT is configured the same way: an embed listing each setting
+beside the icon of the button that changes it, and rows of those buttons under it.
+Nothing has to be typed as command options, and the panel redraws itself after
+every change so the current state is always on screen.
+
+A line reads `🔢 **Open ticket limit:** \`10\``, and the settings are grouped
+exactly like the buttons below them — the first line belongs to the first button.
+Anything off or unset is marked ⚪, so what still needs attention is found without
+reading the panel. Long values are shown as a short preview rather than in full.
+
+The buttons carry the same state in their colour:
+
+| Colour | Meaning                                                     |
+| ------ | ----------------------------------------------------------- |
+| Green  | the setting is on, or the button posts something publicly    |
+| Blue   | a channel or role has been chosen                            |
+| Grey   | everything still untouched                                   |
 
 ## The control hub
 
@@ -11,11 +24,15 @@ always on screen.
 /panel
 ```
 
-Opens a private hub with one button per system. Clicking a system replaces the
-hub with that system's panel; the 🏠 button brings the hub back. Everything stays
-in a single ephemeral message, so a server never collects leftover setup posts.
+Opens a private hub with one button per system, split into what the server is
+running and what it has left off — the state of every system before anything is
+clicked. Clicking a system replaces the hub with that system's panel; the 🏠
+button brings the hub back. Everything stays in a single ephemeral message, so a
+server never collects leftover setup posts.
 
-Requires **Manage Server** — both to open the panel and to press anything in it.
+Changing a setting requires **Manage Server**. Somebody without it gets the same
+command opening the [command panel](#every-command-as-a-panel) instead, which is
+the other half of what `/panel` is for.
 
 Systems available from the hub:
 
@@ -33,16 +50,81 @@ Systems available from the hub:
 | 📬   | Modmail           | thread channel, support roles, anonymity                           |
 | 🎂   | Birthdays         | announcement channel, message, birthday role                       |
 | ✨   | AI                | AI moderation, ticket summaries, knowledge base                    |
+| 📡   | Feeds             | Twitch, YouTube, RSS and GitHub sources, one entry each            |
+| 🔢   | Counters          | the voice channels showing the member count                        |
+| 📌   | Sticky messages   | the message that keeps itself at the bottom of a channel           |
+| 🎭   | Reaction roles    | the messages roles are handed out from                             |
 
 ### How the buttons behave
 
-- **Toggles** flip immediately — the panel redraws with the new state.
-- **Numbers and text** open a small dialog with the current value already in it.
-  Out-of-range numbers are rejected without touching what was stored.
-- **Channels and roles** open a picker in place of the buttons. Pick, and the
-  panel comes straight back. Choosing nothing in a multi-select clears the list.
+- **Toggles** flip immediately — the panel redraws with the new state, and the
+  button turns green.
+- **Numbers and text** open a small dialog with the current value already in it
+  and an example of what belongs there. Out-of-range numbers are rejected without
+  touching what was stored.
+- **Channels and roles** open a picker in place of the buttons, already on what is
+  stored, with the setting it belongs to underlined in the embed. Pick, and the
+  panel comes straight back. Choosing nothing clears the setting.
 - **Post the panel** fields place the public message members click — the ticket
-  panel, the verify button, the voice controls — replacing the previous one.
+  panel, the verify button, the voice controls — replacing the previous one. Those
+  public panels are written in the server's language until a server words them
+  itself.
+
+### Systems a server has several of
+
+Feeds, counters, sticky messages and reaction roles are not one setting each — a
+server has as many as it wants. Those four open on a list instead of a form:
+
+- The list names every entry, says whether it is running, and adds up how many of
+  them there are against the limit. **➕ Add** is greyed out once the limit is
+  reached, rather than refusing after everything is filled in.
+- Picking an entry from the menu opens it with its stored values already in place,
+  and every field is the same button-and-dialog as anywhere else. **🗑️ Delete**
+  sits on the same row.
+- Nothing is written until **✅ Create** or **💾 Save** is pressed: adding a feed
+  reaches out to the source first, a sticky message is posted the moment it is
+  saved, and reaction roles are placed on the message. Half-finished edits stay in
+  the panel where they can be corrected.
+
+What each one does when it is saved:
+
+| System         | On save                                                            | On delete                                      |
+| -------------- | ------------------------------------------------------------------ | ---------------------------------------------- |
+| Feeds          | checks the source exists and adopts its current item, so setup does not announce a backlog | stops watching it                              |
+| Counters       | creates the voice channel, or renames it on the spot                | removes the counter and its channel            |
+| Sticky         | posts the message right away; pausing takes the posted copy down    | deletes the posted copy too                    |
+| Reaction roles | adds the reactions to the message and drops the ones no longer used | removes the configuration and the bot's reactions |
+
+## Every command as a panel
+
+Settings are only half of what a bot does; the other half is the hundred-odd
+commands, none of which anybody remembers. The 📚 button on the hub — and `/panel`
+for anybody without Manage Server — opens those as the same kind of screen.
+
+Three steps, in one message:
+
+1. **A section.** Moderation, music, tickets, admin, and so on — only the sections
+   holding something this member is allowed to run.
+2. **A command.** A menu listing what each one does. A command with subcommands
+   asks which one first.
+3. **Its form.** Every option the command takes, one line and one button each,
+   exactly like a settings panel: text and numbers open a dialog, channels, roles
+   and members open a picker, switches flip in place. Options the command cannot
+   run without are marked ⚠️ and their buttons are red, and **▶️ Run** stays
+   disabled until they are filled in.
+
+Pressing Run hands the form to the command itself, which answers the way it always
+does — the panel stays where it is, above the answer.
+
+Nothing about a command is written twice: the form is built from the options the
+command already declares for Discord, so a command added tomorrow appears in the
+panel with no work. Commands that never got a slash version — reaction roles, the
+purge family, the invite tools — get a single box for their arguments, with their
+own usage string as the example.
+
+The panel is not a way around anything: the same permission, owner and cooldown
+checks run as if the command had been typed, and a command somebody may not run is
+not offered to them in the first place.
 
 ## Temporary voice channels
 

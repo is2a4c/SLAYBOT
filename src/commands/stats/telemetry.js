@@ -139,7 +139,7 @@ function renderTelemetryEmbed({ client, guild, summary }) {
         value: [
           `Всего: **${formatNumber(counters.commands)}**`,
           `Успешность: **${successRate}%**`,
-          `Slash / prefix: **${formatNumber(counters.slash_commands)} / ${formatNumber(counters.prefix_commands)}**`,
+          `Slash / prefix / panel: **${formatNumber(counters.slash_commands)} / ${formatNumber(counters.prefix_commands)} / ${formatNumber(counters.panel_commands)}**`,
           `Среднее время: **${formatNumber(commandLatency.averageMs)} мс**`,
           `Максимум: **${formatNumber(commandLatency.maxMs)} мс**`,
         ].join("\n"),

@@ -112,6 +112,19 @@ test("the panel carries the verify button and explains the active mode", () => {
   assert.equal(custom.components[0].components[0].data.label, "Let me in");
 });
 
+test("a panel nobody has worded speaks the language of the server", () => {
+  const russian = buildPanel(config(), { settings: { language: "ru" } });
+
+  assert.match(russian.embeds[0].data.title, /Верификация/);
+  assert.match(russian.embeds[0].data.description, /подтверди, что ты человек/);
+  assert.match(russian.components[0].components[0].data.label, /проверку/i);
+
+  // Wording a server chose for itself is never translated over.
+  const worded = buildPanel(config({ title: "Gate", button_label: "Enter" }), { settings: { language: "ru" } });
+  assert.match(worded.embeds[0].data.title, /Gate/);
+  assert.equal(worded.components[0].components[0].data.label, "Enter");
+});
+
 /* ------------------------------------------------------------ answer timing */
 
 const mongoose = require("mongoose");

@@ -1,6 +1,13 @@
 const { ButtonStyle, ChannelType } = require("discord.js");
 const { defineConfigPanel } = require("./configPanel");
 const publish = require("./publish");
+const counters = require("./collections/counters");
+const feeds = require("./collections/feeds");
+const reactionRoles = require("./collections/reactionRoles");
+const sticky = require("./collections/sticky");
+const { countFeeds } = require("@schemas/Feed");
+const { listStickies } = require("@schemas/StickyMessage");
+const { listGuildReactionRoles } = require("@schemas/ReactionRoles");
 
 /**
  * Every configurable system, described as icons rather than as command options.
@@ -85,7 +92,71 @@ const choice = (id, emoji, key, choices, choicesKey) => ({
 });
 
 // Every system panel keeps a way back to the hub, whatever it redraws into.
-const HOME_ID = "PANELHUB:home";
+const { HOME_ID } = require("./ids");
+
+/**
+ * Icons the hub uses for each system, and each system uses for itself.
+ */
+const SYSTEM_ICONS = {
+  server: "🛠️",
+  tempvoice: "🎙️",
+  ticket: "🎫",
+  verification: "🛡️",
+  welcome: "👋",
+  farewell: "🚪",
+  automod: "🤖",
+  starboard: "⭐",
+  suggestions: "📝",
+  modmail: "📬",
+  birthdays: "🎂",
+  ai: "✨",
+  feeds: "📡",
+  counters: "🔢",
+  sticky: "📌",
+  reactionroles: "🎭",
+};
+
+/**
+ * Whether a system is doing anything on a server right now.
+ *
+ * Most systems have their own switch; the ones that do not are running as soon as
+ * the piece they cannot work without is in place. The hub sorts itself by this, so
+ * what a server has turned on is answered before anything is clicked.
+ */
+const SYSTEM_ACTIVE = {
+  // The basics — prefix, moderation log, warnings — always apply.
+  server: () => true,
+  tempvoice: (settings) => Boolean(settings?.temp_voice?.enabled),
+  ticket: (settings) => Boolean(settings?.ticket?.panel_channel_id),
+  verification: (settings) => Boolean(settings?.verification?.enabled),
+  welcome: (settings) => Boolean(settings?.welcome?.enabled),
+  farewell: (settings) => Boolean(settings?.farewell?.enabled),
+  automod: (settings) => {
+    const config = settings?.automod || {};
+    const checks = [
+      config.anti_invites,
+      config.anti_links,
+      config.anti_attachments,
+      config.anti_spam,
+      config.anti_image_spam,
+      config.anti_ghostping,
+    ];
+    const limits = [config.anti_massmention, config.max_lines, config.max_mentions, config.max_role_mentions];
+    return checks.some(Boolean) || limits.some((limit) => Number(limit) > 0);
+  },
+  starboard: (settings) => Boolean(settings?.starboard?.enabled),
+  suggestions: (settings) => Boolean(settings?.suggestions?.enabled),
+  modmail: (settings) => Boolean(settings?.modmail?.enabled),
+  birthdays: (settings) => Boolean(settings?.birthdays?.enabled),
+  ai: (settings) => Boolean(settings?.ai?.enabled),
+  // A list is running when the server has put something in it. These are the only
+  // ones that have to ask the database, so the hub awaits them.
+  counters: (settings) => (settings?.counters || []).length > 0,
+  feeds: (settings, guild) => (guild ? countFeeds(guild.id).then((count) => count > 0) : false),
+  sticky: (settings, guild) => (guild ? listStickies(guild.id).then((list) => list.length > 0) : false),
+  reactionroles: (settings, guild) =>
+    guild ? listGuildReactionRoles(guild.id).then((list) => list.length > 0) : false,
+};
 
 /**
  * @param {string} name system id, also its translation key
@@ -93,9 +164,10 @@ const HOME_ID = "PANELHUB:home";
  * @param {object[][]} rows
  */
 function system(name, path, rows) {
-  return defineConfigPanel({
+  const panel = defineConfigPanel({
     id: `CFG_${name.toUpperCase()}`,
     titleKey: `panels.${name}.title`,
+    icon: SYSTEM_ICONS[name],
     descriptionKey: `panels.${name}.description`,
     actionsKey: `panels.${name}.fields`,
     hintKey: "panels.common.hint",
@@ -103,12 +175,37 @@ function system(name, path, rows) {
     path,
     rows,
   });
+
+  return withHub(name, "settings", {
+    ...panel,
+    // Every panel opens the same way, whatever shape it has inside.
+    open: (t, settings, interaction) => panel.build(t, settings, interaction.client),
+  });
+}
+
+/**
+ * What the hub needs from a panel, whichever kind it is.
+ *
+ * `kind` says what is inside: "settings" is one screen of values kept on the
+ * guild document, "collection" is a list of entries with their own screens.
+ *
+ * @param {string} name
+ * @param {"settings"|"collection"} kind
+ * @param {object} panel
+ */
+function withHub(name, kind, panel) {
+  return {
+    ...panel,
+    kind,
+    icon: SYSTEM_ICONS[name],
+    isActive: (settings, guild) => SYSTEM_ACTIVE[name]?.(settings, guild) || false,
+  };
 }
 
 const PANELS = {
   server: system("server", "", [
     [
-      text("prefix", "❗", "prefix", { maxLength: 5 }),
+      text("prefix", "❗", "prefix", { maxLength: 5, example: "!" }),
       channel("modlog", "📜", "modlog_channel"),
       roleList("autorole", "🎭", "autorole"),
       toggle("stats", "📈", "stats.enabled"),
@@ -128,7 +225,7 @@ const PANELS = {
       toggle("enabled", "🔘", "enabled"),
       channel("hub", "🎙️", "hub_channel_id", [ChannelType.GuildVoice]),
       channel("category", "📂", "category_id", [ChannelType.GuildCategory]),
-      text("template", "✏️", "name_template", { maxLength: 100 }),
+      text("template", "✏️", "name_template", { maxLength: 100, example: "{user} · {count}" }),
       number("limit", "🔢", "default_limit", 0, 99),
     ],
     [
@@ -171,14 +268,24 @@ const PANELS = {
     [
       toggle("enabled", "🔘", "enabled"),
       channel("channel", "📢", "channel"),
-      text("content", "💬", "content", { long: true, maxLength: 1000, required: false }),
+      text("content", "💬", "content", {
+        long: true,
+        maxLength: 1000,
+        required: false,
+        example: "{member:mention} · {server} · {count}",
+      }),
       text("description", "📝", "embed.description", { long: true, maxLength: 1000, required: false }),
-      text("color", "🎨", "embed.color", { maxLength: 7, required: false, validate: color }),
+      text("color", "🎨", "embed.color", { maxLength: 7, required: false, validate: color, example: "#A855F7" }),
     ],
     [
       text("footer", "🔻", "embed.footer", { maxLength: 200, required: false }),
       toggle("thumbnail", "🖼️", "embed.thumbnail"),
-      text("image", "🏞️", "embed.image", { maxLength: 300, required: false, validate: httpsUrl }),
+      text("image", "🏞️", "embed.image", {
+        maxLength: 300,
+        required: false,
+        validate: httpsUrl,
+        example: "https://example.com/banner.png",
+      }),
     ],
   ]),
 
@@ -186,14 +293,24 @@ const PANELS = {
     [
       toggle("enabled", "🔘", "enabled"),
       channel("channel", "📢", "channel"),
-      text("content", "💬", "content", { long: true, maxLength: 1000, required: false }),
+      text("content", "💬", "content", {
+        long: true,
+        maxLength: 1000,
+        required: false,
+        example: "{member:mention} · {server} · {count}",
+      }),
       text("description", "📝", "embed.description", { long: true, maxLength: 1000, required: false }),
-      text("color", "🎨", "embed.color", { maxLength: 7, required: false, validate: color }),
+      text("color", "🎨", "embed.color", { maxLength: 7, required: false, validate: color, example: "#A855F7" }),
     ],
     [
       text("footer", "🔻", "embed.footer", { maxLength: 200, required: false }),
       toggle("thumbnail", "🖼️", "embed.thumbnail"),
-      text("image", "🏞️", "embed.image", { maxLength: 300, required: false, validate: httpsUrl }),
+      text("image", "🏞️", "embed.image", {
+        maxLength: 300,
+        required: false,
+        validate: httpsUrl,
+        example: "https://example.com/banner.png",
+      }),
     ],
   ]),
 
@@ -224,7 +341,7 @@ const PANELS = {
     [
       toggle("enabled", "🔘", "enabled"),
       channel("channel", "⭐", "channel_id"),
-      text("emoji", "😀", "emoji", { maxLength: 32 }),
+      text("emoji", "😀", "emoji", { maxLength: 32, example: "⭐" }),
       number("threshold", "🔢", "threshold", 1, 100),
       toggle("selfStar", "🙋", "self_star"),
     ],
@@ -255,13 +372,13 @@ const PANELS = {
     [
       toggle("enabled", "🔘", "enabled"),
       channel("channel", "🎉", "channel_id"),
-      text("message", "💬", "message", { long: true, maxLength: 1000 }),
+      text("message", "💬", "message", { long: true, maxLength: 1000, example: "🎉 {member} · {server}" }),
       role("role", "🎂", "role_id"),
       number("hour", "🕘", "hour", 0, 23),
     ],
     [
       number("offset", "🌍", "utc_offset", -12, 14),
-      text("color", "🎨", "color", { maxLength: 7, required: false, validate: color }),
+      text("color", "🎨", "color", { maxLength: 7, required: false, validate: color, example: "#A855F7" }),
     ],
   ]),
 
@@ -280,6 +397,12 @@ const PANELS = {
       toggle("forms", "🗒️", "form_analysis"),
     ],
   ]),
+
+  // Systems a server has several of, each with its own list.
+  feeds: withHub("feeds", "collection", feeds),
+  counters: withHub("counters", "collection", counters),
+  sticky: withHub("sticky", "collection", sticky),
+  reactionroles: withHub("reactionroles", "collection", reactionRoles),
 };
 
 /**
@@ -287,22 +410,10 @@ const PANELS = {
  */
 const SYSTEM_IDS = Object.keys(PANELS);
 
-/**
- * Icons the hub uses for each system.
- */
-const SYSTEM_ICONS = {
-  server: "🛠️",
-  tempvoice: "🎙️",
-  ticket: "🎫",
-  verification: "🛡️",
-  welcome: "👋",
-  farewell: "🚪",
-  automod: "🤖",
-  starboard: "⭐",
-  suggestions: "📝",
-  modmail: "📬",
-  birthdays: "🎂",
-  ai: "✨",
-};
+/** Systems that are one screen of settings on the guild document. */
+const SETTINGS_IDS = SYSTEM_IDS.filter((name) => PANELS[name].kind === "settings");
 
-module.exports = { HOME_ID, PANELS, SYSTEM_ICONS, SYSTEM_IDS };
+/** Systems that are a list of entries. */
+const COLLECTION_IDS = SYSTEM_IDS.filter((name) => PANELS[name].kind === "collection");
+
+module.exports = { COLLECTION_IDS, HOME_ID, PANELS, SETTINGS_IDS, SYSTEM_ACTIVE, SYSTEM_ICONS, SYSTEM_IDS };

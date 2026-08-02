@@ -34,6 +34,27 @@ const { definePanel } = require("./definePanel");
 
 const BACK = "__back";
 
+// One mark for everything that is off or unset, so a glance down the panel finds
+// what still needs attention without reading a word of it.
+const ON = "🟢";
+const OFF = "⚪";
+
+// Free text is a setting, not the message itself: a long welcome would push the
+// rest of the panel out of the embed.
+const PREVIEW = 60;
+
+/**
+ * Free text as one short line of code, safe to drop into the description.
+ *
+ * @param {*} value
+ * @returns {string}
+ */
+function preview(value) {
+  // Backticks would end the code span and let the rest of the value style the panel.
+  const text = String(value).replace(/\s+/g, " ").replace(/`/g, "ʼ").trim();
+  return `\`${text.length > PREVIEW ? `${text.slice(0, PREVIEW - 1)}…` : text}\``;
+}
+
 /**
  * @param {object} target
  * @param {string} path dotted
@@ -61,28 +82,63 @@ function writePath(target, path, value) {
  * @returns {string}
  */
 function formatValue(field, value, t) {
+  const unset = `${OFF} ${t("common.notSet")}`;
+
   switch (field.type) {
     case "toggle":
-      return value ? t("common.enabled") : t("common.disabled");
+      // Short, because the name beside it already says what is being switched.
+      return value ? `${ON} ${t("common.on")}` : `${OFF} ${t("common.off")}`;
     case "channel":
-      return value ? `<#${value}>` : t("common.notSet");
+      return value ? `<#${value}>` : unset;
     case "role":
-      return value ? `<@&${value}>` : t("common.notSet");
+      return value ? `<@&${value}>` : unset;
     case "roleList":
-      return value?.length ? value.map((id) => `<@&${id}>`).join(", ") : t("common.none");
+      return value?.length ? value.map((id) => `<@&${id}>`).join(", ") : `${OFF} ${t("common.none")}`;
     case "channelList":
-      return value?.length ? value.map((id) => `<#${id}>`).join(", ") : t("common.none");
+      return value?.length ? value.map((id) => `<#${id}>`).join(", ") : `${OFF} ${t("common.none")}`;
     case "choice":
-      return value ? t(`${field.choicesKey}.${value}`) : t("common.notSet");
+      return value ? preview(t(`${field.choicesKey}.${value}`)) : unset;
+    case "number":
+      // Where zero is a value the field accepts, it means "do not apply this at
+      // all" — a limit of zero lines is not a limit of zero.
+      if (value === 0) return field.min === 0 ? `${OFF} ${t("common.off")}` : "`0`";
+      return value ? `\`${value}\`` : unset;
     default:
-      return value === 0 || value ? `\`${value}\`` : t("common.notSet");
+      return value === 0 || value ? preview(value) : unset;
   }
+}
+
+/**
+ * The colour a field's button is drawn in.
+ *
+ * The panel is read as a map before it is read as a list: green is on or about to
+ * do something, blue is a channel or role already chosen, grey is everything
+ * still untouched.
+ *
+ * @param {object} field
+ * @param {*} value
+ * @returns {number} discord.js ButtonStyle
+ */
+function buttonStyle(field, value) {
+  if (field.type === "toggle") return value ? ButtonStyle.Success : ButtonStyle.Secondary;
+
+  // Fields that also do something once stored — posting the public panel — are the
+  // one call to action on the screen.
+  if (field.type === "action" || field.after) return ButtonStyle.Success;
+
+  if (field.type === "channel" || field.type === "role" || field.type === "roleList" || field.type === "channelList") {
+    const filled = Array.isArray(value) ? value.length > 0 : Boolean(value);
+    return filled ? ButtonStyle.Primary : ButtonStyle.Secondary;
+  }
+
+  return field.style ?? ButtonStyle.Secondary;
 }
 
 /**
  * @param {Object} definition
  * @param {string} definition.id custom id namespace
  * @param {string} definition.titleKey
+ * @param {string} [definition.icon] emoji shown before the title
  * @param {string} definition.descriptionKey
  * @param {string} definition.actionsKey translation prefix for the field names
  * @param {string} [definition.hintKey]
@@ -91,13 +147,14 @@ function formatValue(field, value, t) {
  * @param {string} [definition.homeId] custom id of a "back to the menu" button kept
  *   on every render, so the way out survives a redraw
  */
-function defineConfigPanel({ id, titleKey, descriptionKey, actionsKey, hintKey, path, rows, homeId }) {
+function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hintKey, path, rows, homeId }) {
   const fields = rows.flat();
   const byId = new Map(fields.map((field) => [field.id, field]));
 
   const panel = definePanel({
     id,
     titleKey,
+    icon,
     descriptionKey,
     actionsKey,
     hintKey,
@@ -108,36 +165,52 @@ function defineConfigPanel({ id, titleKey, descriptionKey, actionsKey, hintKey, 
   const fieldPath = (field) => (field.key ? (path ? `${path}.${field.key}` : field.key) : null);
 
   /**
-   * The "**Name:** value" lines above the legend.
+   * What every setting currently is, keyed by the button that changes it.
    *
    * @param {(key: string, vars?: object) => string} t
    * @param {object} settings guild settings document
-   * @returns {string[]}
+   * @returns {Record<string, string>}
    */
-  function statusLines(t, settings) {
-    return fields
-      .filter((field) => field.type !== "action")
-      .map((field) => {
-        const value = formatValue(field, readPath(settings, fieldPath(field)), t);
-        return `**${t(`${actionsKey}.${field.id}`)}:** ${value}`;
-      });
+  function values(t, settings) {
+    return Object.fromEntries(
+      fields
+        .filter((field) => field.type !== "action")
+        .map((field) => [field.id, formatValue(field, readPath(settings, fieldPath(field)), t)])
+    );
   }
 
   /**
+   * @param {object} settings guild settings document
+   * @returns {Record<string, number>} button style per field
+   */
+  function styles(settings) {
+    return Object.fromEntries(
+      fields.map((field) => [
+        field.id,
+        buttonStyle(field, field.type === "action" ? null : readPath(settings, fieldPath(field))),
+      ])
+    );
+  }
+
+  /**
+   * The way back to the hub, kept on every render so it survives a redraw.
+   *
    * @param {(key: string, vars?: object) => string} t
+   * @param {ButtonBuilder[]} [before] buttons sharing the row, drawn first
    * @returns {ActionRowBuilder[]}
    */
-  function homeRow(t) {
-    if (!homeId) return [];
+  function homeRow(t, before = []) {
+    if (!homeId) return before.length ? [new ActionRowBuilder().addComponents(before)] : [];
 
     return [
-      new ActionRowBuilder().addComponents(
+      new ActionRowBuilder().addComponents([
+        ...before,
         new ButtonBuilder()
           .setCustomId(homeId)
           .setEmoji("🏠")
           .setLabel(t("common.menu"))
-          .setStyle(ButtonStyle.Secondary)
-      ),
+          .setStyle(ButtonStyle.Secondary),
+      ]),
     ];
   }
 
@@ -147,34 +220,56 @@ function defineConfigPanel({ id, titleKey, descriptionKey, actionsKey, hintKey, 
    * @param {import('discord.js').Client} [client]
    */
   function build(t, settings, client) {
-    const base = panel.build(t, { settings, client, status: statusLines(t, settings) });
+    const base = panel.build(t, { settings, client, values: values(t, settings), styles: styles(settings) });
     return { embeds: base.embeds, components: [...base.components, ...homeRow(t)] };
   }
 
   /**
    * The same panel with one picker open in place of the buttons.
    *
+   * The menu opens on what is already stored, the way a modal opens on the text it
+   * is replacing, and picking nothing clears the setting.
+   *
    * @param {(key: string, vars?: object) => string} t
    * @param {object} settings guild settings document
    * @param {object} field
-   * @param {import('discord.js').Client} [client]
+   * @param {{client?: import('discord.js').Client, guild?: import('discord.js').Guild}} [context]
    */
-  function buildPicker(t, settings, field, client) {
-    const base = panel.build(t, { settings, client, status: statusLines(t, settings) });
+  function buildPicker(t, settings, field, { client, guild } = {}) {
+    const base = panel.build(t, {
+      settings,
+      client,
+      values: values(t, settings),
+      styles: styles(settings),
+      focus: field.id,
+    });
+
     const customId = panel.selectId(field.id);
     const placeholder = t(`${actionsKey}.${field.id}`).slice(0, 150);
     const current = readPath(settings, fieldPath(field));
+    const list = field.type === "roleList" || field.type === "channelList";
+    // Discord rejects the whole menu over a default pointing at something the
+    // guild no longer has, so a deleted channel or role is quietly dropped.
+    const alive = (cache) => [current || []].flat().filter((id) => id && cache?.get?.(id));
 
     let menu;
     if (field.type === "channel" || field.type === "channelList") {
+      const chosen = alive(guild?.channels?.cache);
       menu = new ChannelSelectMenuBuilder()
         .setCustomId(customId)
         .setPlaceholder(placeholder)
-        .setChannelTypes(field.channelTypes || [ChannelType.GuildText]);
-      if (field.type === "channelList") menu.setMinValues(0).setMaxValues(field.max || 10);
+        .setChannelTypes(field.channelTypes || [ChannelType.GuildText])
+        .setMinValues(0)
+        .setMaxValues(list ? field.max || 10 : 1);
+      if (chosen.length) menu.setDefaultChannels(chosen);
     } else if (field.type === "role" || field.type === "roleList") {
-      menu = new RoleSelectMenuBuilder().setCustomId(customId).setPlaceholder(placeholder);
-      if (field.type === "roleList") menu.setMinValues(0).setMaxValues(field.max || 10);
+      const chosen = alive(guild?.roles?.cache);
+      menu = new RoleSelectMenuBuilder()
+        .setCustomId(customId)
+        .setPlaceholder(placeholder)
+        .setMinValues(0)
+        .setMaxValues(list ? field.max || 10 : 1);
+      if (chosen.length) menu.setDefaultRoles(chosen);
     } else {
       menu = new StringSelectMenuBuilder()
         .setCustomId(customId)
@@ -188,19 +283,15 @@ function defineConfigPanel({ id, titleKey, descriptionKey, actionsKey, hintKey, 
         );
     }
 
+    const back = new ButtonBuilder()
+      .setCustomId(panel.buttonId(BACK))
+      .setEmoji("↩️")
+      .setLabel(t("common.back"))
+      .setStyle(ButtonStyle.Secondary);
+
     return {
       embeds: base.embeds,
-      components: [
-        new ActionRowBuilder().addComponents(menu),
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId(panel.buttonId(BACK))
-            .setEmoji("↩️")
-            .setLabel(t("common.back"))
-            .setStyle(ButtonStyle.Secondary)
-        ),
-        ...homeRow(t),
-      ],
+      components: [new ActionRowBuilder().addComponents(menu), ...homeRow(t, [back])],
     };
   }
 
@@ -211,12 +302,20 @@ function defineConfigPanel({ id, titleKey, descriptionKey, actionsKey, hintKey, 
    */
   function buildModal(field, t, current) {
     const label = t(`${actionsKey}.${field.id}`).slice(0, 45);
+    // A range reaching below zero needs room for the sign: -12 is three characters
+    // even though 14 is two.
+    const digits = Math.max(String(field.min ?? 0).length, String(field.max ?? 99).length);
     const input = new TextInputBuilder()
       .setCustomId("value")
       .setLabel(label)
       .setStyle(field.long ? TextInputStyle.Paragraph : TextInputStyle.Short)
       .setRequired(field.required !== false)
-      .setMaxLength(field.type === "number" ? String(field.max ?? 99).length : field.maxLength || 200);
+      .setMaxLength(field.type === "number" ? digits : field.maxLength || 200);
+
+    // What a good answer looks like, so nobody has to guess and be told no.
+    const hint =
+      field.type === "number" ? t("panels.common.range", { min: field.min ?? 0, max: field.max ?? 99 }) : field.example;
+    if (hint) input.setPlaceholder(String(hint).slice(0, 100));
 
     if (current !== undefined && current !== null && current !== "") input.setValue(String(current).slice(0, 4000));
 
@@ -284,7 +383,9 @@ function defineConfigPanel({ id, titleKey, descriptionKey, actionsKey, hintKey, 
         return true;
       }
 
-      await interaction.update(buildPicker(t, settings, field, interaction.client));
+      await interaction.update(
+        buildPicker(t, settings, field, { client: interaction.client, guild: interaction.guild })
+      );
       return true;
     }
 
@@ -352,8 +453,9 @@ function defineConfigPanel({ id, titleKey, descriptionKey, actionsKey, hintKey, 
     matches: panel.matches,
     panel,
     path,
-    statusLines,
+    styles,
+    values,
   };
 }
 
-module.exports = { BACK, defineConfigPanel, formatValue, readPath, writePath };
+module.exports = { BACK, OFF, ON, buttonStyle, defineConfigPanel, formatValue, preview, readPath, writePath };

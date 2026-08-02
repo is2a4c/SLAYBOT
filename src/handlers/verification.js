@@ -10,6 +10,7 @@ const {
 const { EMBED_COLORS } = require("@root/config");
 const { generateCode, matchesCode, renderCaptchaImage } = require("@src/services/verification/Captcha");
 const { applyBranding, resolveBranding } = require("@helpers/Branding");
+const { guildTranslator } = require("@src/i18n");
 const { clearChallenge, getChallenge, registerTry, startChallenge } = require("@schemas/VerificationAttempt");
 
 const BUTTON_ID = "VERIFY_START";
@@ -17,29 +18,39 @@ const MODAL_ID = "VERIFY_MODAL";
 const CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const MAX_TRIES = 3;
 
+// What the schema stores until a server writes its own wording. Left as-is these
+// would pin an English panel onto a Russian server, so they fall back to the
+// translation instead of being shown.
+const SCHEMA_TITLE = "Verification";
+const SCHEMA_BUTTON = "Verify";
+
 /**
+ * The panel members press to get in.
+ *
+ * Everything on it can be set per server; what a server has not set is written in
+ * the language that server speaks rather than in English.
+ *
  * @param {object} config guild verification settings
- * @param {{settings?: object, client?: import('discord.js').Client}} [context] guild branding
+ * @param {{settings?: object, client?: import('discord.js').Client, guild?: import('discord.js').Guild}} [context]
  */
-function buildPanel(config, { settings, client } = {}) {
+function buildPanel(config, { settings, client, guild } = {}) {
+  const t = guildTranslator(settings, guild);
+  const captcha = config.mode === "CAPTCHA";
+  const own = (value, schemaDefault) => (value && value !== schemaDefault ? value : null);
+
   const embed = new EmbedBuilder()
     .setColor(config.color || EMBED_COLORS.BOT_EMBED)
-    .setTitle(config.title || "Verification")
-    .setDescription(
-      config.description ||
-        (config.mode === "CAPTCHA"
-          ? "Press the button, read the code from the image and type it in to get access."
-          : "Press the button to confirm you are human and get access.")
-    );
+    .setTitle(`🛡️ ${own(config.title, SCHEMA_TITLE) || t("verification.panel.title")}`)
+    .setDescription(config.description || t(captcha ? "verification.panel.captcha" : "verification.panel.button"));
 
   if (!config.color) applyBranding(embed, resolveBranding(settings, client), { force: true });
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(BUTTON_ID)
-      .setLabel(config.button_label || "Verify")
+      .setLabel(own(config.button_label, SCHEMA_BUTTON) || t("verification.panel.action"))
       .setStyle(ButtonStyle.Success)
-      .setEmoji("✅")
+      .setEmoji(captcha ? "🔠" : "✅")
   );
 
   return { embeds: [embed], components: [row] };

@@ -2,7 +2,10 @@ module.exports = {
   common: {
     enabled: "enabled",
     disabled: "disabled",
+    on: "on",
+    off: "off",
     notSet: "not set",
+    needed: "needed",
     none: "none",
     cancel: "Cancel",
     unknown: "unknown",
@@ -15,6 +18,7 @@ module.exports = {
   panels: {
     common: {
       hint: "Use the buttons below — the panel updates as you go.",
+      range: "between {min} and {max}",
       forbidden: "Only someone with **Manage Server** can change these settings.",
       badColor: "Use a hex colour such as `#A855F7`. Leave it empty to fall back to the default.",
       badUrl: "Use a link starting with `https://`. Leave it empty to drop the image.",
@@ -39,6 +43,9 @@ module.exports = {
     hub: {
       title: "Control panel",
       description: "Every server setting lives here. Pick the system you want to configure.",
+      hint: "The buttons below open a system inside this message — 🏠 brings you back here.",
+      running: "Running",
+      idle: "Off",
     },
 
     server: {
@@ -62,7 +69,7 @@ module.exports = {
       title: "Temporary voice",
       description: "A join-to-create channel hands every member their own voice channel and panel.",
       fields: {
-        enabled: "Enabled",
+        enabled: "Personal channels",
         hub: "Join-to-create channel",
         category: "Category",
         template: "Name template",
@@ -92,7 +99,7 @@ module.exports = {
       title: "Verification",
       description: "Gate newcomers behind a button or a captcha before they see the server.",
       fields: {
-        enabled: "Enabled",
+        enabled: "Entry check",
         mode: "Mode",
         role: "Verified role",
         removeRole: "Role to remove",
@@ -109,7 +116,7 @@ module.exports = {
       title: "Welcome",
       description: "What the bot says when somebody joins the server.",
       fields: {
-        enabled: "Enabled",
+        enabled: "Greeting",
         channel: "Channel",
         content: "Message text",
         description: "Embed description",
@@ -124,7 +131,7 @@ module.exports = {
       title: "Farewell",
       description: "What the bot says when somebody leaves the server.",
       fields: {
-        enabled: "Enabled",
+        enabled: "Farewell",
         channel: "Channel",
         content: "Message text",
         description: "Embed description",
@@ -160,7 +167,7 @@ module.exports = {
       title: "Starboard",
       description: "Messages with enough reactions get mirrored into their own channel.",
       fields: {
-        enabled: "Enabled",
+        enabled: "Starboard",
         channel: "Channel",
         emoji: "Emoji",
         threshold: "Reaction threshold",
@@ -174,7 +181,7 @@ module.exports = {
       title: "Suggestions",
       description: "Where members' ideas land and who approves them.",
       fields: {
-        enabled: "Enabled",
+        enabled: "Suggestions",
         channel: "Suggestion channel",
         approved: "Approved channel",
         rejected: "Rejected channel",
@@ -186,7 +193,7 @@ module.exports = {
       title: "Modmail",
       description: "Members' direct messages arrive as private threads.",
       fields: {
-        enabled: "Enabled",
+        enabled: "Modmail",
         channel: "Thread channel",
         staff: "Support roles",
         anonymous: "Hide staff names",
@@ -198,7 +205,7 @@ module.exports = {
       title: "Birthdays",
       description: "Birthday wishes and a role for the day.",
       fields: {
-        enabled: "Enabled",
+        enabled: "Birthday wishes",
         channel: "Channel",
         message: "Message",
         role: "Birthday role",
@@ -212,7 +219,7 @@ module.exports = {
       title: "AI",
       description: "Smarter moderation, ticket summaries and answers from your knowledge base.",
       fields: {
-        enabled: "Enabled",
+        enabled: "Smart features",
         automod: "AI moderation",
         mode: "Moderation mode",
         threshold: "Confidence threshold, %",
@@ -222,6 +229,151 @@ module.exports = {
         suggestions: "Suggestion analysis",
         forms: "Form analysis",
       },
+    },
+
+    feeds: {
+      title: "Feeds",
+      description: "Announce Twitch streams, YouTube uploads, RSS items and GitHub releases.",
+      empty: "Nothing is being watched yet.",
+      hint: "Add a source — it is checked right away and watched from then on.",
+      targetHint: "twitch: channel name · youtube: channel id (UC…) · rss: url · github: owner/repo",
+      lastError: "last error: {error}",
+      limit: "A server can watch at most {max} sources.",
+      exists: "`{target}` is already watched in that channel.",
+      badChannel: "Announcements need a text channel.",
+      noPermission: "I need to view, send messages and embed links in {channel}.",
+      added: "Watching **{target}**. The current item was skipped; the next one is announced.",
+      saved: "Feed **{target}** saved.",
+      removed: "Feed removed.",
+      fields: {
+        type: "Source",
+        target: "What to watch",
+        channel: "Announcement channel",
+        mention: "Who to ping",
+        message: "Announcement text",
+        enabled: "Enabled",
+      },
+    },
+
+    counters: {
+      title: "Counters",
+      description: "Voice channels showing how many people are on the server.",
+      empty: "No counters yet.",
+      hint: "Add one — the channel is created for you and keeps itself up to date.",
+      exists: "There is already a counter of that kind.",
+      noPermission: "I need Manage Channels to create a counter.",
+      added: "Counter created: {channel}.",
+      saved: "Counter updated.",
+      removed: "Counter and its channel removed.",
+      fields: {
+        type: "What to count",
+        name: "Name",
+      },
+    },
+
+    sticky: {
+      title: "Sticky messages",
+      description: "A message that keeps itself at the bottom of a channel.",
+      empty: "No sticky messages.",
+      hint: "Add one — it is posted now and follows the channel down.",
+      rule: "moves down after {messages} message(s) and {seconds}s",
+      badChannel: "Sticky messages only work in text channels.",
+      noPermission: "I need to view, send messages, read history and manage messages in {channel}.",
+      notPosted: "Saved, but I could not post in {channel}. Check my permissions.",
+      saved: "Sticky message set for {channel}.",
+      paused: "The sticky message in {channel} is paused.",
+      removed: "Sticky message removed.",
+      fields: {
+        channel: "Channel",
+        content: "Text",
+        title: "Title",
+        embed: "Show as an embed",
+        minMessages: "Messages before it moves",
+        cooldown: "Cooldown, seconds",
+        enabled: "Enabled",
+      },
+    },
+
+    reactionroles: {
+      title: "Reaction roles",
+      description: "Roles members get by clicking a reaction under a message.",
+      empty: "No message is configured yet.",
+      hint: "Add a message and its emoji–role pairs; the reactions are placed for you.",
+      summary: "{message} · {count} pair(s)",
+      pairCount: "{count} of {max}",
+      badChannel: "Reaction roles need a text channel.",
+      removed: "Reaction roles taken off the message.",
+      fields: {
+        channel: "Message channel",
+        message: "Message id",
+        pairs: "Emoji–role pairs",
+      },
+    },
+  },
+
+  collections: {
+    pick: "Pick an entry",
+    add: "Add",
+    entry: "Entry",
+    newEntry: "New entry",
+    create: "Create",
+    save: "Save",
+    remove: "Delete",
+    ready: "Fill in what you need, then save.",
+    missing: "Fill in first: {names}",
+    count: "{count} of {max} entries",
+    gone: "That entry is already gone.",
+  },
+
+  commands: {
+    title: "Every command",
+    all: "Every command",
+    settings: "Server settings",
+    description: "Everything the bot can do — {count} commands, sorted into sections. Nothing to type.",
+    hint: "Pick a section, then a command — the bot asks for whatever it needs.",
+    pickCommand: "Pick a command",
+    pickAction: "Pick an action",
+    noOptions: "This one needs nothing from you — just run it.",
+    missing: "Fill in first: {names}",
+    readyHint: "Fill in what you need, then press Run.",
+    run: "Run",
+    page: "Page {page} of {pages} — use the arrows.",
+    failed: "The command did not go through. Try again.",
+    emptyCatalog: "There is nothing here for you to run yet.",
+    categories: {
+      ADMIN: "Admin",
+      ANIME: "Anime",
+      AUTOMOD: "Automod",
+      ECONOMY: "Economy",
+      FUN: "Fun",
+      GIVEAWAY: "Giveaways",
+      IMAGE: "Images",
+      INFORMATION: "Information",
+      INVITE: "Invites",
+      MODERATION: "Moderation",
+      MUSIC: "Music",
+      OWNER: "Bot owner",
+      SOCIAL: "Social",
+      STATS: "Statistics",
+      SUGGESTION: "Suggestions",
+      TICKET: "Tickets",
+      UTILITY: "Utility",
+    },
+  },
+
+  verification: {
+    panel: {
+      title: "Verification",
+      button: "Press the button to confirm you are human and get access.",
+      captcha: "Press the button, read the code from the image and type it in to get access.",
+      action: "Verify",
+    },
+  },
+
+  ticket: {
+    panel: {
+      title: "Support ticket",
+      body: "Press the button below and a private channel opens for you and the support team.",
     },
   },
 

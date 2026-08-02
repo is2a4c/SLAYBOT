@@ -5,7 +5,7 @@ require("@schemas/Guild");
 
 const mongoose = require("mongoose");
 const { EmbedBuilder } = require("discord.js");
-const { PANELS, SYSTEM_IDS } = require("@src/services/panels/registry");
+const { PANELS, SETTINGS_IDS } = require("@src/services/panels/registry");
 const { readPath, writePath } = require("@src/services/panels/configPanel");
 
 /**
@@ -40,8 +40,10 @@ const SAMPLE = {
   channelList: ["123456789012345678"],
 };
 
+// The list panels keep their entries in their own collections, so the guild
+// document has nothing to check them against.
 const everyField = () =>
-  SYSTEM_IDS.flatMap((name) =>
+  SETTINGS_IDS.flatMap((name) =>
     PANELS[name].fields.map((field) => ({ name, field, path: PANELS[name].fieldPath(field) }))
   );
 

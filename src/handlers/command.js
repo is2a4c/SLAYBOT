@@ -6,7 +6,55 @@ const { getSettings } = require("@schemas/Guild");
 
 const cooldownCache = new Map();
 
+/**
+ * Why this person cannot run this command, or null when they can.
+ *
+ * Shared with the control panel, which offers the same commands as buttons: the
+ * rules about who may run what are decided once, so a button cannot become a way
+ * around a permission a slash command enforces.
+ *
+ * @param {import('@structures/Command')} cmd
+ * @param {Object} who
+ * @param {import('discord.js').User} who.user
+ * @param {import('discord.js').GuildMember} [who.member]
+ * @param {import('discord.js').Guild} [who.guild]
+ * @returns {string|null}
+ */
+function accessProblem(cmd, { user, member, guild }) {
+  if (cmd.category === "OWNER" && !OWNER_IDS.includes(user?.id)) {
+    return "This command is only accessible to bot owners";
+  }
+
+  if (member && cmd.userPermissions?.length > 0 && !member.permissions.has(cmd.userPermissions)) {
+    return `You need ${parsePermissions(cmd.userPermissions)} for this command`;
+  }
+
+  if (cmd.botPermissions?.length > 0 && guild && !guild.members.me.permissions.has(cmd.botPermissions)) {
+    return `I need ${parsePermissions(cmd.botPermissions)} for this command`;
+  }
+
+  return null;
+}
+
+/**
+ * @param {import('@structures/Command')} cmd
+ * @param {string} userId
+ * @returns {string|null}
+ */
+function cooldownProblem(cmd, userId) {
+  if (!(cmd.cooldown > 0)) return null;
+
+  const remaining = getRemainingCooldown(userId, cmd);
+  if (remaining <= 0) return null;
+
+  return `You are on cooldown. You can again use the command in \`${timeformat(remaining)}\``;
+}
+
 module.exports = {
+  accessProblem,
+  applyCooldown,
+  cooldownProblem,
+
   /**
    * @param {import('discord.js').Message} message
    * @param {import("@structures/Command")} cmd
@@ -128,44 +176,12 @@ module.exports = {
       }
     }
 
-    // Owner commands
-    if (cmd.category === "OWNER" && !OWNER_IDS.includes(interaction.user.id)) {
-      return interaction.reply({
-        content: `This command is only accessible to bot owners`,
-        ephemeral: true,
-      });
-    }
+    // who may run this, and whether they have waited long enough
+    const problem =
+      accessProblem(cmd, { user: interaction.user, member: interaction.member, guild: interaction.guild }) ||
+      cooldownProblem(cmd, interaction.user.id);
 
-    // user permissions
-    if (interaction.member && cmd.userPermissions?.length > 0) {
-      if (!interaction.member.permissions.has(cmd.userPermissions)) {
-        return interaction.reply({
-          content: `You need ${parsePermissions(cmd.userPermissions)} for this command`,
-          ephemeral: true,
-        });
-      }
-    }
-
-    // bot permissions
-    if (cmd.botPermissions && cmd.botPermissions.length > 0) {
-      if (!interaction.guild.members.me.permissions.has(cmd.botPermissions)) {
-        return interaction.reply({
-          content: `I need ${parsePermissions(cmd.botPermissions)} for this command`,
-          ephemeral: true,
-        });
-      }
-    }
-
-    // cooldown check
-    if (cmd.cooldown > 0) {
-      const remaining = getRemainingCooldown(interaction.user.id, cmd);
-      if (remaining > 0) {
-        return interaction.reply({
-          content: `You are on cooldown. You can again use the command in \`${timeformat(remaining)}\``,
-          ephemeral: true,
-        });
-      }
-    }
+    if (problem) return interaction.reply({ content: problem, ephemeral: true });
 
     try {
       // Deferring costs an extra round-trip and shows a "thinking" placeholder

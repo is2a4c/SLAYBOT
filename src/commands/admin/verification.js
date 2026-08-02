@@ -225,7 +225,7 @@ async function setup(guild, settings, { channel, role, mode, title, description,
   if (description) settings.verification.description = description;
   if (removeRole) settings.verification.remove_role_id = removeRole.id;
 
-  const panel = verificationHandler.buildPanel(settings.verification, { settings, client: guild.client });
+  const panel = verificationHandler.buildPanel(settings.verification, { settings, client: guild.client, guild });
 
   // Replace the previous panel so a server never ends up with two of them.
   if (settings.verification.message_id) {
@@ -287,7 +287,7 @@ async function configure(guild, settings, changes) {
     await channel?.messages
       ?.fetch(settings.verification.message_id)
       .then((message) =>
-        message.edit(verificationHandler.buildPanel(settings.verification, { settings, client: guild.client }))
+        message.edit(verificationHandler.buildPanel(settings.verification, { settings, client: guild.client, guild }))
       )
       .catch(() => {});
   }

@@ -2,8 +2,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 require("module-alias/register");
 
+const { ButtonStyle } = require("discord.js");
 const { buildHub, handle, matches } = require("@src/handlers/controlPanel");
-const { HOME_ID, PANELS, SYSTEM_ICONS, SYSTEM_IDS } = require("@src/services/panels/registry");
+const { HOME_ID, PANELS, SETTINGS_IDS, SYSTEM_ICONS, SYSTEM_IDS } = require("@src/services/panels/registry");
 const { LOCALES, translate } = require("@src/i18n");
 
 const t = (key, vars) => translate("ru", key, vars);
@@ -60,7 +61,7 @@ const route = (interaction, settings) => router.handle.call(router, interaction,
 test("every system fits inside Discord's component limits", () => {
   const settings = makeSettings();
 
-  for (const name of SYSTEM_IDS) {
+  for (const name of SETTINGS_IDS) {
     const panel = PANELS[name].build(t, settings);
 
     assert.ok(panel.components.length <= 5, `${name} has ${panel.components.length} rows`);
@@ -70,11 +71,12 @@ test("every system fits inside Discord's component limits", () => {
   }
 });
 
-test("the hub offers every system and an icon for it", () => {
-  const hub = buildHub(t, makeSettings());
+test("the hub offers every system and an icon for it", async () => {
+  const hub = await buildHub(t, makeSettings());
   const buttons = hub.components.flatMap((row) => row.components.map((button) => button.data));
 
-  assert.equal(buttons.length, SYSTEM_IDS.length);
+  // Every system, plus the way into the commands that are not settings.
+  assert.equal(buttons.length, SYSTEM_IDS.length + 1);
   for (const name of SYSTEM_IDS) {
     assert.ok(SYSTEM_ICONS[name], `${name} has no icon`);
     assert.ok(
@@ -82,11 +84,17 @@ test("the hub offers every system and an icon for it", () => {
       `${name} has no button`
     );
   }
+
+  assert.ok(
+    buttons.some((button) => button.custom_id === "CMDP:home"),
+    "the hub does not lead to the commands"
+  );
 });
 
 test("panels do not answer for each other", () => {
   for (const name of SYSTEM_IDS) {
-    const own = PANELS[name].panel.buttonId("whatever");
+    // A collection panel namespaces its ids the same way, without a button helper.
+    const own = PANELS[name].panel ? PANELS[name].panel.buttonId("whatever") : `${PANELS[name].id}:whatever`;
 
     for (const other of SYSTEM_IDS) {
       if (other === name) continue;
@@ -99,7 +107,7 @@ test("every field is named in every language", () => {
   for (const locale of Object.keys(LOCALES)) {
     for (const name of SYSTEM_IDS) {
       for (const field of PANELS[name].fields) {
-        const key = `panels.${name}.fields.${field.id}`;
+        const key = field.nameKey || `panels.${name}.fields.${field.id}`;
         assert.notEqual(translate(locale, key), key, `${locale} is missing ${key}`);
       }
     }
@@ -110,6 +118,12 @@ test("choice fields translate each of their values", () => {
   for (const locale of Object.keys(LOCALES)) {
     for (const name of SYSTEM_IDS) {
       for (const field of PANELS[name].fields.filter((entry) => entry.type === "choice")) {
+        // A collection field carries its own labels rather than translation keys.
+        if (!field.choicesKey) {
+          for (const choice of field.choices) assert.ok(field.choiceLabels?.[choice], `${name}.${field.id} unlabelled`);
+          continue;
+        }
+
         for (const choice of field.choices) {
           const key = `${field.choicesKey}.${choice}`;
           assert.notEqual(translate(locale, key), key, `${locale} is missing ${key}`);
@@ -128,6 +142,88 @@ test("the panel shows what each setting currently is", () => {
   assert.match(description, /<@&777>/);
 });
 
+/* --------------------------------------------------------------- appearance */
+
+test("a setting is named beside the icon of the button that changes it", () => {
+  const settings = makeSettings({ ticket: { log_channel: "555", limit: 3, staff_roles: [] } });
+  const description = PANELS.ticket.build(t, settings).embeds[0].data.description;
+
+  const log = PANELS.ticket.fields.find((field) => field.id === "log");
+  assert.match(description, new RegExp(`${log.emoji} \\*\\*${t("panels.ticket.fields.log")}:\\*\\* <#555>`));
+
+  // Every field is on the panel exactly once: the icons are the legend.
+  for (const field of PANELS.ticket.fields) {
+    const name = t(`panels.ticket.fields.${field.id}`);
+    assert.equal(description.split(`**${name}:**`).length, 2, `${field.id} is not shown once`);
+  }
+});
+
+test("buttons carry the state of their setting", () => {
+  const settings = makeSettings({
+    ticket: { log_channel: "555", limit: 3, staff_roles: [] },
+    automod: { anti_spam: true, anti_links: false, strikes: 10, action: "TIMEOUT" },
+  });
+
+  const styleOf = (panel, id) => {
+    const button = panel
+      .build(t, settings)
+      .components.flatMap((row) => row.components)
+      .find((entry) => entry.data.custom_id === panel.panel.buttonId(id));
+    return button.data.style;
+  };
+
+  assert.equal(styleOf(PANELS.automod, "spam"), ButtonStyle.Success, "a setting that is on shows as on");
+  assert.equal(styleOf(PANELS.automod, "links"), ButtonStyle.Secondary, "a setting that is off stays quiet");
+  assert.equal(styleOf(PANELS.ticket, "log"), ButtonStyle.Primary, "a chosen channel is marked as chosen");
+  assert.equal(styleOf(PANELS.ticket, "staff"), ButtonStyle.Secondary, "an empty list is not");
+  assert.equal(styleOf(PANELS.ticket, "panel"), ButtonStyle.Success, "posting the panel is the call to action");
+});
+
+test("an unset setting says so rather than being left blank", () => {
+  const description = PANELS.ticket.build(t, makeSettings()).embeds[0].data.description;
+
+  assert.match(description, new RegExp(`\\*\\*${t("panels.ticket.fields.log")}:\\*\\* ⚪ ${t("common.notSet")}`));
+  assert.match(description, new RegExp(`\\*\\*${t("panels.ticket.fields.staff")}:\\*\\* ⚪ ${t("common.none")}`));
+});
+
+test("a long setting is previewed instead of being poured into the panel", () => {
+  const settings = makeSettings({
+    ticket: { log_channel: null, limit: 3, staff_roles: [], panel_description: `${"а".repeat(900)}\n\`x\`` },
+  });
+
+  const description = PANELS.ticket.build(t, settings).embeds[0].data.description;
+
+  assert.ok(description.length < 1000, `the panel grew to ${description.length} characters`);
+  assert.match(description, /…`/, "the value is cut short");
+  // A backtick inside the value would end the code span and style the rest of the panel.
+  assert.equal((description.match(/`/g) || []).length % 2, 0, "the code spans are unbalanced");
+});
+
+test("the hub separates what the server is running from what it is not", async () => {
+  const settings = makeSettings({
+    starboard: { enabled: true },
+    welcome: { enabled: false, channel: null, embed: {} },
+  });
+
+  const [running, idle] = (await buildHub(t, settings)).embeds[0].data.fields;
+  assert.match(running.value, new RegExp(t("panels.starboard.title")));
+  assert.match(idle.value, new RegExp(t("panels.welcome.title")));
+
+  const hub = await buildHub(t, settings);
+  const button = (name) =>
+    hub.components.flatMap((row) => row.components).find((entry) => entry.data.custom_id === `PANELHUB:open:${name}`);
+
+  assert.equal(button("starboard").data.style, ButtonStyle.Success);
+  assert.equal(button("welcome").data.style, ButtonStyle.Secondary);
+});
+
+test("a system with nothing turned on still lists every other one", async () => {
+  const [running, idle] = (await buildHub(t, makeSettings())).embeds[0].data.fields;
+  const named = `${running.value}\n${idle.value}`;
+
+  for (const name of SYSTEM_IDS) assert.match(named, new RegExp(t(`panels.${name}.title`)), `${name} is missing`);
+});
+
 /* ----------------------------------------------------------------- routing */
 
 test("the router recognises the hub and its systems, and nothing else", () => {
@@ -143,14 +239,14 @@ test("a button opens that system's panel in place", async () => {
   await route(interaction, makeSettings());
 
   assert.equal(interaction.seen.update.length, 1);
-  assert.equal(interaction.seen.update[0].embeds[0].data.title, t("panels.ticket.title"));
+  assert.equal(interaction.seen.update[0].embeds[0].data.title, `${SYSTEM_ICONS.ticket} ${t("panels.ticket.title")}`);
 });
 
 test("the menu button goes back to the hub", async () => {
   const interaction = makeInteraction({ customId: HOME_ID });
   await route(interaction, makeSettings());
 
-  assert.equal(interaction.seen.update[0].embeds[0].data.title, t("panels.hub.title"));
+  assert.match(interaction.seen.update[0].embeds[0].data.title, new RegExp(t("panels.hub.title")));
 });
 
 test("settings stay behind Manage Server", async () => {
@@ -200,6 +296,33 @@ test("a picker replaces the buttons instead of sending a new message", async () 
   assert.equal(interaction.seen.reply.length, 0);
 });
 
+test("a picker opens on what is stored, and picking nothing clears it", async () => {
+  const settings = makeSettings({ ticket: { log_channel: "555", limit: 3, staff_roles: [] } });
+  const interaction = makeInteraction({ customId: PANELS.ticket.panel.buttonId("log") });
+  interaction.guild.channels = { cache: new Map([["555", {}]]) };
+
+  await route(interaction, settings);
+
+  const menu = interaction.seen.update[0].components[0].components[0].data;
+  assert.equal(menu.min_values, 0, "a channel can be unset again");
+  assert.deepEqual(
+    menu.default_values.map((value) => value.id),
+    ["555"]
+  );
+});
+
+test("a picker leaves out a channel the server no longer has", async () => {
+  const settings = makeSettings({ ticket: { log_channel: "555", limit: 3, staff_roles: [] } });
+  const interaction = makeInteraction({ customId: PANELS.ticket.panel.buttonId("log") });
+  interaction.guild.channels = { cache: new Map() };
+
+  await route(interaction, settings);
+
+  // Discord rejects the whole menu if a default points at something gone.
+  const menu = interaction.seen.update[0].components[0].components[0].data;
+  assert.deepEqual(menu.default_values ?? [], []);
+});
+
 test("picking a channel stores one id, picking roles stores the list", async () => {
   const settings = makeSettings();
 
@@ -223,6 +346,18 @@ test("a text button opens a modal carrying the current value", async () => {
   const modal = interaction.seen.modal[0].toJSON();
   assert.equal(modal.custom_id, PANELS.server.panel.modalId("prefix"));
   assert.equal(modal.components[0].components[0].value, "?", "the modal opens on the value being replaced");
+});
+
+test("a number modal leaves room for every value it accepts", async () => {
+  const settings = makeSettings({ birthdays: { utc_offset: 0 } });
+  const interaction = makeInteraction({ customId: PANELS.birthdays.panel.buttonId("offset") });
+
+  await route(interaction, settings);
+
+  const [input] = interaction.seen.modal[0].toJSON().components[0].components;
+  // The range is -12..14, so two characters would refuse the lowest offsets.
+  assert.ok(input.max_length >= 3, `a UTC offset gets ${input.max_length} characters`);
+  assert.match(input.placeholder, /-12/, "the modal says what it will accept");
 });
 
 test("a submitted number is bounded before it is stored", async () => {
