@@ -70,9 +70,12 @@ function describeOption(option) {
     choices: option.choices?.map((choice) => String(choice.value)) || null,
     choiceLabels: Object.fromEntries((option.choices || []).map((choice) => [String(choice.value), choice.name])),
     channelTypes: option.channelTypes || option.channel_types || null,
-    min: option.minValue ?? option.min_value ?? 0,
-    max: option.maxValue ?? option.max_value ?? 999999,
-    maxLength: option.maxLength ?? option.max_length ?? 200,
+    // Only what the command actually declared. Standing in 0 and 999999 for the
+    // options that declare nothing quietly rewrote what somebody typed: a
+    // transfer of five million became 999999, and no limit was ever mentioned.
+    min: option.minValue ?? option.min_value ?? null,
+    max: option.maxValue ?? option.max_value ?? null,
+    maxLength: option.maxLength ?? option.max_length ?? null,
     // A description is the only hint Discord shows for an option; the modal
     // borrows it rather than leaving the box unexplained.
     example: option.description || null,
