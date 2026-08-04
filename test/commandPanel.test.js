@@ -281,6 +281,36 @@ test("a number is kept inside the range the option declares", async () => {
   assert.equal(draft.read(USER, "ban").days, 7);
 });
 
+test("a number the command left unbounded is taken as it was typed", async () => {
+  const command = slashCommand();
+  // `days` declares no minValue or maxValue, the way most numeric options do.
+  const interaction = makeInteraction([command], { customId: "CMDP~MOD:opt:ban|days", text: "5000000" });
+
+  await route(interaction);
+
+  assert.equal(draft.read(USER, "ban").days, 5000000, "the panel does not invent a ceiling of its own");
+});
+
+test("a number box is wide enough for what the command accepts", async () => {
+  const command = slashCommand();
+  const interaction = makeInteraction([command], { customId: "CMDP:opt:ban|days" });
+
+  await route(interaction);
+
+  const input = interaction.seen.modal[0].toJSON().components[0].components[0];
+  assert.ok(input.max_length >= 7, `an unbounded number got a ${input.max_length}-character box`);
+});
+
+test("free text the command did not cap is not capped at some panel default", async () => {
+  const command = slashCommand();
+  const interaction = makeInteraction([command], { customId: "CMDP:opt:ban|reason" });
+
+  await route(interaction);
+
+  const input = interaction.seen.modal[0].toJSON().components[0].components[0];
+  assert.ok(input.max_length > 200, `a reason of any length was cut to ${input.max_length} characters`);
+});
+
 /* -------------------------------------------------------------- running it */
 
 test("running hands the command what the form was filled in with", async () => {
@@ -357,6 +387,22 @@ test("a command that throws is reported instead of failing silently", async () =
   await route(interaction);
 
   assert.match(interaction.seen.followUp[0].content, /Команда не отработала/);
+});
+
+test("a prefix-only command opens its form like any other", async () => {
+  const command = prefixCommand();
+  const interaction = makeInteraction([command], { customId: "CMDP:cmd:setrr" });
+
+  await route(interaction);
+
+  const [payload] = interaction.seen.update;
+  assert.match(payload.embeds[0].data.title, /setrr/, "the command it was asked for, not the catalogue");
+
+  const buttons = payload.components.flatMap((row) => row.components).map((button) => button.data);
+  assert.ok(
+    buttons.some((button) => button.custom_id === "CMDP:run:setrr"),
+    "a command with no slash version is still runnable from its own screen"
+  );
 });
 
 test("a prefix-only command runs from the panel too", async () => {

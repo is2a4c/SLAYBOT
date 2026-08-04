@@ -457,7 +457,9 @@ async function runAsMessage(interaction, command, line, settings) {
  */
 function openCommand(t, interaction, settings, path) {
   const [name] = path.split(" ");
-  const command = interaction.client.slashCommands.get(name);
+  // The catalogue offers prefix-only commands too, so the screen behind one is
+  // looked up the same way it was listed: by name, across both kinds.
+  const command = catalog.allCommands(interaction.client).find((entry) => entry.name === name);
   if (!command || !catalog.allowed(command, interaction.member)) return null;
 
   const leaves = catalog.leavesOf(command);
