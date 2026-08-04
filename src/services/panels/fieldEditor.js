@@ -33,6 +33,11 @@ const MISSING = "⚠️";
 const ON = "🟢";
 const PREVIEW = 60;
 
+// Discord takes at most this much in one modal box.
+const MAX_TEXT = 4000;
+// Room for the largest whole number counted exactly, and its sign.
+const UNBOUNDED_DIGITS = 16;
+
 const ICONS = {
   text: "📝",
   number: "🔢",
@@ -234,20 +239,25 @@ function select(field, current, { customId, placeholder, guild }) {
  */
 function modal(field, current, { customId, t }) {
   const name = fit(label(field, t), 45);
-  // A range reaching below zero needs room for the sign.
-  const digits = Math.max(String(field.min ?? 0).length, String(field.max ?? 99).length);
+  // A field that names no range still has to take a number somebody can type, so
+  // the box is sized to the largest whole number JavaScript counts exactly, sign
+  // included. A range reaching below zero needs room for the sign too.
+  const bounds = [field.min, field.max].filter((value) => value !== null && value !== undefined);
+  const digits = bounds.length ? Math.max(...bounds.map((value) => String(value).length)) : UNBOUNDED_DIGITS;
 
   const input = new TextInputBuilder()
     .setCustomId("value")
     .setLabel(name)
     .setStyle(field.long ? TextInputStyle.Paragraph : TextInputStyle.Short)
     .setRequired(false)
-    .setMaxLength(field.type === "number" ? Math.max(digits, 2) : Math.min(field.maxLength || 200, 4000));
+    // Without a declared length the only limit is the modal's own.
+    .setMaxLength(field.type === "number" ? Math.max(digits, 2) : Math.min(field.maxLength || MAX_TEXT, MAX_TEXT));
 
-  // What a good answer looks like, so nobody has to guess and be told no.
+  // What a good answer looks like, so nobody has to guess and be told no. A range
+  // is only worth quoting when the field has one on both ends.
   const hint =
-    field.type === "number"
-      ? t("panels.common.range", { min: field.min ?? 0, max: field.max ?? 99 })
+    field.type === "number" && bounds.length === 2
+      ? t("panels.common.range", { min: field.min, max: field.max })
       : field.example || (field.descriptionKey ? t(field.descriptionKey) : null);
   if (hint) input.setPlaceholder(fit(hint, 100));
 
@@ -273,9 +283,13 @@ function parseInput(field, raw) {
   if (field.type === "number") {
     if (!/^-?\d+$/.test(text)) return { ok: false, reason: "common.numberRange" };
     const parsed = Number.parseInt(text, 10);
-    const min = field.min ?? 0;
-    const max = field.max ?? 99;
-    if (parsed < min || parsed > max) return { ok: false, reason: "common.numberRange" };
+    // A field is held to the range it declares, and to nothing when it declares none.
+    if (field.min !== null && field.min !== undefined && parsed < field.min) {
+      return { ok: false, reason: "common.numberRange" };
+    }
+    if (field.max !== null && field.max !== undefined && parsed > field.max) {
+      return { ok: false, reason: "common.numberRange" };
+    }
     return { ok: true, value: parsed };
   }
 

@@ -231,6 +231,47 @@ test("deleting an entry asks the panel to remove it and returns to the list", as
   assert.equal(interaction.seen.followUp[0].content, "удалено");
 });
 
+test("backing out of a picker keeps what the entry was already filled in with", async () => {
+  const { panel } = makePanel();
+
+  await panel.handle(makeInteraction({ customId: "TESTCOL:open:a" }), {}, t);
+  await panel.handle(makeInteraction({ customId: "TESTCOL~MOD:field:a|name", text: "переименована" }), {}, t);
+
+  // Open the channel picker, then change your mind about it.
+  const picker = makeInteraction({ customId: "TESTCOL:field:a|channel" });
+  await panel.handle(picker, {}, t);
+
+  const back = picker.seen.drawn[0].components
+    .flatMap((row) => row.components)
+    .find((button) => button.data.label === t("common.back"));
+
+  const returned = makeInteraction({ customId: back.data.custom_id });
+  await panel.handle(returned, {}, t);
+
+  assert.equal(draft.read(USER, "TESTCOL|a").name, "переименована", "the edit survives the trip to the picker");
+  assert.match(returned.seen.drawn[0].embeds[0].data.description, /переименована/);
+});
+
+test("backing out of a picker on a new entry returns to it, not to the list", async () => {
+  const { panel } = makePanel();
+
+  await panel.handle(makeInteraction({ customId: "TESTCOL:new" }), {}, t);
+  await panel.handle(makeInteraction({ customId: "TESTCOL~MOD:field:+|name", text: "черновик" }), {}, t);
+
+  const picker = makeInteraction({ customId: "TESTCOL:field:+|channel" });
+  await panel.handle(picker, {}, t);
+
+  const back = picker.seen.drawn[0].components
+    .flatMap((row) => row.components)
+    .find((button) => button.data.label === t("common.back"));
+
+  const returned = makeInteraction({ customId: back.data.custom_id });
+  await panel.handle(returned, {}, t);
+
+  assert.equal(draft.read(USER, "TESTCOL|+").name, "черновик", "an entry being created is not thrown away");
+  assert.match(returned.seen.drawn[0].embeds[0].data.description, /черновик/);
+});
+
 test("an entry that vanished sends you back to the list rather than to an empty form", async () => {
   const { panel } = makePanel();
   const interaction = makeInteraction({ customId: "TESTCOL:open:gone" });

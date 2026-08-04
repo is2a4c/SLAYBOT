@@ -399,6 +399,33 @@ module.exports = {
     },
   },
 
+  // Shared by the reaction-roles panel and the `setrr` command: both put a set of
+  // pairs on a message, so both say the same things about how it went.
+  reactionRoles: {
+    saved: "Готово. Пар «эмодзи — роль» на сообщении: {count}.",
+    needPermissions: "Мне не хватает прав в {channel}:\n{permissions}",
+    messageNotFound: "Не нашёл такое сообщение. Проверь, верный ли ID и тот ли канал.",
+    channelNotFound: "Не нашёл канал по запросу «{name}».",
+    roleNotMatched: "Не нашёл роль по запросу «{name}».",
+    added: "Готово. Реакция {emoji} теперь выдаёт роль.",
+    replaced: "Готово. Для {emoji} уже была роль — заменил её на новую.",
+    removed: "Готово. Реакции-роли сняты с сообщения.",
+    noPairs: "Укажи хотя бы одну пару «эмодзи — роль».",
+    tooManyPairs: "На одном сообщении может быть не больше {max} пар.",
+    badPair: "Пара №{index} записана неверно. Формат: `эмодзи @роль`, пары разделяй запятыми.",
+    badPairs: "Пары записаны неверно. Формат: `эмодзи @роль`, пары разделяй запятыми.",
+    badEmoji: "{emoji} — это не эмодзи.",
+    foreignEmoji: "Эмодзи {emoji} не с этого сервера, я не смогу его поставить.",
+    duplicateEmoji: "Эмодзи {emoji} указан больше одного раза.",
+    duplicateEmojis: "Один и тот же эмодзи указан больше одного раза.",
+    roleNotFound: "Роль {role} на сервере не найдена.",
+    roleManaged: "Роль {role} принадлежит интеграции — выдавать её я не могу.",
+    roleEveryone: "Роль @everyone выдавать нельзя.",
+    roleTooHigh: "Не могу выдавать {role}: подними мою роль выше неё и попробуй снова.",
+    reactionFailed: "Не удалось поставить реакцию {emoji}. Ничего не сохранено.",
+    saveFailed: "Не удалось сохранить. Попробуй ещё раз чуть позже.",
+  },
+
   language: {
     title: "Язык бота",
     description: "Выбери, на каком языке бот отвечает на этом сервере.",

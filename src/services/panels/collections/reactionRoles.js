@@ -63,9 +63,7 @@ async function put({ guild, key, values, t }) {
   const channel = guild.channels.cache.get(values.channel);
   if (!channel?.isTextBased?.()) return { ok: false, message: t("panels.reactionroles.badChannel") };
 
-  const response = await applyReactionRoles(guild, channel, values.message, values.pairs);
-  // The shared setup answers in prose; anything but its success line is a refusal.
-  const ok = response.startsWith("Done!");
+  const { ok, key: outcome, vars } = await applyReactionRoles(guild, channel, values.message, values.pairs);
 
   if (ok && key && key !== "+") {
     const previous = split(key);
@@ -74,7 +72,7 @@ async function put({ guild, key, values, t }) {
     }
   }
 
-  return { ok, message: response };
+  return { ok, message: t(outcome, vars) };
 }
 
 module.exports = defineCollectionPanel({

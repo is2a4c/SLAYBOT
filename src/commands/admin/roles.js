@@ -16,6 +16,7 @@ const { clearGuildRoles, getMemberRoles } = require("@schemas/MemberRoles");
 const { addRR } = require("./reaction-role/addrr");
 const { removeRR } = require("./reaction-role/removerr");
 const { setReactionRoles } = require("./reaction-role/setrr");
+const { guildTranslator } = require("@src/i18n");
 
 const MAX_VOICE_ROLE_CHANNELS = 25;
 
@@ -570,7 +571,7 @@ module.exports = {
       if (group === "temp") return interaction.safeFollowUp(await runTemp(interaction, sub));
       if (group === "voice") return interaction.safeFollowUp(await runVoice(interaction, sub, data.settings));
       if (group === "restore") return interaction.safeFollowUp(await runRestore(interaction, sub, data.settings));
-      if (group === "reaction") return interaction.safeFollowUp(await runReaction(interaction, sub));
+      if (group === "reaction") return interaction.safeFollowUp(await runReaction(interaction, sub, data.settings));
     } catch (ex) {
       if (ex instanceof SelfRoleError || ex instanceof TempRoleError) return interaction.safeFollowUp(ex.message);
       throw ex;
@@ -586,25 +587,32 @@ function isAny(value) {
 
 /* -------------------------------------------------------------- reaction roles */
 
-async function runReaction(interaction, sub) {
+async function runReaction(interaction, sub, settings) {
   const guild = interaction.guild;
   const channel = interaction.options.getChannel("channel");
   const messageId = interaction.options.getString("message_id");
 
+  // All three answer with a key and its values, so they are spoken in the
+  // language of the server being configured rather than in English.
+  const t = guildTranslator(settings, guild);
+  const say = (result) => t(result.key, result.vars);
+
   if (sub === "add") {
-    return addRR(
-      guild,
-      channel,
-      messageId,
-      interaction.options.getString("emoji"),
-      interaction.options.getRole("role")
+    return say(
+      await addRR(
+        guild,
+        channel,
+        messageId,
+        interaction.options.getString("emoji"),
+        interaction.options.getRole("role")
+      )
     );
   }
   if (sub === "set") {
-    return setReactionRoles(guild, channel, messageId, interaction.options.getString("pairs"));
+    return say(await setReactionRoles(guild, channel, messageId, interaction.options.getString("pairs")));
   }
   if (sub === "remove") {
-    return removeRR(guild, channel, messageId);
+    return say(await removeRR(guild, channel, messageId));
   }
 
   return "Invalid subcommand";

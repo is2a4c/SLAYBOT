@@ -115,7 +115,9 @@ async function getHelpMenu({ client, guild }) {
   let buttonsRow = new ActionRowBuilder().addComponents(components);
 
   const categoryCount = options.length;
-  const commandCount = client.slashCommands.size || client.commands.size;
+  // Prefix commands are kept in an array, which has no `size` — counting them
+  // that way showed "undefined" on a bot running without slash commands.
+  const commandCount = client.slashCommands.size || client.commands.length;
 
   const embed = new EmbedBuilder()
     .setColor(EMBED_COLORS.BOT_EMBED)

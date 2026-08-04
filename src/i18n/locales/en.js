@@ -399,6 +399,33 @@ module.exports = {
     },
   },
 
+  // Shared by the reaction-roles panel and the `setrr` command: both put a set of
+  // pairs on a message, so both say the same things about how it went.
+  reactionRoles: {
+    saved: "Done. This message now hands out {count} role(s).",
+    needPermissions: "I am missing permissions in {channel}:\n{permissions}",
+    messageNotFound: "I could not find that message. Check the id and the channel it is in.",
+    channelNotFound: 'No channel matched "{name}".',
+    roleNotMatched: 'No role matched "{name}".',
+    added: "Done. Reacting with {emoji} now hands out that role.",
+    replaced: "Done. {emoji} already had a role, so I replaced it.",
+    removed: "Done. The reaction roles are off that message.",
+    noPairs: "Give me at least one emoji and role pair.",
+    tooManyPairs: "A message can carry at most {max} pairs.",
+    badPair: "Pair {index} is malformed. Use `emoji @role`, and separate pairs with commas.",
+    badPairs: "The pairs are malformed. Use `emoji @role`, and separate pairs with commas.",
+    badEmoji: "{emoji} is not an emoji.",
+    foreignEmoji: "The emoji {emoji} is not from this server, so I cannot react with it.",
+    duplicateEmoji: "The emoji {emoji} is listed more than once.",
+    duplicateEmojis: "The same emoji is listed more than once.",
+    roleNotFound: "The role {role} is not on this server.",
+    roleManaged: "The role {role} belongs to an integration, so I cannot hand it out.",
+    roleEveryone: "The @everyone role cannot be handed out.",
+    roleTooHigh: "I cannot hand out {role}: move my highest role above it and try again.",
+    reactionFailed: "I could not react with {emoji}. Nothing was saved.",
+    saveFailed: "Saving failed. Try again in a moment.",
+  },
+
   language: {
     title: "Bot language",
     description: "Pick the language the bot speaks on this server.",
