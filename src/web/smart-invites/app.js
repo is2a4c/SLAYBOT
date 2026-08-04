@@ -8,6 +8,47 @@ const { renderHome, renderInvite, renderResource, renderStatus } = require("./te
 const PRIVACY_URL = "https://github.com/is2a4c/SLAYBOT/blob/main/PRIVACY.md";
 const TERMS_URL = "https://github.com/is2a4c/SLAYBOT/blob/main/TERMS.md";
 
+// Discord icons are square, so the card image is requested square too; 256 is
+// the smallest size that still looks sharp on a HiDPI phone.
+const CARD_ICON_SIZE = 256;
+
+/**
+ * Chat clients unfurl a pasted link by fetching it with their own crawler and
+ * reading the Open Graph tags. These are the agents that do it - matched case
+ * insensitively against a substring of the User-Agent, which is how each of
+ * them identifies itself.
+ */
+const LINK_PREVIEW_AGENTS = [
+  "discordbot",
+  "telegrambot",
+  "twitterbot",
+  "slackbot",
+  "facebookexternalhit",
+  "whatsapp",
+  "linkedinbot",
+  "redditbot",
+  "vkshare",
+  "skypeuripreview",
+  "embedly",
+  "iframely",
+  "mattermost",
+  "googlebot",
+  "bingbot",
+  "yandexbot",
+  "applebot",
+  "pinterest",
+];
+
+function isLinkPreviewCrawler(userAgent) {
+  if (typeof userAgent !== "string" || !userAgent) return false;
+  const agent = userAgent.toLowerCase();
+  return LINK_PREVIEW_AGENTS.some((name) => agent.includes(name));
+}
+
+function serviceURL(config, suffix = "") {
+  return `${normalizeBaseURL(config.baseURL)}${config.pathPrefix || ""}${suffix}`;
+}
+
 function createSmartInvitesApp(service) {
   const app = express();
   const config = service.config;
@@ -26,7 +67,7 @@ function createSmartInvitesApp(service) {
     res
       .status(200)
       .type("html")
-      .send(renderHome(normalizeBaseURL(config.baseURL)))
+      .send(renderHome(serviceURL(config)))
   );
   router.get("/health", (_req, res) => res.status(200).json({ status: "ok", service: "slaybot-smart-invites" }));
   router.get("/privacy", (_req, res) =>
@@ -38,7 +79,8 @@ function createSmartInvitesApp(service) {
           "Privacy",
           "Политика описывает данные Smart Invites, retention и возможные reverse proxy access logs.",
           PRIVACY_URL,
-          "Открыть Privacy Policy"
+          "Открыть Privacy Policy",
+          serviceURL(config, "/privacy")
         )
       )
   );
@@ -51,7 +93,8 @@ function createSmartInvitesApp(service) {
           "Terms",
           "Условия запрещают вредоносные и обманные Smart Invites и описывают ограничения сервиса.",
           TERMS_URL,
-          "Открыть Terms"
+          "Открыть Terms",
+          serviceURL(config, "/terms")
         )
       )
   );
@@ -64,7 +107,8 @@ function createSmartInvitesApp(service) {
           "Сообщить о нарушении",
           "Передайте slug ссылки и описание нарушения команде поддержки SLAYBOT.",
           safeSupportURL(service.client.config.SUPPORT_SERVER),
-          "Связаться с поддержкой"
+          "Связаться с поддержкой",
+          serviceURL(config, "/abuse")
         )
       )
   );
@@ -95,6 +139,13 @@ function createSmartInvitesApp(service) {
           .send(renderStatus("Ссылка не найдена", "Проверьте адрес и попробуйте снова."));
       }
       record = found.record;
+      if (isLinkPreviewCrawler(req.get("user-agent"))) {
+        try {
+          return sendPreviewCard(service, res, found.record, req.params.slug);
+        } catch (error) {
+          return handlePublicError(service, res, error, "preview-card");
+        }
+      }
       await service.incrementStats(record._id, { clickCount: 1 });
       if (record.status === "deleted" || record.status === "disabled") throw service.statusError(record.status);
       const resolved = await service.ensureUsable(record);
@@ -106,7 +157,6 @@ function createSmartInvitesApp(service) {
       }
 
       await service.incrementStats(record._id, { successfulPreviewCount: 1 });
-      const pathPrefix = config.pathPrefix || "";
       return res
         .status(200)
         .type("html")
@@ -116,7 +166,10 @@ function createSmartInvitesApp(service) {
             guildIcon: resolved.guild.iconURL?.({ extension: "png", size: 128 }) || null,
             description: service.getPublicDescription(resolved.record),
             channelName: resolved.channel.name,
-            joinPath: `${pathPrefix}/${encodeURIComponent(req.params.slug)}/join`,
+            joinPath: joinPath(config, req.params.slug),
+            canonicalURL: service.getPublicURL(resolved.record),
+            cardImage: resolved.guild.iconURL?.({ extension: "png", size: CARD_ICON_SIZE }) || null,
+            cardImageSize: CARD_ICON_SIZE,
           })
         );
     } catch (error) {
@@ -129,6 +182,38 @@ function createSmartInvitesApp(service) {
     res.status(404).type("html").send(renderStatus("Страница не найдена", "Проверьте адрес и попробуйте снова."))
   );
   return app;
+}
+
+function joinPath(config, slug) {
+  return `${config.pathPrefix || ""}/${encodeURIComponent(slug)}/join`;
+}
+
+/**
+ * Answers a link-preview crawler with the card markup and nothing else. It
+ * deliberately skips what the human path does: no click is counted (a rendered
+ * card is not a visitor), and the invite is never validated or regenerated, so
+ * pasting a link into a chat can't make the bot call Discord's invite API. The
+ * channel name is taken from cache only for the same reason - it is cosmetic
+ * here and absent from the card itself.
+ */
+function sendPreviewCard(service, res, record, slug) {
+  if (record.status === "deleted" || record.status === "disabled") throw service.statusError(record.status);
+  const guild = service.getGuild(record.guildId);
+  return res
+    .status(200)
+    .type("html")
+    .send(
+      renderInvite({
+        guildName: guild.name,
+        guildIcon: guild.iconURL?.({ extension: "png", size: 128 }) || null,
+        description: service.getPublicDescription(record),
+        channelName: guild.channels?.cache?.get(record.channelId)?.name || null,
+        joinPath: joinPath(service.config, slug),
+        canonicalURL: service.getPublicURL(record),
+        cardImage: guild.iconURL?.({ extension: "png", size: CARD_ICON_SIZE }) || null,
+        cardImageSize: CARD_ICON_SIZE,
+      })
+    );
 }
 
 async function resolvePublicInvite(service, slug) {
@@ -197,5 +282,6 @@ module.exports = {
   createSmartInvitesApp,
   resolvePublicInvite,
   discordURL,
+  isLinkPreviewCrawler,
   safeSupportURL,
 };
