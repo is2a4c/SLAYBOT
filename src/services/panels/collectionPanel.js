@@ -307,7 +307,9 @@ function defineCollectionPanel(definition) {
 
     return {
       embeds: base.embeds,
-      components: [new ActionRowBuilder().addComponents(menu), navigation(t, [], buttonId("open", key))],
+      // Back to the entry as it is being edited, not as it is stored: reopening it
+      // would reload it from the database and throw away everything typed so far.
+      components: [new ActionRowBuilder().addComponents(menu), navigation(t, [], buttonId("entry", key))],
     };
   }
 
@@ -355,7 +357,14 @@ function defineCollectionPanel(definition) {
       return true;
     }
 
-    if (parsed.action === "open" || (parsed.kind === "select" && parsed.action === "open")) {
+    // The entry as it currently stands, drawn from the draft alone — nothing to
+    // read back, so nothing half-typed is lost on the way.
+    if (parsed.action === "entry") {
+      await redraw(interaction, buildEntry(t, settings, interaction, parsed.ref));
+      return true;
+    }
+
+    if (parsed.action === "open") {
       const key = parsed.kind === "select" ? interaction.values[0] : parsed.ref;
       // Reading the entry back is a database round-trip of its own.
       await ack(interaction);
