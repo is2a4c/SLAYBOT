@@ -15,7 +15,12 @@ const {
 const { normalizeBaseURL, validateSmartInviteConfiguration } = require("../src/services/smart-invites/config");
 const { SmartInviteService } = require("../src/services/smart-invites/SmartInviteService");
 const SmartInviteScheduler = require("../src/services/smart-invites/SmartInviteScheduler");
-const { createSmartInvitesApp, discordURL, safeSupportURL } = require("../src/web/smart-invites/app");
+const {
+  createSmartInvitesApp,
+  discordURL,
+  isLinkPreviewCrawler,
+  safeSupportURL,
+} = require("../src/web/smart-invites/app");
 const { escapeHtml } = require("../src/web/smart-invites/templates");
 const runtime = require("../src/services/smart-invites/runtime");
 const inviteHandler = require("../src/handlers/invite");
@@ -413,6 +418,57 @@ test("renders secure preview, disabled and 404 pages without leaking the invite 
   } finally {
     await close(server);
   }
+});
+
+test("every server link carries the Open Graph card chat clients unfurl", async () => {
+  const fixture = createFixture();
+  await createRecord(fixture, "card-link", "Уютный сервер про музыку");
+  const server = await listen(createSmartInvitesApp(fixture.service));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const html = await (await fetch(`${base}/card-link`)).text();
+    assert.match(html, /<meta property="og:site_name" content="SLAYBOT Smart Invites">/);
+    assert.match(html, /<meta property="og:title" content="Test Guild">/);
+    assert.match(html, /<meta property="og:description" content="Уютный сервер про музыку">/);
+    assert.match(html, /<meta property="og:url" content="https:\/\/slaybot\.televibe\.host\/card-link">/);
+    assert.match(html, /<meta property="og:image" content="https:\/\/cdn\.discordapp\.com\/icons\/test\.png">/);
+    assert.match(html, /<meta name="twitter:card" content="summary">/);
+    assert.match(html, /<meta name="theme-color" content="#a855f7">/);
+    assert.match(html, /<link rel="canonical" href="https:\/\/slaybot\.televibe\.host\/card-link">/);
+
+    const home = await (await fetch(`${base}/`)).text();
+    assert.match(home, /<meta property="og:title" content="SLAYBOT Smart Invites">/);
+  } finally {
+    await close(server);
+  }
+});
+
+test("a link preview crawler gets the card without a click, a redirect or a Discord call", async () => {
+  const fixture = createFixture({ redirectMode: "redirect" });
+  const record = await createRecord(fixture, "crawled-link");
+  fixture.client.fetchInvite = async () => assert.fail("a crawler must not trigger invite validation");
+  const server = await listen(createSmartInvitesApp(fixture.service));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const response = await fetch(`${base}/crawled-link`, {
+      headers: { "user-agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)" },
+      redirect: "manual",
+    });
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    assert.match(html, /<meta property="og:title" content="Test Guild">/);
+    assert.doesNotMatch(html, new RegExp(record.discordInviteCode));
+
+    const stored = await SmartInvite.findById(record._id);
+    assert.equal(stored.clickCount, 0);
+    assert.equal(stored.successfulRedirectCount, 0);
+    assert.equal(stored.successfulPreviewCount, 0);
+  } finally {
+    await close(server);
+  }
+  assert.equal(isLinkPreviewCrawler("Mozilla/5.0 (Macintosh; Intel Mac OS X) Safari/605.1.15"), false);
+  assert.equal(isLinkPreviewCrawler(undefined), false);
+  assert.equal(isLinkPreviewCrawler("TelegramBot (like TwitterBot)"), true);
 });
 
 test("temporary Discord failures set exponential validation backoff", async () => {

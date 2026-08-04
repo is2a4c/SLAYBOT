@@ -238,31 +238,42 @@ curl -fsS https://node-control.example/ready
 - исходящее HTTPS-соединение с control plane;
 - Linux x86_64/arm64. GPU необязателен.
 
-Скачайте и запустите единый installer:
+Установка одной командой — installer прикреплён к каждому релизу:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/is2a4c/SLAYBOT/main/scripts/install-slaynode.sh
-chmod +x install-slaynode.sh
-./install-slaynode.sh
+curl -fsSL https://github.com/is2a4c/SLAYBOT/releases/latest/download/install-slaynode.sh | bash
 ```
 
-Installer спросит HTTPS URL control plane и одноразовый token. Затем он:
+Installer спросит HTTPS URL control plane и одноразовый token прямо в терминале. Затем он:
 
-1. скачает актуальные исходники SlayNode;
+1. скачает исходники SlayNode последнего релиза;
 2. локально соберёт non-root Docker image;
 3. выполнит enrollment внутри одноразового контейнера;
 4. сохранит уникальные `SLAYNODE_ID` и `SLAYNODE_SECRET` в `.env` с правами `0600`;
 5. создаст постоянный volume для моделей;
 6. запустит worker и дождётся реального heartbeat до статуса `healthy`.
 
-Для автоматической установки без вопросов:
+Полностью без вопросов — все ответы передаются флагами:
 
 ```bash
-SLAYNODE_CONTROL_URL=https://node-control.example \
-SLAYNODE_ENROLLMENT_TOKEN='token-from-discord' \
-SLAYNODE_INSTALL_DIR=/opt/slaynode \
-./install-slaynode.sh
+curl -fsSL https://github.com/is2a4c/SLAYBOT/releases/latest/download/install-slaynode.sh | bash -s -- \
+  --control-url https://node-control.example \
+  --token 'token-from-discord' \
+  --dir /opt/slaynode
 ```
+
+Те же значения понимаются как `SLAYNODE_CONTROL_URL`, `SLAYNODE_ENROLLMENT_TOKEN` и `SLAYNODE_INSTALL_DIR` в environment. Полный список — `--help`.
+
+Если выполнять скачанный код сразу не хочется, скачайте файл, сверьте контрольную сумму из того же релиза и запустите вручную:
+
+```bash
+curl -fsSLO https://github.com/is2a4c/SLAYBOT/releases/latest/download/install-slaynode.sh
+curl -fsSLO https://github.com/is2a4c/SLAYBOT/releases/latest/download/SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS
+bash install-slaynode.sh
+```
+
+По умолчанию installer ставит версию последнего опубликованного релиза; `--ref v3.0.0` или `--ref main` выбирает другую.
 
 > [!IMPORTANT]
 > Не передавайте `.env` другой ноде. Каждый worker должен получить собственный token через `/slaynode enroll` и собственную пару credentials.

@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 REPOSITORY="${SLAYNODE_REPOSITORY:-is2a4c/SLAYBOT}"
-SOURCE_REF="${SLAYNODE_SOURCE_REF:-main}"
+SOURCE_REF="${SLAYNODE_SOURCE_REF:-}"
 INSTALL_DIR="${SLAYNODE_INSTALL_DIR:-${PWD}/slaynode-worker}"
 SOURCE_DIR="${SLAYNODE_SOURCE_DIR:-}"
 TEMP_DIR=""
@@ -11,6 +11,81 @@ ENROLL_ENV=""
 die() {
   printf 'SlayNode installer: %s\n' "$*" >&2
   exit 1
+}
+
+usage() {
+  cat <<'USAGE'
+Installs a SlayNode worker (Docker) and connects it to a control plane.
+
+  install-slaynode.sh [--control-url URL] [--token TOKEN] [--dir PATH] [--ref REF]
+                      [--parallelism N] [--allow-http] [--help]
+
+  --control-url URL  HTTPS address of the SlayNode control plane
+  --token TOKEN      one-time token from /slaynode enroll in Discord
+  --dir PATH         install directory (default: ./slaynode-worker)
+  --ref REF          source tag or branch (default: the latest published release)
+  --parallelism N    concurrent jobs for this worker (default: 1)
+  --allow-http       permit a plain-HTTP control plane, for local tests only
+
+Anything not passed as a flag is read from the matching SLAYNODE_* environment
+variable, and whatever is still missing is asked for on the terminal.
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --control-url | --token | --dir | --ref | --parallelism)
+      [[ $# -ge 2 ]] || die "$1 needs a value (see --help)"
+      case "$1" in
+        --control-url) SLAYNODE_CONTROL_URL="$2" ;;
+        --token) SLAYNODE_ENROLLMENT_TOKEN="$2" ;;
+        --dir) INSTALL_DIR="$2" ;;
+        --ref) SOURCE_REF="$2" ;;
+        --parallelism) SLAYNODE_PARALLELISM="$2" ;;
+      esac
+      shift 2
+      ;;
+    --allow-http)
+      SLAYNODE_ALLOW_HTTP=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *) die "unknown option: $1 (see --help)" ;;
+  esac
+done
+
+# `curl … | bash` hands the script itself to stdin, so a prompt has to talk to
+# the terminal directly. With no terminal at all (CI, cloud-init) the value has
+# to arrive as a flag or an environment variable instead.
+ask() {
+  local prompt="$1" mode="$2" value=""
+  # A readable /dev/tty still fails to open where there is no controlling
+  # terminal, so the open itself is the test - quietly, since a missing
+  # terminal is an expected way to run this.
+  { exec 3</dev/tty; } 2>/dev/null || return 0
+  if [[ "$mode" == "hidden" ]]; then
+    read -r -s -p "$prompt" value <&3
+    printf '\n' >&2
+  else
+    read -r -p "$prompt" value <&3
+  fi
+  exec 3<&-
+  printf '%s' "$value"
+}
+
+# An installer downloaded from a release should install that release, not
+# whatever main happens to hold; the branch stays as the fallback.
+latest_release_ref() {
+  local tag=""
+  tag="$(
+    curl -fsSL --retry 2 "https://api.github.com/repos/${REPOSITORY}/releases/latest" 2>/dev/null |
+      sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1
+  )" || true
+  [[ "$tag" =~ ^[A-Za-z0-9._-]+$ ]] || tag=""
+  printf '%s' "${tag:-main}"
 }
 
 cleanup() {
@@ -28,10 +103,10 @@ docker compose version >/dev/null 2>&1 || die "Docker Compose v2 is required"
 docker info >/dev/null 2>&1 || die "Docker daemon is not running"
 
 if [[ -z "${SLAYNODE_CONTROL_URL:-}" ]]; then
-  read -r -p "SlayNode control URL (https://...): " SLAYNODE_CONTROL_URL
+  SLAYNODE_CONTROL_URL="$(ask "SlayNode control URL (https://...): " visible)"
 fi
 SLAYNODE_CONTROL_URL="${SLAYNODE_CONTROL_URL%/}"
-[[ -n "$SLAYNODE_CONTROL_URL" ]] || die "SLAYNODE_CONTROL_URL is required"
+[[ -n "$SLAYNODE_CONTROL_URL" ]] || die "control URL is required: pass --control-url or set SLAYNODE_CONTROL_URL"
 if [[ "$SLAYNODE_CONTROL_URL" != https://* && "${SLAYNODE_ALLOW_HTTP:-false}" != "true" ]]; then
   die "HTTPS is required. Set SLAYNODE_ALLOW_HTTP=true only for a local test control plane."
 fi
@@ -49,6 +124,8 @@ fi
 if [[ -z "$SOURCE_DIR" ]]; then
   command -v curl >/dev/null 2>&1 || die "curl is required to download SlayNode"
   command -v tar >/dev/null 2>&1 || die "tar is required to unpack SlayNode"
+  [[ -n "$SOURCE_REF" ]] || SOURCE_REF="$(latest_release_ref)"
+  printf 'Installing SlayNode %s from %s\n' "$SOURCE_REF" "$REPOSITORY"
   TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/slaynode-install.XXXXXX")"
   curl -fsSL --retry 3 \
     "https://github.com/${REPOSITORY}/archive/${SOURCE_REF}.tar.gz" \
@@ -81,10 +158,10 @@ docker build \
 
 if [[ ! -s .env ]] || ! grep -Eq '^SLAYNODE_ID=.+$' .env || ! grep -Eq '^SLAYNODE_SECRET=.+$' .env; then
   if [[ -z "${SLAYNODE_ENROLLMENT_TOKEN:-}" ]]; then
-    read -r -s -p "One-time token from /slaynode enroll: " SLAYNODE_ENROLLMENT_TOKEN
-    printf '\n'
+    SLAYNODE_ENROLLMENT_TOKEN="$(ask "One-time token from /slaynode enroll: " hidden)"
   fi
-  [[ -n "$SLAYNODE_ENROLLMENT_TOKEN" ]] || die "SLAYNODE_ENROLLMENT_TOKEN is required"
+  [[ -n "$SLAYNODE_ENROLLMENT_TOKEN" ]] ||
+    die "enrollment token is required: pass --token or set SLAYNODE_ENROLLMENT_TOKEN"
 
   ENROLL_ENV="$INSTALL_DIR/.enroll.env"
   umask 077
