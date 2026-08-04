@@ -1,6 +1,6 @@
 {
   "name": "slaybot",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "description": "SLAYBOT is a powerful and flexible Discord bot with automatic moderation and more than 50 commands. The main focus is on security, server management, and advanced functionality.",
   "main": "bot.js",
   "author": "isaac",

@@ -273,7 +273,7 @@ sha256sum --ignore-missing -c SHA256SUMS
 bash install-slaynode.sh
 ```
 
-По умолчанию installer ставит версию последнего опубликованного релиза; `--ref v2.2.0` или `--ref main` выбирает другую.
+По умолчанию installer ставит версию последнего опубликованного релиза; `--ref v3.0.0` или `--ref main` выбирает другую.
 
 > [!IMPORTANT]
 > Не передавайте `.env` другой ноде. Каждый worker должен получить собственный token через `/slaynode enroll` и собственную пару credentials.
