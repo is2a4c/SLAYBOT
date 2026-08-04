@@ -5,9 +5,15 @@ const { getSettings } = require("@schemas/Guild");
  * @param {import('@src/structures').BotClient} client
  */
 async function updateCounterChannels(client) {
-  client.counterUpdateQueue.forEach(async (guildId) => {
+  // Taken off the queue in one go: the entries are worked through one after the
+  // other, and anything queued while that happens belongs to the next run. The
+  // old code walked the queue and spliced out of it as it went, so a server the
+  // bot had left was never removed and every later run tried it again.
+  const pending = client.counterUpdateQueue.splice(0, client.counterUpdateQueue.length);
+
+  for (const guildId of pending) {
     const guild = client.guilds.cache.get(guildId);
-    if (!guild) return;
+    if (!guild) continue;
 
     try {
       const settings = await getSettings(guild);
@@ -21,21 +27,19 @@ async function updateCounterChannels(client) {
         const vc = guild.channels.cache.get(chId);
         if (!vc) continue;
 
-        let channelName;
-        if (config.counter_type.toUpperCase() === "USERS") channelName = `${config.name} : ${all}`;
-        if (config.counter_type.toUpperCase() === "MEMBERS") channelName = `${config.name} : ${members}`;
-        if (config.counter_type.toUpperCase() === "BOTS") channelName = `${config.name} : ${bots}`;
+        const counts = { USERS: all, MEMBERS: members, BOTS: bots };
+        const count = counts[config.counter_type.toUpperCase()];
+        // A kind nothing counts would have renamed the channel to "undefined".
+        if (count === undefined) continue;
 
-        if (vc.manageable) vc.setName(channelName).catch((err) => vc.client.logger.log("Set Name error: ", err));
+        if (vc.manageable) {
+          await vc.setName(`${config.name} : ${count}`).catch((err) => vc.client.logger.log("Set Name error: ", err));
+        }
       }
     } catch (ex) {
       client.logger.error(`Error updating counter channels for guildId: ${guildId}`, ex);
-    } finally {
-      // remove guildId from cache
-      const i = client.counterUpdateQueue.indexOf(guildId);
-      if (i > -1) client.counterUpdateQueue.splice(i, 1);
     }
-  });
+  }
 }
 
 /**
