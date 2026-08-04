@@ -51,7 +51,9 @@ test("setrr saves every comma-separated emoji and role in one replacement", asyn
     `😀 <@&${firstRole.id}>, 🎮 <@&${secondRole.id}>`
   );
 
-  assert.equal(response, "Done! Saved 2 reaction roles for this message.");
+  // The outcome is a key and its values, so the panel and the command can each
+  // say it in the language of the server they are configuring.
+  assert.deepEqual(response, { ok: true, key: "reactionRoles.saved", vars: { count: 2 } });
   assert.deepEqual(reactions, ["😀", "🎮"]);
   assert.deepEqual(saved, [
     [
@@ -67,6 +69,35 @@ test("setrr saves every comma-separated emoji and role in one replacement", asyn
 
   reactionRoleSchema.getReactionRoles = originalGet;
   reactionRoleSchema.replaceReactionRoles = originalReplace;
+});
+
+test("every outcome reaction roles can report is translated in both languages", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const { LOCALES, translate } = require("@src/i18n");
+
+  // The keys are chosen in code and only ever resolved at run time, so nothing
+  // else would notice one being renamed on one side and not the other.
+  const sources = [
+    "src/services/roles/ReactionRoleSetup.js",
+    "src/helpers/ReactionRoleMappings.js",
+    "src/commands/admin/reaction-role/setrr.js",
+    "src/commands/admin/reaction-role/addrr.js",
+    "src/commands/admin/reaction-role/removerr.js",
+  ].map((file) => fs.readFileSync(path.join(__dirname, "..", file), "utf8"));
+
+  const keys = new Set();
+  for (const source of sources) {
+    for (const [, key] of source.matchAll(/["'`](reactionRoles\.\w+)["'`]/g)) keys.add(key);
+  }
+
+  assert.ok(keys.size >= 12, `only ${keys.size} outcomes found — the search stopped matching`);
+
+  for (const key of keys) {
+    for (const locale of Object.keys(LOCALES)) {
+      assert.notEqual(translate(locale, key), key, `${key} has no ${locale} wording`);
+    }
+  }
 });
 
 function createRole(id, position) {

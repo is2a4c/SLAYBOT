@@ -1,4 +1,5 @@
 const { applyReactionRoles } = require("@src/services/roles/ReactionRoleSetup");
+const { guildTranslator } = require("@src/i18n");
 const { ApplicationCommandOptionType, ChannelType } = require("discord.js");
 
 /**
@@ -41,22 +42,24 @@ module.exports = {
     ],
   },
 
-  async messageRun(message, args) {
+  async messageRun(message, args, data) {
+    const t = guildTranslator(data?.settings, message.guild);
     const targetChannels = message.guild.findMatchingChannels(args[0]);
-    if (targetChannels.length === 0) return message.safeReply(`No channels found matching ${args[0]}`);
+    if (targetChannels.length === 0) return message.safeReply(t("reactionRoles.channelNotFound", { name: args[0] }));
 
-    const response = await applyReactionRoles(message.guild, targetChannels[0], args[1], args.slice(2).join(" "));
-    await message.safeReply(response);
+    const result = await applyReactionRoles(message.guild, targetChannels[0], args[1], args.slice(2).join(" "));
+    await message.safeReply(t(result.key, result.vars));
   },
 
-  async interactionRun(interaction) {
-    const response = await applyReactionRoles(
+  async interactionRun(interaction, data) {
+    const t = guildTranslator(data?.settings, interaction.guild);
+    const result = await applyReactionRoles(
       interaction.guild,
       interaction.options.getChannel("channel"),
       interaction.options.getString("message_id"),
       interaction.options.getString("pairs")
     );
-    await interaction.safeFollowUp(response);
+    await interaction.safeFollowUp(t(result.key, result.vars));
   },
 };
 

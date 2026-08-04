@@ -36,49 +36,66 @@ function formatReactionRoles(guild, roles = []) {
 }
 
 /**
+ * @param {string} key translation key
+ * @param {object} [vars]
+ * @returns {{ok: false, key: string, vars: object}}
+ */
+const refuse = (key, vars = {}) => ({ ok: false, key, vars });
+
+/**
+ * Put a set of reaction roles on a message.
+ *
+ * The outcome is returned as a key and its values rather than as a finished
+ * sentence: the panel and the command both show it, and both have to say it in
+ * the language of the server they are configuring. It also means the caller can
+ * tell success from refusal by asking, instead of by reading the wording.
+ *
  * @param {import('discord.js').Guild} guild
  * @param {import('discord.js').GuildTextBasedChannel} channel
  * @param {string} messageId
  * @param {string} input pairs such as "😀 @Member, 🎮 @Gamer"
- * @returns {Promise<string>} what to tell whoever asked for it
+ * @returns {Promise<{ok: boolean, key: string, vars: object}>}
  */
 async function applyReactionRoles(guild, channel, messageId, input) {
   if (!channel.permissionsFor(guild.members.me).has(CHANNEL_PERMISSIONS)) {
-    return `You need the following permissions in ${channel.toString()}\n${parsePermissions(CHANNEL_PERMISSIONS)}`;
+    return refuse("reactionRoles.needPermissions", {
+      channel: channel.toString(),
+      permissions: parsePermissions(CHANNEL_PERMISSIONS),
+    });
   }
 
   let targetMessage;
   try {
     targetMessage = await channel.messages.fetch({ message: messageId });
   } catch {
-    return "Could not fetch message. Did you provide a valid messageId?";
+    return refuse("reactionRoles.messageNotFound");
   }
 
   let requested;
   try {
     requested = parseReactionRoleMappings(input);
   } catch (ex) {
-    return ex.message;
+    return refuse(ex.key || "reactionRoles.badPairs", ex.vars);
   }
 
   const roles = [];
   const seenEmojis = new Set();
   for (const pair of requested) {
     const role = guild.roles.cache.get(pair.roleId);
-    if (!role) return `Role <@&${pair.roleId}> was not found on this server.`;
-    if (role.managed) return `I cannot assign the managed role ${role.toString()}.`;
-    if (guild.roles.everyone.id === role.id) return "You cannot assign the everyone role.";
+    if (!role) return refuse("reactionRoles.roleNotFound", { role: `<@&${pair.roleId}>` });
+    if (role.managed) return refuse("reactionRoles.roleManaged", { role: role.toString() });
+    if (guild.roles.everyone.id === role.id) return refuse("reactionRoles.roleEveryone");
     if (guild.members.me.roles.highest.position <= role.position) {
-      return `I cannot assign ${role.toString()}. Move my highest role above it and try again.`;
+      return refuse("reactionRoles.roleTooHigh", { role: role.toString() });
     }
 
     let emote;
     try {
       emote = normalizeReactionEmoji(pair.reaction, guild);
     } catch (ex) {
-      return ex.message;
+      return refuse(ex.key || "reactionRoles.badEmoji", ex.vars);
     }
-    if (seenEmojis.has(emote)) return `Emoji ${pair.reaction} is listed more than once.`;
+    if (seenEmojis.has(emote)) return refuse("reactionRoles.duplicateEmoji", { emoji: pair.reaction });
 
     seenEmojis.add(emote);
     roles.push({ emote, role_id: role.id });
@@ -88,7 +105,7 @@ async function applyReactionRoles(guild, channel, messageId, input) {
     try {
       await targetMessage.react(role.emote);
     } catch {
-      return `Failed to add reaction ${role.emote}. No configuration was saved.`;
+      return refuse("reactionRoles.reactionFailed", { emoji: showEmote(guild, role.emote) });
     }
   }
 
@@ -96,7 +113,7 @@ async function applyReactionRoles(guild, channel, messageId, input) {
   try {
     await replaceReactionRoles(guild.id, channel.id, targetMessage.id, roles);
   } catch {
-    return "Failed to save reaction roles. Try again later.";
+    return refuse("reactionRoles.saveFailed");
   }
 
   // Reactions that are no longer part of the set stop being offered.
@@ -110,7 +127,7 @@ async function applyReactionRoles(guild, channel, messageId, input) {
     )
   );
 
-  return `Done! Saved ${roles.length} reaction role${roles.length === 1 ? "" : "s"} for this message.`;
+  return { ok: true, key: "reactionRoles.saved", vars: { count: roles.length } };
 }
 
 module.exports = { CHANNEL_PERMISSIONS, applyReactionRoles, formatReactionRoles, showEmote };

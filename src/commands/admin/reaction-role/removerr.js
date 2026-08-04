@@ -1,5 +1,6 @@
 const { removeReactionRole } = require("@schemas/ReactionRoles");
 const { parsePermissions } = require("@helpers/Utils");
+const { guildTranslator } = require("@src/i18n");
 const { ApplicationCommandOptionType, ChannelType } = require("discord.js");
 
 const channelPerms = ["EmbedLinks", "ReadMessageHistory", "AddReactions", "UseExternalEmojis", "ManageMessages"];
@@ -38,45 +39,55 @@ module.exports = {
     ],
   },
 
-  async messageRun(message, args) {
+  async messageRun(message, args, data) {
+    const t = guildTranslator(data?.settings, message.guild);
     const targetChannel = message.guild.findMatchingChannels(args[0]);
-    if (targetChannel.length === 0) return message.safeReply(`No channels found matching ${args[0]}`);
+    if (targetChannel.length === 0) return message.safeReply(t("reactionRoles.channelNotFound", { name: args[0] }));
 
-    const targetMessage = args[1];
-    const response = await removeRR(message.guild, targetChannel[0], targetMessage);
-
-    await message.safeReply(response);
+    const result = await removeRR(message.guild, targetChannel[0], args[1]);
+    await message.safeReply(t(result.key, result.vars));
   },
 
-  async interactionRun(interaction) {
-    const targetChannel = interaction.options.getChannel("channel");
-    const messageId = interaction.options.getString("message_id");
-
-    const response = await removeRR(interaction.guild, targetChannel, messageId);
-    await interaction.safeFollowUp(response);
+  async interactionRun(interaction, data) {
+    const t = guildTranslator(data?.settings, interaction.guild);
+    const result = await removeRR(
+      interaction.guild,
+      interaction.options.getChannel("channel"),
+      interaction.options.getString("message_id")
+    );
+    await interaction.safeFollowUp(t(result.key, result.vars));
   },
 };
 
+/**
+ * @returns {Promise<{ok: boolean, key: string, vars: object}>} the outcome as
+ *   something the caller translates, so the panel and the command agree.
+ */
 async function removeRR(guild, channel, messageId) {
+  const refuse = (key, vars = {}) => ({ ok: false, key, vars });
+
   if (!channel.permissionsFor(guild.members.me).has(channelPerms)) {
-    return `You need the following permissions in ${channel.toString()}\n${parsePermissions(channelPerms)}`;
+    return refuse("reactionRoles.needPermissions", {
+      channel: channel.toString(),
+      permissions: parsePermissions(channelPerms),
+    });
   }
 
   let targetMessage;
   try {
     targetMessage = await channel.messages.fetch({ message: messageId });
   } catch (ex) {
-    return "Could not fetch message. Did you provide a valid messageId?";
+    return refuse("reactionRoles.messageNotFound");
   }
 
   try {
     await removeReactionRole(guild.id, channel.id, targetMessage.id);
     await targetMessage.reactions?.removeAll();
   } catch (ex) {
-    return "Oops! An unexpected error occurred. Try again later";
+    return refuse("reactionRoles.saveFailed");
   }
 
-  return "Done! Configuration updated";
+  return { ok: true, key: "reactionRoles.removed", vars: {} };
 }
 
 module.exports.removeRR = removeRR;
