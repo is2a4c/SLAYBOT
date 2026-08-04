@@ -26,8 +26,10 @@ module.exports = async (client, message) => {
   let isCommand = false;
   const startsWithPrefix = PREFIX_COMMANDS.enabled && messageContent.startsWith(settings.prefix);
   if (PREFIX_COMMANDS.enabled) {
-    // check for bot mentions
-    if (messageContent.includes(`${client.user.id}`)) {
+    // Answer only a real mention of the bot. Matching the bare id matched any
+    // message that merely contained it — a link to the bot, somebody quoting its
+    // id — and the bot announced its prefix into the middle of the conversation.
+    if (new RegExp(`<@!?${client.user.id}>`).test(messageContent)) {
       message.channel.safeSend(`> My prefix is \`${settings.prefix}\``);
     }
 
