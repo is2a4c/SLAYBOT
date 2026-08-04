@@ -1,5 +1,5 @@
-require("dotenv").config();
 require("module-alias/register");
+require("@helpers/loadEnvironment")();
 require("@helpers/ConfigDefaults").applyConfigDefaults();
 
 require("@helpers/extenders/Message");
