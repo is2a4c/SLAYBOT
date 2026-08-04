@@ -214,33 +214,40 @@ module.exports = class ModUtils {
     const toDelete = new Collection();
 
     try {
+      // A filtered purge has to look at more messages than it deletes, and the
+      // fetch defaults to fifty — so asking to clear a hundred of somebody's
+      // messages searched half the window it was given. A hundred is the most
+      // Discord returns at once, and the most bulkDelete takes.
+      const SEARCH_LIMIT = 100;
+      const search = () => channel.messages.fetch({ limit: SEARCH_LIMIT, cache: false, force: true });
+
       let messages;
       switch (type) {
         case "ALL":
           messages = await channel.messages.fetch({ limit: amount, cache: false, force: true });
           break;
         case "BOT": {
-          messages = await channel.messages.fetch({ cache: false, force: true });
+          messages = await search();
           messages = messages.filter((message) => message.author.bot).first(amount);
           break;
         }
         case "LINK": {
-          messages = await channel.messages.fetch({ cache: false, force: true });
+          messages = await search();
           messages = messages.filter((message) => containsLink(message.content)).first(amount);
           break;
         }
         case "TOKEN": {
-          messages = await channel.messages.fetch({ cache: false, force: true });
+          messages = await search();
           messages = messages.filter((message) => message.content.includes(argument)).first(amount);
           break;
         }
         case "ATTACHMENT": {
-          messages = await channel.messages.fetch({ cache: false, force: true });
+          messages = await search();
           messages = messages.filter((message) => message.attachments.size > 0).first(amount);
           break;
         }
         case "USER": {
-          messages = await channel.messages.fetch({ cache: false, force: true });
+          messages = await search();
           messages = messages.filter((message) => message.author.id === argument).first(amount);
           break;
         }
