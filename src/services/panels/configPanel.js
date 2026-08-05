@@ -346,8 +346,9 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
      * before it shows anything.
      *
      * @param {object} field
+     * @param {*} [previous] what the setting was before this click
      */
-    async function store(field) {
+    async function store(field, previous) {
       const saving = settings.save().catch((error) => {
         interaction.client?.logger?.error("panel: failed to save settings", error);
       });
@@ -355,7 +356,9 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
       await draw();
       await saving;
       // Some settings do something once stored, such as posting a public panel.
-      await field.after?.(interaction, settings, t);
+      // What the setting was is passed along: a panel that has just been pointed
+      // at another channel has to be taken down from the one it was in.
+      await field.after?.(interaction, settings, t, previous);
     }
 
     if (parsed.action === BACK) {
@@ -363,8 +366,15 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
       return true;
     }
 
+    // A panel message outlives the version that posted it, so a button may name a
+    // setting this version no longer has. Drawing the panel as it is now says so
+    // plainly; leaving the click unanswered reads as a broken button.
     const field = byId.get(parsed.action);
-    if (!field) return true;
+    if (!field) {
+      if (parsed.kind === "modal" && !interaction.isFromMessage?.()) await warn(interaction, t("panels.common.failed"));
+      else await draw();
+      return true;
+    }
 
     // Buttons either act at once, open a picker in place, or open a modal.
     if (parsed.kind === "button") {
@@ -374,8 +384,9 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
       }
 
       if (field.type === "toggle") {
-        writePath(settings, fieldPath(field), !readPath(settings, fieldPath(field)));
-        await store(field);
+        const previous = readPath(settings, fieldPath(field));
+        writePath(settings, fieldPath(field), !previous);
+        await store(field, previous);
         return true;
       }
 
@@ -393,11 +404,12 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
 
     if (parsed.kind === "select") {
       const values = interaction.values || [];
+      const previous = readPath(settings, fieldPath(field));
 
       if (field.type === "roleList" || field.type === "channelList") writePath(settings, fieldPath(field), values);
       else writePath(settings, fieldPath(field), values[0] ?? null);
 
-      await store(field);
+      await store(field, previous);
       return true;
     }
 
@@ -431,15 +443,16 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
       value = checked.value ?? value;
     }
 
+    const previous = readPath(settings, fieldPath(field));
     writePath(settings, fieldPath(field), value);
 
     if (interaction.isFromMessage()) {
-      await store(field);
+      await store(field, previous);
       return true;
     }
 
     await settings.save();
-    await field.after?.(interaction, settings, t);
+    await field.after?.(interaction, settings, t, previous);
     await warn(interaction, t("common.saved"));
 
     return true;

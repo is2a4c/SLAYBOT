@@ -330,3 +330,13 @@ test("each list panel keeps a required key that identifies an entry", () => {
     assert.ok(required.length, `${name} would let an empty entry be created`);
   }
 });
+
+test("a button this version no longer has comes back with the list", async () => {
+  const { panel } = makePanel();
+  const interaction = makeInteraction({ customId: "TESTCOL:retired:a" });
+
+  await panel.handle(interaction, {}, t);
+
+  assert.equal(interaction.seen.drawn.length, 1, "the click is answered rather than left hanging");
+  assert.match(interaction.seen.drawn[0].embeds[0].data.description, /первая/);
+});

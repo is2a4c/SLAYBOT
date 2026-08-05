@@ -581,6 +581,9 @@ async function route(interaction, settings, t, parsed) {
     return true;
   }
 
+  // A panel message outlives the version that posted it: a button this version no
+  // longer knows still has to be answered, and the catalogue always exists.
+  await redraw(buildCatalog(t, interaction, settings));
   return true;
 }
 

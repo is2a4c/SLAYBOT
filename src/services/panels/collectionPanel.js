@@ -459,6 +459,10 @@ function defineCollectionPanel(definition) {
       return true;
     }
 
+    // A panel message outlives the version that posted it, and a button naming
+    // something this version no longer does is still a click Discord expects an
+    // answer to. The list is what the panel would show anyway.
+    await showList();
     return true;
   }
 

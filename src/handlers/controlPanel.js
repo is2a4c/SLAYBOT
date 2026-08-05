@@ -157,7 +157,11 @@ async function route(interaction, settings, t) {
   if (customId.startsWith(`${HUB_PREFIX}:${OPEN}:`)) {
     const name = customId.slice(`${HUB_PREFIX}:${OPEN}:`.length);
     const panel = PANELS[name];
-    if (!panel) return true;
+    // A hub posted by an older version can name a system this one does not have.
+    if (!panel) {
+      await slowRedraw(interaction, () => buildHub(t, settings, interaction.client, interaction.guild));
+      return true;
+    }
 
     // A settings panel is drawn from what is already in memory and answers in one
     // round-trip; a list panel has to read its entries first.
@@ -174,6 +178,8 @@ async function route(interaction, settings, t) {
     if (await PANELS[name].handle(interaction, settings, t)) return true;
   }
 
+  // Nothing owns it any more — the hub is the one screen that always exists.
+  await slowRedraw(interaction, () => buildHub(t, settings, interaction.client, interaction.guild));
   return true;
 }
 
