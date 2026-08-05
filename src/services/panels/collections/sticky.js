@@ -126,9 +126,7 @@ module.exports = defineCollectionPanel({
 
   async update(context) {
     // Moved to another channel: the old one keeps neither the sticky nor its copy.
-    if (context.key !== context.values.channel) {
-      await module.exports.remove({ ...context, quiet: true });
-    }
+    if (context.key !== context.values.channel) await drop(context.guild, context.key);
 
     return put(context);
   },
@@ -137,17 +135,35 @@ module.exports = defineCollectionPanel({
     const existing = await getSticky(guild.id, key);
     if (!existing) return { ok: false, message: t("collections.gone") };
 
-    if (existing.last_message_id) {
-      const channel = guild.channels.cache.get(key);
-      await channel?.messages
-        ?.fetch(existing.last_message_id)
-        .then((message) => message.delete())
-        .catch(() => {});
-    }
-
-    await deleteSticky(guild.id, key);
-    require("@src/handlers").stickyHandler.forget(key);
+    await drop(guild, key, existing);
 
     return { ok: true, message: t("panels.sticky.removed") };
   },
 });
+
+/**
+ * Take one sticky out of a channel: what is stored, and the copy it posted.
+ *
+ * Removing one and moving one somewhere else leave the same thing behind, so both
+ * go through here rather than through the panel this file exports — which is the
+ * engine's own object and carries none of these functions.
+ *
+ * @param {import('discord.js').Guild} guild
+ * @param {string} channelId
+ * @param {object} [known] the stored sticky, when it has already been read
+ */
+async function drop(guild, channelId, known = null) {
+  const existing = known || (await getSticky(guild.id, channelId));
+  if (!existing) return;
+
+  if (existing.last_message_id) {
+    const channel = guild.channels.cache.get(channelId);
+    await channel?.messages
+      ?.fetch(existing.last_message_id)
+      .then((message) => message.delete())
+      .catch(() => {});
+  }
+
+  await deleteSticky(guild.id, channelId);
+  require("@src/handlers").stickyHandler.forget(channelId);
+}
