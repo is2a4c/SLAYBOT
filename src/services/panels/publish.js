@@ -44,13 +44,16 @@ module.exports = {
    * @param {import('discord.js').Interaction} interaction
    * @param {object} settings guild settings document
    * @param {(key: string, vars?: object) => string} t
+   * @param {string} [previousChannelId] where the panel was before this click
    */
-  async ticketPanel(interaction, settings, t) {
+  async ticketPanel(interaction, settings, t, previousChannelId) {
     const config = settings.ticket;
     const channel = resolveChannel(interaction, config.panel_channel_id);
     if (!channel) return;
 
-    await removePrevious(interaction.guild, config.panel_channel_id, config.panel_message_id);
+    // The setting already names the new channel, so the message that has to go is
+    // looked for where it was actually posted.
+    await removePrevious(interaction.guild, previousChannelId || config.panel_channel_id, config.panel_message_id);
 
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLORS.BOT_EMBED)
@@ -84,13 +87,15 @@ module.exports = {
    *
    * @param {import('discord.js').Interaction} interaction
    * @param {object} settings guild settings document
+   * @param {(key: string, vars?: object) => string} [t]
+   * @param {string} [previousChannelId] where the panel was before this click
    */
-  async verificationPanel(interaction, settings) {
+  async verificationPanel(interaction, settings, t, previousChannelId) {
     const config = settings.verification;
     const channel = resolveChannel(interaction, config.channel_id);
     if (!channel) return;
 
-    await removePrevious(interaction.guild, config.channel_id, config.message_id);
+    await removePrevious(interaction.guild, previousChannelId || config.channel_id, config.message_id);
 
     const { verificationHandler } = require("@src/handlers");
     const panel = verificationHandler.buildPanel(config, {
@@ -111,12 +116,14 @@ module.exports = {
    *
    * @param {import('discord.js').Interaction} interaction
    * @param {object} settings guild settings document
+   * @param {(key: string, vars?: object) => string} [t]
+   * @param {string} [previousChannelId] where the panel was before this click
    */
-  async tempVoicePanel(interaction, settings) {
+  async tempVoicePanel(interaction, settings, t, previousChannelId) {
     const channel = resolveChannel(interaction, settings.temp_voice.panel_channel_id);
     if (!channel) return;
 
     const { tempVoiceHandler } = require("@src/handlers");
-    await tempVoiceHandler.postPanel(channel, settings).catch(() => {});
+    await tempVoiceHandler.postPanel(channel, settings, { previousChannelId }).catch(() => {});
   },
 };

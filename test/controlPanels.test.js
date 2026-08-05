@@ -411,3 +411,33 @@ test("a choice is stored as its stable value, not its label", async () => {
   assert.equal(settings.max_warn.action, "BAN");
   assert.match(PANELS.server.build(t, settings).embeds[0].data.description, /бан/);
 });
+
+test("a button this version no longer has redraws instead of failing", async () => {
+  const settings = makeSettings();
+
+  const gone = makeInteraction({ customId: `${PANELS.ticket.panel.id}:whatever` });
+  await route(gone, settings);
+  assert.equal(gone.seen.update.length, 1, "the panel comes back as it is now");
+
+  const system = makeInteraction({ customId: "PANELHUB:open:retired" });
+  await route(system, settings);
+  assert.match(system.seen.update[0].embeds[0].data.title, new RegExp(t("panels.hub.title")));
+});
+
+test("a panel moved to another channel is taken down from the one it was in", async () => {
+  const settings = makeSettings({ ticket: { log_channel: null, limit: 10, staff_roles: [], panel_channel_id: "111" } });
+  const seen = [];
+
+  const field = PANELS.ticket.fields.find((entry) => entry.id === "panel");
+  const after = field.after;
+  field.after = async (interaction, current, translator, previous) => seen.push(previous);
+
+  try {
+    await route(makeInteraction({ customId: PANELS.ticket.panel.selectId("panel"), values: ["222"] }), settings);
+  } finally {
+    field.after = after;
+  }
+
+  assert.equal(settings.ticket.panel_channel_id, "222");
+  assert.deepEqual(seen, ["111"], "the publisher is told where the old message is");
+});

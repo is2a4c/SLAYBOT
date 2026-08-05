@@ -335,13 +335,16 @@ module.exports = {
    *
    * @param {import('discord.js').TextBasedChannel} channel
    * @param {object} settings guild settings document
+   * @param {{previousChannelId?: string}} [context] where the panel was, when the
+   *   setting has already been pointed somewhere else
    */
-  async postPanel(channel, settings) {
+  async postPanel(channel, settings, { previousChannelId } = {}) {
     const t = guildTranslator(settings, channel.guild);
     const config = settings.temp_voice;
+    const from = previousChannelId || config.panel_channel_id;
 
-    if (config.panel_channel_id && config.panel_message_id) {
-      const previous = channel.guild.channels.cache.get(config.panel_channel_id);
+    if (from && config.panel_message_id) {
+      const previous = channel.guild.channels.cache.get(from);
       await previous?.messages
         ?.fetch(config.panel_message_id)
         .then((message) => message.delete())
