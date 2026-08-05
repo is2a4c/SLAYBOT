@@ -84,7 +84,7 @@ module.exports = defineCollectionPanel({
 
   async create({ guild, settings, values, t }) {
     const type = values.type;
-    if (settings.counters.some((counter) => counter.counter_type.toUpperCase() === type)) {
+    if (settings.counters.some((counter) => kindOf(counter) === type)) {
       return { ok: false, message: t("panels.counters.exists") };
     }
 
@@ -114,12 +114,12 @@ module.exports = defineCollectionPanel({
   },
 
   async update({ guild, settings, key, values, t }) {
-    const counter = settings.counters.find((entry) => entry.counter_type.toUpperCase() === key);
+    const counter = settings.counters.find((entry) => kindOf(entry) === key);
     if (!counter) return { ok: false, message: t("collections.gone") };
 
     // The kind is what the channel counts, and one channel counts one thing; a
     // different kind is a different counter.
-    if (values.type !== key && settings.counters.some((entry) => entry.counter_type.toUpperCase() === values.type)) {
+    if (values.type !== key && settings.counters.some((entry) => kindOf(entry) === values.type)) {
       return { ok: false, message: t("panels.counters.exists") };
     }
 
@@ -135,7 +135,7 @@ module.exports = defineCollectionPanel({
   },
 
   async remove({ guild, settings, key, t }) {
-    const index = settings.counters.findIndex((entry) => entry.counter_type.toUpperCase() === key);
+    const index = settings.counters.findIndex((entry) => kindOf(entry) === key);
     if (index === -1) return { ok: false, message: t("collections.gone") };
 
     const [counter] = settings.counters.splice(index, 1);
