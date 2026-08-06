@@ -24,7 +24,7 @@ const {
  *   {id, name|nameKey, emoji, type, required?, choices?, choiceLabels?, min?, max?,
  *    maxLength?, long?, example?, channelTypes?, validate?}
  *
- * Types: text, number, toggle, choice, channel, role, user.
+ * Types: text, number, toggle, choice, channel, role, user, roleList, channelList.
  */
 
 // Off or unset; a required field still waiting is louder than an optional one.
@@ -45,8 +45,13 @@ const ICONS = {
   choice: "📋",
   channel: "#️⃣",
   role: "🎭",
+  roleList: "🎭",
+  channelList: "#️⃣",
   user: "👤",
 };
+
+/** Field types that hold several values rather than one. */
+const LISTS = new Set(["roleList", "channelList"]);
 
 /**
  * @param {string} text
@@ -83,12 +88,18 @@ function label(field, t) {
  * @returns {string}
  */
 function formatValue(field, value, t) {
-  if (value === null || value === undefined || value === "") {
+  const empty = value === null || value === undefined || value === "" || (LISTS.has(field.type) && !value.length);
+
+  if (empty) {
     if (field.type === "toggle") return `${OFF} ${t("common.off")}`;
     return field.required ? `${MISSING} ${t("common.needed")}` : `${OFF} ${t("common.notSet")}`;
   }
 
   switch (field.type) {
+    case "roleList":
+      return value.map((id) => `<@&${id}>`).join(", ");
+    case "channelList":
+      return value.map((id) => `<#${id}>`).join(", ");
     case "toggle":
       return value ? `${ON} ${t("common.on")}` : `${OFF} ${t("common.off")}`;
     case "channel":
@@ -115,7 +126,7 @@ function formatValue(field, value, t) {
  * @returns {number} discord.js ButtonStyle
  */
 function buttonStyle(field, value) {
-  const filled = value !== null && value !== undefined && value !== "";
+  const filled = value !== null && value !== undefined && value !== "" && (!LISTS.has(field.type) || value.length > 0);
 
   if (field.type === "toggle") return value ? ButtonStyle.Success : ButtonStyle.Secondary;
   if (!filled) return field.required ? ButtonStyle.Danger : ButtonStyle.Secondary;
@@ -180,27 +191,31 @@ function rows(t, fields, values, customId, { rows: maxRows = 4 } = {}) {
  * @param {{customId: string, placeholder: string, guild?: import('discord.js').Guild}} context
  */
 function select(field, current, { customId, placeholder, guild }) {
-  const alive = (cache) => (current && cache?.get?.(current) ? [current] : []);
+  const list = LISTS.has(field.type);
+  // Discord rejects the whole menu over a default pointing at something the guild
+  // no longer has, so a deleted channel or role is quietly dropped.
+  const alive = (cache) => [current || []].flat().filter((id) => id && cache?.get?.(id));
+  const most = list ? field.max || 10 : 1;
 
-  if (field.type === "channel") {
+  if (field.type === "channel" || field.type === "channelList") {
     const menu = new ChannelSelectMenuBuilder()
       .setCustomId(customId)
       .setPlaceholder(fit(placeholder, 100))
       .setChannelTypes(field.channelTypes?.length ? field.channelTypes : [ChannelType.GuildText])
-      .setMinValues(field.required ? 1 : 0)
-      .setMaxValues(1);
+      .setMinValues(field.required && !list ? 1 : 0)
+      .setMaxValues(most);
 
     const chosen = alive(guild?.channels?.cache);
     if (chosen.length) menu.setDefaultChannels(chosen);
     return menu;
   }
 
-  if (field.type === "role") {
+  if (field.type === "role" || field.type === "roleList") {
     const menu = new RoleSelectMenuBuilder()
       .setCustomId(customId)
       .setPlaceholder(fit(placeholder, 100))
-      .setMinValues(field.required ? 1 : 0)
-      .setMaxValues(1);
+      .setMinValues(field.required && !list ? 1 : 0)
+      .setMaxValues(most);
 
     const chosen = alive(guild?.roles?.cache);
     if (chosen.length) menu.setDefaultRoles(chosen);
@@ -304,11 +319,16 @@ function parseInput(field, raw) {
  * @returns {object[]} the fields still standing between here and saving
  */
 function missing(fields, values) {
-  return fields.filter((field) => field.required && (values[field.id] === undefined || values[field.id] === null));
+  return fields.filter((field) => {
+    if (!field.required) return false;
+    const value = values[field.id];
+    return value === undefined || value === null || (LISTS.has(field.type) && !value.length);
+  });
 }
 
 module.exports = {
   ICONS,
+  LISTS,
   MISSING,
   OFF,
   ON,

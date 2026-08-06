@@ -9,6 +9,7 @@ const {
   StringSelectMenuBuilder,
   TextInputBuilder,
   TextInputStyle,
+  UserSelectMenuBuilder,
 } = require("discord.js");
 const { definePanel } = require("./definePanel");
 const { redraw, warn } = require("./reply");
@@ -29,11 +30,19 @@ const { redraw, warn } = require("./reply");
  *   role         one role, picked from a role menu
  *   roleList     several roles at once
  *   channelList  several channels at once
+ *   userList     several members at once
  *   choice       one of a fixed set of values
- *   action       runs the field's own `run()` instead of storing anything
+ *   action       runs the field's own `run()` instead of storing anything — this is
+ *                how a system opens the list it owns in the same message
  */
 
 const BACK = "__back";
+
+// Fields answered by picking from a menu rather than by typing.
+const PICKED = new Set(["channel", "role", "user", "roleList", "channelList", "userList"]);
+
+// Fields that hold several values at once.
+const LISTS = new Set(["roleList", "channelList", "userList"]);
 
 // One mark for everything that is off or unset, so a glance down the panel finds
 // what still needs attention without reading a word of it.
@@ -97,6 +106,8 @@ function formatValue(field, value, t) {
       return value?.length ? value.map((id) => `<@&${id}>`).join(", ") : `${OFF} ${t("common.none")}`;
     case "channelList":
       return value?.length ? value.map((id) => `<#${id}>`).join(", ") : `${OFF} ${t("common.none")}`;
+    case "userList":
+      return value?.length ? value.map((id) => `<@${id}>`).join(", ") : `${OFF} ${t("common.none")}`;
     case "choice":
       return value ? preview(t(`${field.choicesKey}.${value}`)) : unset;
     case "number":
@@ -127,7 +138,7 @@ function buttonStyle(field, value) {
   // one call to action on the screen.
   if (field.type === "action" || field.after) return ButtonStyle.Success;
 
-  if (field.type === "channel" || field.type === "role" || field.type === "roleList" || field.type === "channelList") {
+  if (PICKED.has(field.type)) {
     const filled = Array.isArray(value) ? value.length > 0 : Boolean(value);
     return filled ? ButtonStyle.Primary : ButtonStyle.Secondary;
   }
@@ -248,7 +259,7 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
     const customId = panel.selectId(field.id);
     const placeholder = t(`${actionsKey}.${field.id}`).slice(0, 150);
     const current = readPath(settings, fieldPath(field));
-    const list = field.type === "roleList" || field.type === "channelList";
+    const list = LISTS.has(field.type);
     // Discord rejects the whole menu over a default pointing at something the
     // guild no longer has, so a deleted channel or role is quietly dropped.
     const alive = (cache) => [current || []].flat().filter((id) => id && cache?.get?.(id));
@@ -263,6 +274,14 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
         .setMinValues(0)
         .setMaxValues(list ? field.max || 10 : 1);
       if (chosen.length) menu.setDefaultChannels(chosen);
+    } else if (field.type === "user" || field.type === "userList") {
+      menu = new UserSelectMenuBuilder()
+        .setCustomId(customId)
+        .setPlaceholder(placeholder)
+        .setMinValues(0)
+        .setMaxValues(list ? field.max || 10 : 1);
+      const chosen = [current || []].flat().filter(Boolean);
+      if (chosen.length) menu.setDefaultUsers(chosen);
     } else if (field.type === "role" || field.type === "roleList") {
       const chosen = alive(guild?.roles?.cache);
       menu = new RoleSelectMenuBuilder()
@@ -406,7 +425,7 @@ function defineConfigPanel({ id, titleKey, icon, descriptionKey, actionsKey, hin
       const values = interaction.values || [];
       const previous = readPath(settings, fieldPath(field));
 
-      if (field.type === "roleList" || field.type === "channelList") writePath(settings, fieldPath(field), values);
+      if (LISTS.has(field.type)) writePath(settings, fieldPath(field), values);
       else writePath(settings, fieldPath(field), values[0] ?? null);
 
       await store(field, previous);

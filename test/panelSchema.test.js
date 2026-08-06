@@ -26,6 +26,7 @@ const ACCEPTS = {
   choice: ["String"],
   roleList: ["Array"],
   channelList: ["Array"],
+  userList: ["Array"],
 };
 
 // A value of the shape the panel would store for each kind.
@@ -38,13 +39,18 @@ const SAMPLE = {
   choice: null, // filled in from the field's own choices
   roleList: ["123456789012345678"],
   channelList: ["123456789012345678"],
+  userList: ["123456789012345678"],
 };
 
 // The list panels keep their entries in their own collections, so the guild
 // document has nothing to check them against.
+// A field that opens another panel stores nothing, so there is no setting behind
+// it to check against the schema.
 const everyField = () =>
   SETTINGS_IDS.flatMap((name) =>
-    PANELS[name].fields.map((field) => ({ name, field, path: PANELS[name].fieldPath(field) }))
+    PANELS[name].fields
+      .filter((field) => field.type !== "action")
+      .map((field) => ({ name, field, path: PANELS[name].fieldPath(field) }))
   );
 
 test("every panel field points at a setting the schema actually has", () => {

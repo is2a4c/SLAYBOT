@@ -405,7 +405,10 @@ function defineCollectionPanel(definition) {
       }
 
       if (parsed.kind === "select") {
-        draft.write(interaction.user.id, draftPath(key), fieldId, interaction.values[0] ?? null);
+        // A field that holds several values keeps the whole choice, including the
+        // empty one — picking nothing is how a list is cleared.
+        const picked = editor.LISTS.has(field.type) ? [...(interaction.values || [])] : (interaction.values[0] ?? null);
+        draft.write(interaction.user.id, draftPath(key), fieldId, picked);
         await redraw(interaction, buildEntry(t, settings, interaction, key));
         return true;
       }
