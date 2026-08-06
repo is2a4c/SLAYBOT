@@ -87,13 +87,24 @@ function brand(interaction, embed, settings) {
  * @param {ButtonBuilder[]} [before]
  */
 function navigationRow(t, backId, before = []) {
-  return new ActionRowBuilder().addComponents([
-    ...before,
-    new ButtonBuilder().setCustomId(backId).setEmoji("↩️").setLabel(t("common.back")).setStyle(ButtonStyle.Secondary),
-    // Home is the catalogue rather than the settings hub: anybody may open this
-    // panel, and the hub is behind Manage Server.
-    new ButtonBuilder().setCustomId(HOME).setEmoji("🏠").setLabel(t("commands.all")).setStyle(ButtonStyle.Secondary),
-  ]);
+  const buttons = [...before];
+
+  // A screen one step from the catalogue has the same place behind it and above
+  // it. Two buttons carrying one custom id is a message Discord refuses to send
+  // at all, so the row says it once.
+  if (backId && backId !== HOME) {
+    buttons.push(
+      new ButtonBuilder().setCustomId(backId).setEmoji("↩️").setLabel(t("common.back")).setStyle(ButtonStyle.Secondary)
+    );
+  }
+
+  // Home is the catalogue rather than the settings hub: anybody may open this
+  // panel, and the hub is behind Manage Server.
+  buttons.push(
+    new ButtonBuilder().setCustomId(HOME).setEmoji("🏠").setLabel(t("commands.all")).setStyle(ButtonStyle.Secondary)
+  );
+
+  return new ActionRowBuilder().addComponents(buttons);
 }
 
 /* ------------------------------------------------------------------ screens */
