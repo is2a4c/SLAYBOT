@@ -49,15 +49,35 @@ const checkInviteRewards = async (guild, inviterData = {}, isAdded) => {
     if (!inviter) return;
 
     const invites = getEffectiveInvites(inviterData.invite_data);
-    settings.invite.ranks.forEach((reward) => {
-      if (isAdded) {
-        if (invites >= reward.invites && !inviter.roles.cache.has(reward._id)) {
-          inviter.roles.add(reward._id);
-        }
-      } else if (invites < reward.invites && inviter.roles.cache.has(reward._id)) {
-        inviter.roles.remove(reward._id);
+    // A reward whose role the server has since deleted can never be given, and
+    // asking Discord for it again on every invite is the same refusal every time.
+    const gone = [];
+
+    for (const reward of settings.invite.ranks) {
+      const has = inviter.roles.cache.has(reward._id);
+      const wanted = isAdded ? invites >= reward.invites && !has : false;
+      const unwanted = !isAdded && invites < reward.invites && has;
+      if (!wanted && !unwanted) continue;
+
+      if (!guild.roles.cache.has(reward._id)) {
+        gone.push(reward._id);
+        continue;
       }
-    });
+
+      const failure = await inviter.roles[wanted ? "add" : "remove"](reward._id, "Invite reward").then(
+        () => null,
+        (error) => error
+      );
+
+      if (failure?.code === 10011) gone.push(reward._id);
+      else if (failure) guild.client.logger?.debug?.(`invite reward ${reward._id}: ${failure.message}`);
+    }
+
+    if (gone.length) {
+      settings.invite.ranks = settings.invite.ranks.filter((reward) => !gone.includes(reward._id));
+      await settings.save();
+      guild.client.logger?.log?.(`Dropped ${gone.length} invite reward(s) whose role is gone in ${guild.id}`);
+    }
   }
 };
 
