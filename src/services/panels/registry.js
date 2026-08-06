@@ -73,6 +73,15 @@ const channel = (id, emoji, key, channelTypes = TEXT_CHANNELS, extra = {}) => ({
   ...extra,
 });
 const role = (id, emoji, key) => ({ id, emoji, key, type: "role", style: ButtonStyle.Primary });
+const channelList = (id, emoji, key, channelTypes = TEXT_CHANNELS, max = 10) => ({
+  id,
+  emoji,
+  key,
+  type: "channelList",
+  channelTypes,
+  max,
+  style: ButtonStyle.Primary,
+});
 const roleList = (id, emoji, key, max = 10) => ({
   id,
   emoji,
@@ -218,6 +227,30 @@ const PANELS = {
       toggle("restore", "♻️", "restore_roles.enabled"),
       number("retention", "🗓️", "restore_roles.retention_days", 1, 365),
     ],
+    [
+      choice("language", "🗣️", "language", ["ru", "en"], "panels.choices.language"),
+      toggle("restorePrivileged", "🔑", "restore_roles.include_privileged"),
+      channel("levelup", "🏅", "stats.xp.channel"),
+      text("levelupMessage", "💬", "stats.xp.message", { long: true, maxLength: 500, required: false }),
+    ],
+    // The bot's own look on this server: set by command until now, and read by
+    // every embed the panel draws.
+    [
+      text("brandName", "🏷️", "branding.name", { maxLength: 60, required: false }),
+      text("brandColor", "🎨", "branding.color", {
+        maxLength: 7,
+        required: false,
+        validate: color,
+        example: "#A855F7",
+      }),
+      text("brandFooter", "🔻", "branding.footer", { maxLength: 120, required: false }),
+      text("brandIcon", "🖼️", "branding.iconURL", {
+        maxLength: 300,
+        required: false,
+        validate: httpsUrl,
+        example: "https://example.com/icon.png",
+      }),
+    ],
   ]),
 
   tempvoice: system("tempvoice", "temp_voice", [
@@ -262,6 +295,7 @@ const PANELS = {
       text("button", "🔡", "button_label", { maxLength: 60 }),
       channel("panel", "📮", "channel_id", TEXT_CHANNELS, { after: publish.verificationPanel }),
     ],
+    [text("color", "🎨", "color", { maxLength: 7, required: false, validate: color, example: "#A855F7" })],
   ]),
 
   welcome: system("welcome", "welcome", [
@@ -334,7 +368,9 @@ const PANELS = {
       number("maxMentions", "👤", "max_mentions", 0, 50),
       number("maxRoleMentions", "👥", "max_role_mentions", 0, 50),
       toggle("debug", "🐞", "debug"),
+      channelList("whitelistChannels", "🕊️", "wh_channels"),
     ],
+    [roleList("whitelistRoles", "🎫", "spam_whitelist_roles")],
   ]),
 
   starboard: system("starboard", "starboard", [
@@ -345,7 +381,12 @@ const PANELS = {
       number("threshold", "🔢", "threshold", 1, 100),
       toggle("selfStar", "🙋", "self_star"),
     ],
-    [toggle("bots", "🤖", "allow_bots"), toggle("removeBelow", "🧹", "remove_below")],
+    [
+      toggle("bots", "🤖", "allow_bots"),
+      toggle("removeBelow", "🧹", "remove_below"),
+      channelList("ignored", "🚫", "ignored_channels"),
+      text("color", "🎨", "color", { maxLength: 7, required: false, validate: color, example: "#A855F7" }),
+    ],
   ]),
 
   suggestions: system("suggestions", "suggestions", [

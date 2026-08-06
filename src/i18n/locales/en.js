@@ -35,6 +35,10 @@ module.exports = {
         BUTTON: "button",
         CAPTCHA: "captcha",
       },
+      language: {
+        ru: "Russian",
+        en: "English",
+      },
       aiMode: {
         SHADOW: "watch only",
         ENFORCE: "act on it",
@@ -63,6 +67,14 @@ module.exports = {
         warnaction: "Action at the limit",
         restore: "Restore roles",
         retention: "Keep roles for, days",
+        language: "Bot language",
+        restorePrivileged: "Restore privileged roles too",
+        levelup: "Level-up channel",
+        levelupMessage: "Level-up message",
+        brandName: "Name on panels",
+        brandColor: "Accent colour",
+        brandFooter: "Embed footer",
+        brandIcon: "Panel icon",
       },
     },
 
@@ -110,6 +122,7 @@ module.exports = {
         description: "Panel description",
         button: "Button label",
         panel: "Post the panel",
+        color: "Panel colour",
       },
     },
 
@@ -161,6 +174,8 @@ module.exports = {
         maxMentions: "Maximum mentions",
         maxRoleMentions: "Maximum role mentions",
         debug: "Debug",
+        whitelistChannels: "Channels automod skips",
+        whitelistRoles: "Roles antispam skips",
       },
     },
 
@@ -175,6 +190,8 @@ module.exports = {
         selfStar: "Count your own star",
         bots: "Allow bots",
         removeBelow: "Remove when it drops",
+        ignored: "Channels without stars",
+        color: "Card colour",
       },
     },
 

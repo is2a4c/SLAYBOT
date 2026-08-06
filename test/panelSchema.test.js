@@ -137,12 +137,15 @@ test("free text that Discord has to parse is validated before it is stored", () 
   assert.ok(validated.length, "colours and image URLs are meant to be checked");
 
   for (const { name, field } of validated) {
+    // A field says what a good answer looks like; the example is what it is for.
+    const wantsUrl = String(field.example || "").startsWith("http");
+
     // Whatever a field accepts must survive being handed to a real embed.
-    const good = field.validate(field.id === "image" ? "https://example.com/a.png" : "a855f7");
+    const good = field.validate(wantsUrl ? "https://example.com/a.png" : "a855f7");
     assert.equal(good.ok, true, `${name}.${field.id} rejected a valid value`);
     assert.doesNotThrow(() => {
       const embed = new EmbedBuilder();
-      if (field.id === "image") embed.setImage(good.value);
+      if (wantsUrl) embed.setImage(good.value);
       else embed.setColor(good.value);
     }, `${name}.${field.id} accepts something Discord refuses`);
 

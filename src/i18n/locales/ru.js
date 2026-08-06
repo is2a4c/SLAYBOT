@@ -39,6 +39,10 @@ module.exports = {
         SHADOW: "наблюдение",
         ENFORCE: "с наказанием",
       },
+      language: {
+        ru: "русский",
+        en: "английский",
+      },
     },
 
     hub: {
@@ -63,6 +67,14 @@ module.exports = {
         warnaction: "Наказание за лимит",
         restore: "Возврат ролей",
         retention: "Хранить роли, дней",
+        language: "Язык бота",
+        restorePrivileged: "Возвращать и важные роли",
+        levelup: "Канал уровней",
+        levelupMessage: "Сообщение об уровне",
+        brandName: "Имя в панелях",
+        brandColor: "Цвет оформления",
+        brandFooter: "Подпись под эмбедом",
+        brandIcon: "Иконка оформления",
       },
     },
 
@@ -110,6 +122,7 @@ module.exports = {
         description: "Описание панели",
         button: "Текст кнопки",
         panel: "Разместить панель",
+        color: "Цвет панели",
       },
     },
 
@@ -161,6 +174,8 @@ module.exports = {
         maxMentions: "Максимум упоминаний",
         maxRoleMentions: "Максимум упоминаний ролей",
         debug: "Отладка",
+        whitelistChannels: "Каналы без автомода",
+        whitelistRoles: "Роли без антиспама",
       },
     },
 
@@ -175,6 +190,8 @@ module.exports = {
         selfStar: "Считать свою реакцию",
         bots: "Пускать ботов",
         removeBelow: "Убирать при спаде",
+        ignored: "Каналы без звёзд",
+        color: "Цвет карточки",
       },
     },
 
