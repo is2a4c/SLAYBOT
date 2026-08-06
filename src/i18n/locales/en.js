@@ -48,7 +48,8 @@ module.exports = {
     hub: {
       title: "Control panel",
       description: "Every server setting lives here. Pick the system you want to configure.",
-      hint: "The buttons below open a system inside this message — 🏠 brings you back here.",
+      hint: "The menu below opens a system inside this message — 🏠 brings you back here.",
+      pick: "Pick a system",
       running: "Running",
       idle: "Off",
     },
@@ -71,10 +72,69 @@ module.exports = {
         restorePrivileged: "Restore privileged roles too",
         levelup: "Level-up channel",
         levelupMessage: "Level-up message",
+        inviteRanks: "Invite rewards",
         brandName: "Name on panels",
         brandColor: "Accent colour",
         brandFooter: "Embed footer",
         brandIcon: "Panel icon",
+      },
+    },
+
+    voiceroles: {
+      title: "Voice roles",
+      description: "A role while a member sits in voice — one for all of it, or one per channel.",
+      fields: {
+        enabled: "Hand out roles",
+        defaultRole: "Role for any channel",
+        channels: "Channels and roles",
+      },
+    },
+
+    voicechannels: {
+      title: "Channels and roles",
+      description: "The exceptions: this channel, that role.",
+      empty: "No channels yet.",
+      hint: "Add a channel and the role it hands out.",
+      exists: "That channel already has a role.",
+      added: "Channel added.",
+      saved: "Saved.",
+      removed: "Channel removed.",
+      fields: {
+        channel: "Voice channel",
+        role: "Role",
+      },
+    },
+
+    ticketcategories: {
+      title: "Ticket categories",
+      description: "What a member picks when opening a ticket: who is called in, and where it is announced.",
+      empty: "No categories yet.",
+      hint: "Add a category — it shows up in the menu when a ticket is opened.",
+      exists: "A category by that name already exists.",
+      noStaff: "No staff of its own",
+      added: "Category \u201c{name}\u201d added.",
+      saved: "Category \u201c{name}\u201d saved.",
+      removed: "Category removed.",
+      fields: {
+        name: "Name",
+        staff: "Who to call in",
+        notify: "Notification channel",
+      },
+    },
+
+    inviteranks: {
+      title: "Invite rewards",
+      description: "The role the bot hands out for bringing people in.",
+      empty: "No rewards yet.",
+      hint: "Add a role and the number of invites that earns it.",
+      exists: "That role is already a reward.",
+      summary: "for {invites} invites",
+      added: "Reward added.",
+      saved: "Reward saved.",
+      removed: "Reward removed.",
+      fields: {
+        role: "Role",
+        invites: "Invites needed",
       },
     },
 
@@ -105,6 +165,7 @@ module.exports = {
         title: "Panel title",
         description: "Panel description",
         panel: "Post the panel",
+        categories: "Ticket categories",
       },
     },
 
@@ -176,6 +237,7 @@ module.exports = {
         debug: "Debug",
         whitelistChannels: "Channels automod skips",
         whitelistRoles: "Roles antispam skips",
+        whitelistUsers: "Members antispam skips",
       },
     },
 

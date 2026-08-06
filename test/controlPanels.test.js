@@ -4,7 +4,7 @@ require("module-alias/register");
 
 const { ButtonStyle } = require("discord.js");
 const { buildHub, handle, matches } = require("@src/handlers/controlPanel");
-const { HOME_ID, PANELS, SETTINGS_IDS, SYSTEM_ICONS, SYSTEM_IDS } = require("@src/services/panels/registry");
+const { HOME_ID, HUB_IDS, PANELS, SETTINGS_IDS, SYSTEM_ICONS, SYSTEM_IDS } = require("@src/services/panels/registry");
 const { LOCALES, translate } = require("@src/i18n");
 
 const t = (key, vars) => translate("ru", key, vars);
@@ -91,22 +91,19 @@ test("every system fits inside Discord's component limits", () => {
 
 test("the hub offers every system and an icon for it", async () => {
   const hub = await buildHub(t, makeSettings());
-  const buttons = hub.components.flatMap((row) => row.components.map((button) => button.data));
+  const [menu] = hub.components.flatMap((row) => row.components).filter((component) => component.options);
+  const offered = menu.options.map((option) => option.value ?? option.data?.value);
 
-  // Every system, plus the way into the commands that are not settings.
-  assert.equal(buttons.length, SYSTEM_IDS.length + 1);
-  for (const name of SYSTEM_IDS) {
-    assert.ok(SYSTEM_ICONS[name], `${name} has no icon`);
-    assert.ok(
-      buttons.some((button) => button.custom_id === `PANELHUB:open:${name}`),
-      `${name} has no button`
-    );
-  }
+  assert.deepEqual(offered, HUB_IDS, "the menu offers every system, in the order they are declared");
+  for (const name of HUB_IDS) assert.ok(SYSTEM_ICONS[name], `${name} has no icon`);
 
+  const buttons = hub.components.flatMap((row) => row.components.map((component) => component.data));
   assert.ok(
     buttons.some((button) => button.custom_id === "CMDP:home"),
     "the hub does not lead to the commands"
   );
+
+  assert.ok(hub.components.length <= 5, "Discord takes five rows and no more");
 });
 
 test("panels do not answer for each other", () => {
@@ -169,10 +166,12 @@ test("a setting is named beside the icon of the button that changes it", () => {
   const log = PANELS.ticket.fields.find((field) => field.id === "log");
   assert.match(description, new RegExp(`${log.emoji} \\*\\*${t("panels.ticket.fields.log")}:\\*\\* <#555>`));
 
-  // Every field is on the panel exactly once: the icons are the legend.
+  // Every field is on the panel exactly once: the icons are the legend. A field
+  // that opens another panel has no value, so it is named without one.
   for (const field of PANELS.ticket.fields) {
     const name = t(`panels.ticket.fields.${field.id}`);
-    assert.equal(description.split(`**${name}:**`).length, 2, `${field.id} is not shown once`);
+    const shown = field.type === "action" ? `**${name}**` : `**${name}:**`;
+    assert.equal(description.split(shown).length, 2, `${field.id} is not shown once`);
   }
 });
 
@@ -228,18 +227,20 @@ test("the hub separates what the server is running from what it is not", async (
   assert.match(idle.value, new RegExp(t("panels.welcome.title")));
 
   const hub = await buildHub(t, settings);
-  const button = (name) =>
-    hub.components.flatMap((row) => row.components).find((entry) => entry.data.custom_id === `PANELHUB:open:${name}`);
+  const [menu] = hub.components.flatMap((row) => row.components).filter((component) => component.options);
+  const option = (name) =>
+    menu.options.find((entry) => (entry.value ?? entry.data?.value) === name) || { description: "" };
 
-  assert.equal(button("starboard").data.style, ButtonStyle.Success);
-  assert.equal(button("welcome").data.style, ButtonStyle.Secondary);
+  // The same mark the columns carry, beside the system in the menu.
+  assert.match(option("starboard").description ?? option("starboard").data?.description, /🟢/);
+  assert.match(option("welcome").description ?? option("welcome").data?.description, /⚪/);
 });
 
 test("a system with nothing turned on still lists every other one", async () => {
   const [running, idle] = (await buildHub(t, makeSettings())).embeds[0].data.fields;
   const named = `${running.value}\n${idle.value}`;
 
-  for (const name of SYSTEM_IDS) assert.match(named, new RegExp(t(`panels.${name}.title`)), `${name} is missing`);
+  for (const name of HUB_IDS) assert.match(named, new RegExp(t(`panels.${name}.title`)), `${name} is missing`);
 });
 
 /* ----------------------------------------------------------------- routing */
@@ -440,4 +441,18 @@ test("a panel moved to another channel is taken down from the one it was in", as
 
   assert.equal(settings.ticket.panel_channel_id, "222");
   assert.deepEqual(seen, ["111"], "the publisher is told where the old message is");
+});
+
+test("the menu opens the system it names", async () => {
+  const interaction = makeInteraction({ customId: "PANELHUB~SEL:open", values: ["ticket"] });
+  await route(interaction, makeSettings());
+
+  assert.equal(interaction.seen.update[0].embeds[0].data.title, `${SYSTEM_ICONS.ticket} ${t("panels.ticket.title")}`);
+});
+
+test("a hub posted before the menu still opens what its buttons name", async () => {
+  const interaction = makeInteraction({ customId: "PANELHUB:open:ticket" });
+  await route(interaction, makeSettings());
+
+  assert.equal(interaction.seen.update[0].embeds[0].data.title, `${SYSTEM_ICONS.ticket} ${t("panels.ticket.title")}`);
 });

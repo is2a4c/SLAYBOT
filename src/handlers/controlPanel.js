@@ -1,11 +1,19 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits } = require("discord.js");
+const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+  PermissionFlagsBits,
+  StringSelectMenuBuilder,
+} = require("discord.js");
 const { EMBED_COLORS } = require("@root/config");
 const { applyBranding, resolveBranding } = require("@helpers/Branding");
 const { guildTranslator } = require("@src/i18n");
-const { HOME_ID, PANELS, SYSTEM_ICONS, SYSTEM_IDS } = require("@src/services/panels/registry");
+const { HOME_ID, HUB_IDS, PANELS, SYSTEM_ICONS, SYSTEM_IDS } = require("@src/services/panels/registry");
 const { guard, redraw, slowRedraw, warn } = require("@src/services/panels/reply");
 
 const HUB_PREFIX = "PANELHUB";
+const HUB_SELECT = `${HUB_PREFIX}~SEL:open`;
 const OPEN = "open";
 const HUB_ICON = "🎛️";
 
@@ -30,13 +38,17 @@ function within(promise) {
 }
 
 /**
- * The control hub: one button per system, each opening that system's own panel in
- * the same message.
+ * The control hub: the state of the whole server as two columns, and one menu
+ * that opens any system's panel in the same message.
  *
  * The systems are split into what this server has running and what it has not, so
- * the state of the whole server is read before anything is clicked. Buttons carry
- * the same split in their colour, and stay in a fixed order either way — a system
- * is always found in the same place.
+ * the state is read before anything is clicked — and the same mark is carried into
+ * the menu, beside each system, so choosing one never means guessing. The order is
+ * fixed either way: a system is always found in the same place.
+ *
+ * A menu rather than a wall of buttons: Discord allows five rows of five, which the
+ * systems had already filled to the last seat, and a list stays readable as they
+ * keep coming.
  *
  * @param {(key: string, vars?: object) => string} t
  * @param {object} settings guild settings document
@@ -49,13 +61,14 @@ async function buildHub(t, settings, client, guild) {
   // A slow database costs a wrong dot on one system, never the panel itself:
   // Discord gives three seconds to answer a click.
   const active = await Promise.all(
-    SYSTEM_IDS.map((name) => within(Promise.resolve(PANELS[name].isActive(settings, guild)).catch(() => false)))
+    HUB_IDS.map((name) => within(Promise.resolve(PANELS[name].isActive(settings, guild)).catch(() => false)))
   );
 
-  const entries = SYSTEM_IDS.map((name, index) => ({
+  const entries = HUB_IDS.map((name, index) => ({
     name,
     icon: SYSTEM_ICONS[name] || "▫️",
     label: t(`panels.${name}.title`),
+    summary: t(`panels.${name}.description`),
     active: active[index],
   }));
 
@@ -74,20 +87,23 @@ async function buildHub(t, settings, client, guild) {
 
   applyBranding(embed, resolveBranding(settings, client), { force: true });
 
-  const components = [];
-  for (let index = 0; index < entries.length; index += 5) {
-    components.push(
-      new ActionRowBuilder().addComponents(
-        entries.slice(index, index + 5).map((entry) =>
-          new ButtonBuilder()
-            .setCustomId(`${HUB_PREFIX}:${OPEN}:${entry.name}`)
-            .setEmoji(entry.icon)
-            .setLabel(entry.label.slice(0, 40))
-            .setStyle(entry.active ? ButtonStyle.Success : ButtonStyle.Secondary)
+  const components = [
+    new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(HUB_SELECT)
+        .setPlaceholder(t("panels.hub.pick"))
+        .addOptions(
+          entries.slice(0, 25).map((entry) => ({
+            value: entry.name,
+            emoji: entry.icon,
+            label: entry.label.slice(0, 100),
+            // What the system is for, and whether it is doing anything here, on
+            // the same line as its name — the choice is made without opening it.
+            description: `${entry.active ? "🟢" : "⚪"} ${entry.summary}`.slice(0, 100),
+          }))
         )
-      )
-    );
-  }
+    ),
+  ];
 
   // Anything the bot can do that is not a stored setting lives one button away,
   // so the hub is the only thing anybody has to remember.
@@ -109,8 +125,11 @@ async function buildHub(t, settings, client, guild) {
  * @returns {boolean}
  */
 function matches(customId) {
+  const text = String(customId);
   return (
-    String(customId).startsWith(`${HUB_PREFIX}:`) || SYSTEM_IDS.some((name) => PANELS[name].matches(String(customId)))
+    text.startsWith(`${HUB_PREFIX}:`) ||
+    text.startsWith(`${HUB_PREFIX}~SEL:`) ||
+    SYSTEM_IDS.some((name) => PANELS[name].matches(text))
   );
 }
 
@@ -154,8 +173,10 @@ async function route(interaction, settings, t) {
     return true;
   }
 
-  if (customId.startsWith(`${HUB_PREFIX}:${OPEN}:`)) {
-    const name = customId.slice(`${HUB_PREFIX}:${OPEN}:`.length);
+  // The menu opens a system; the button form is what hubs posted by older
+  // versions still carry, and opens the same thing.
+  if (customId === HUB_SELECT || customId.startsWith(`${HUB_PREFIX}:${OPEN}:`)) {
+    const name = customId === HUB_SELECT ? interaction.values?.[0] : customId.slice(`${HUB_PREFIX}:${OPEN}:`.length);
     const panel = PANELS[name];
     // A hub posted by an older version can name a system this one does not have.
     if (!panel) {

@@ -3,8 +3,12 @@ const { defineConfigPanel } = require("./configPanel");
 const publish = require("./publish");
 const counters = require("./collections/counters");
 const feeds = require("./collections/feeds");
+const inviteRanks = require("./collections/inviteRanks");
 const reactionRoles = require("./collections/reactionRoles");
 const sticky = require("./collections/sticky");
+const ticketCategories = require("./collections/ticketCategories");
+const voiceChannels = require("./collections/voiceChannels");
+const { slowRedraw } = require("./reply");
 const { countFeeds } = require("@schemas/Feed");
 const { listStickies } = require("@schemas/StickyMessage");
 const { listGuildReactionRoles } = require("@schemas/ReactionRoles");
@@ -82,6 +86,14 @@ const channelList = (id, emoji, key, channelTypes = TEXT_CHANNELS, max = 10) => 
   max,
   style: ButtonStyle.Primary,
 });
+const userList = (id, emoji, key, max = 10) => ({
+  id,
+  emoji,
+  key,
+  type: "userList",
+  max,
+  style: ButtonStyle.Primary,
+});
 const roleList = (id, emoji, key, max = 10) => ({
   id,
   emoji,
@@ -89,6 +101,19 @@ const roleList = (id, emoji, key, max = 10) => ({
   type: "roleList",
   max,
   style: ButtonStyle.Primary,
+});
+/**
+ * A button that opens another panel in the same message.
+ *
+ * Some things a system owns are a list rather than a setting — the categories of
+ * a ticket, the channels of a voice role. They get their own screen, and this is
+ * the way in, so the list is found where the system is rather than beside it.
+ */
+const opens = (id, emoji, target) => ({
+  id,
+  emoji,
+  type: "action",
+  run: (interaction, settings, t) => slowRedraw(interaction, () => PANELS[target].open(t, settings, interaction)),
 });
 const choice = (id, emoji, key, choices, choicesKey) => ({
   id,
@@ -123,6 +148,11 @@ const SYSTEM_ICONS = {
   counters: "🔢",
   sticky: "📌",
   reactionroles: "🎭",
+  voiceroles: "🔊",
+  // Reached from the system they belong to rather than from the hub.
+  ticketcategories: "🗂️",
+  inviteranks: "🎁",
+  voicechannels: "🔊",
 };
 
 /**
@@ -158,6 +188,7 @@ const SYSTEM_ACTIVE = {
   modmail: (settings) => Boolean(settings?.modmail?.enabled),
   birthdays: (settings) => Boolean(settings?.birthdays?.enabled),
   ai: (settings) => Boolean(settings?.ai?.enabled),
+  voiceroles: (settings) => Boolean(settings?.voice_roles?.enabled),
   // A list is running when the server has put something in it. These are the only
   // ones that have to ask the database, so the hub awaits them.
   counters: (settings) => (settings?.counters || []).length > 0,
@@ -232,6 +263,7 @@ const PANELS = {
       toggle("restorePrivileged", "🔑", "restore_roles.include_privileged"),
       channel("levelup", "🏅", "stats.xp.channel"),
       text("levelupMessage", "💬", "stats.xp.message", { long: true, maxLength: 500, required: false }),
+      opens("inviteRanks", "🎁", "inviteranks"),
     ],
     // The bot's own look on this server: set by command until now, and read by
     // every embed the panel draws.
@@ -277,7 +309,10 @@ const PANELS = {
       text("title", "✏️", "panel_title", { maxLength: 100 }),
       text("description", "📝", "panel_description", { long: true, maxLength: 1000, required: false }),
     ],
-    [channel("panel", "📮", "panel_channel_id", TEXT_CHANNELS, { after: publish.ticketPanel })],
+    [
+      channel("panel", "📮", "panel_channel_id", TEXT_CHANNELS, { after: publish.ticketPanel }),
+      opens("categories", "🗂️", "ticketcategories"),
+    ],
   ]),
 
   verification: system("verification", "verification", [
@@ -370,7 +405,10 @@ const PANELS = {
       toggle("debug", "🐞", "debug"),
       channelList("whitelistChannels", "🕊️", "wh_channels"),
     ],
-    [roleList("whitelistRoles", "🎫", "spam_whitelist_roles")],
+    [
+      roleList("whitelistRoles", "🎫", "spam_whitelist_roles"),
+      userList("whitelistUsers", "🙋", "spam_whitelist_users"),
+    ],
   ]),
 
   starboard: system("starboard", "starboard", [
@@ -439,17 +477,40 @@ const PANELS = {
     ],
   ]),
 
+  voiceroles: system("voiceroles", "voice_roles", [
+    [
+      toggle("enabled", "🔘", "enabled"),
+      role("defaultRole", "🎭", "default_role"),
+      opens("channels", "🔊", "voicechannels"),
+    ],
+  ]),
+
   // Systems a server has several of, each with its own list.
   feeds: withHub("feeds", "collection", feeds),
   counters: withHub("counters", "collection", counters),
   sticky: withHub("sticky", "collection", sticky),
   reactionroles: withHub("reactionroles", "collection", reactionRoles),
+
+  // Lists that belong to a system rather than standing beside it: the hub does
+  // not offer them, the system they are part of does.
+  ticketcategories: { ...withHub("ticketcategories", "collection", ticketCategories), hidden: true },
+  inviteranks: { ...withHub("inviteranks", "collection", inviteRanks), hidden: true },
+  voicechannels: { ...withHub("voicechannels", "collection", voiceChannels), hidden: true },
 };
 
 /**
- * The order systems appear in the hub.
+ * Every panel the router has to know about, in the order they were declared.
  */
 const SYSTEM_IDS = Object.keys(PANELS);
+
+/**
+ * What the hub offers.
+ *
+ * A panel reached from inside another one — the categories of a ticket, the
+ * channels of a voice role — is routed like any other, but listing it beside the
+ * system it belongs to would say there are two of them.
+ */
+const HUB_IDS = SYSTEM_IDS.filter((name) => !PANELS[name].hidden);
 
 /** Systems that are one screen of settings on the guild document. */
 const SETTINGS_IDS = SYSTEM_IDS.filter((name) => PANELS[name].kind === "settings");
@@ -457,4 +518,4 @@ const SETTINGS_IDS = SYSTEM_IDS.filter((name) => PANELS[name].kind === "settings
 /** Systems that are a list of entries. */
 const COLLECTION_IDS = SYSTEM_IDS.filter((name) => PANELS[name].kind === "collection");
 
-module.exports = { COLLECTION_IDS, HOME_ID, PANELS, SETTINGS_IDS, SYSTEM_ACTIVE, SYSTEM_ICONS, SYSTEM_IDS };
+module.exports = { COLLECTION_IDS, HOME_ID, HUB_IDS, PANELS, SETTINGS_IDS, SYSTEM_ACTIVE, SYSTEM_ICONS, SYSTEM_IDS };

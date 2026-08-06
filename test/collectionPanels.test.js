@@ -4,7 +4,7 @@ require("module-alias/register");
 
 const { ButtonStyle } = require("discord.js");
 const { defineCollectionPanel } = require("@src/services/panels/collectionPanel");
-const { COLLECTION_IDS, PANELS } = require("@src/services/panels/registry");
+const { COLLECTION_IDS, HUB_IDS, PANELS, SYSTEM_IDS } = require("@src/services/panels/registry");
 const draft = require("@src/services/panels/draft");
 const { translate } = require("@src/i18n");
 
@@ -305,7 +305,15 @@ test("the panel does not answer for ids that are not its own", () => {
 /* --------------------------------------------------------- the real panels */
 
 test("every list panel is wired into the hub and names its fields in both languages", () => {
-  assert.deepEqual(COLLECTION_IDS, ["feeds", "counters", "sticky", "reactionroles"]);
+  assert.deepEqual(COLLECTION_IDS, [
+    "feeds",
+    "counters",
+    "sticky",
+    "reactionroles",
+    "ticketcategories",
+    "inviteranks",
+    "voicechannels",
+  ]);
 
   for (const name of COLLECTION_IDS) {
     const panel = PANELS[name];
@@ -339,4 +347,70 @@ test("a button this version no longer has comes back with the list", async () =>
 
   assert.equal(interaction.seen.drawn.length, 1, "the click is answered rather than left hanging");
   assert.match(interaction.seen.drawn[0].embeds[0].data.description, /первая/);
+});
+
+/* ------------------------------------------------ lists inside a system */
+
+test("a system opens its own list in place of its settings", async () => {
+  const controlPanel = require("@src/handlers/controlPanel");
+  const settings = {
+    saves: 0,
+    ticket: { limit: 10, staff_roles: [], categories: [{ name: "Help", staff_roles: [], notification_channel: null }] },
+    save: async () => (settings.saves += 1),
+  };
+
+  const open = PANELS.ticket.fields.find((field) => field.id === "categories");
+  assert.equal(open.type, "action", "the categories are reached from the ticket panel");
+
+  const interaction = makeInteraction({ customId: PANELS.ticket.panel.buttonId("categories") });
+  interaction.member = { permissions: { has: () => true } };
+  await controlPanel.handle(interaction, settings);
+
+  assert.match(interaction.seen.drawn[0].embeds[0].data.title, new RegExp(t("panels.ticketcategories.title")));
+  assert.match(interaction.seen.drawn[0].embeds[0].data.description, /Help/);
+});
+
+test("the hub does not offer a list that belongs to a system", () => {
+  for (const name of ["ticketcategories", "inviteranks", "voicechannels"]) {
+    assert.equal(PANELS[name].hidden, true, `${name} would stand beside the system it is part of`);
+    assert.equal(HUB_IDS.includes(name), false);
+    assert.equal(SYSTEM_IDS.includes(name), true, `${name} still has to be routed`);
+  }
+});
+
+test("a category keeps the roles picked for it", async () => {
+  const settings = {
+    saves: 0,
+    ticket: { categories: [] },
+    save: async () => (settings.saves += 1),
+  };
+  const categories = PANELS.ticketcategories;
+
+  await categories.handle(makeInteraction({ customId: "CFG_TICKETCAT:new" }), settings, t);
+  await categories.handle(makeInteraction({ customId: "CFG_TICKETCAT~MOD:field:+|name", text: "Помощь" }), settings, t);
+  await categories.handle(
+    makeInteraction({ customId: "CFG_TICKETCAT~SEL:field:+|staff", values: ["11", "22"] }),
+    settings,
+    t
+  );
+
+  const save = makeInteraction({ customId: "CFG_TICKETCAT:save:+" });
+  await categories.handle(save, settings, t);
+
+  assert.deepEqual(settings.ticket.categories, [
+    { name: "Помощь", staff_roles: ["11", "22"], notification_channel: null },
+  ]);
+  assert.equal(settings.saves, 1);
+});
+
+test("an invite reward is stored the way the tracker reads it", async () => {
+  const settings = { saves: 0, invite: { ranks: [] }, save: async () => (settings.saves += 1) };
+  const ranks = PANELS.inviteranks;
+
+  await ranks.handle(makeInteraction({ customId: "CFG_INVRANK:new" }), settings, t);
+  await ranks.handle(makeInteraction({ customId: "CFG_INVRANK~SEL:field:+|role", values: ["777"] }), settings, t);
+  await ranks.handle(makeInteraction({ customId: "CFG_INVRANK~MOD:field:+|invites", text: "5" }), settings, t);
+  await ranks.handle(makeInteraction({ customId: "CFG_INVRANK:save:+" }), settings, t);
+
+  assert.deepEqual(settings.invite.ranks, [{ _id: "777", invites: 5 }]);
 });
