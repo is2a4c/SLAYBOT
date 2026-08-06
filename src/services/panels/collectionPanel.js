@@ -3,7 +3,7 @@ const { EMBED_COLORS } = require("@root/config");
 const { applyBranding, resolveBranding } = require("@helpers/Branding");
 const draft = require("./draft");
 const editor = require("./fieldEditor");
-const { ack, redraw, slowRedraw, warn } = require("./reply");
+const { ack, ackIfSlow, redraw, slowRedraw, warn } = require("./reply");
 
 /**
  * A settings panel for things a server has several of.
@@ -201,8 +201,13 @@ function defineCollectionPanel(definition) {
 
     // An entry the panel cannot identify has nothing to put in a menu row, and
     // Discord rejects the whole menu over one empty value — it stays listed above
-    // as unreadable instead.
-    const openable = entries.map((entry) => ({ entry, key: safely(() => keyOf(entry), "") })).filter((row) => row.key);
+    // as unreadable instead. Two entries sharing a key are refused the same way,
+    // so the second one is listed rather than offered: settings written by older
+    // versions can hold pairs a key was never meant to tell apart.
+    const seen = new Set();
+    const openable = entries
+      .map((entry) => ({ entry, key: safely(() => keyOf(entry), "") }))
+      .filter((row) => row.key && !seen.has(row.key) && seen.add(row.key));
 
     const components = [];
     if (openable.length) {
@@ -366,10 +371,9 @@ function defineCollectionPanel(definition) {
 
     if (parsed.action === "open") {
       const key = parsed.kind === "select" ? interaction.values[0] : parsed.ref;
-      // Reading the entry back is a database round-trip of its own.
-      await ack(interaction);
-
-      if (!(await adopt(interaction, settings, key))) {
+      // Reading the entry back is a database round-trip of its own, and only
+      // worth acknowledging the click for when it is a slow one.
+      if (!(await ackIfSlow(interaction, adopt(interaction, settings, key)))) {
         await showList();
         return true;
       }

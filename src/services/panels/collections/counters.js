@@ -73,8 +73,11 @@ module.exports = defineCollectionPanel({
   fields,
 
   list: async (guild, settings) => settings.counters || [],
-  keyOf: (counter) => kindOf(counter),
-  summarise: (counter) => `${kindOf(counter).toLowerCase()} · ${counter.name || "—"}`,
+  // The channel is what a counter really is: a server set up before the panel can
+  // hold two of the same kind, and a menu built on the kind would name them both
+  // the same thing — which Discord refuses outright, taking the panel with it.
+  keyOf: (counter) => String(counter?.channel_id || ""),
+  summarise: (counter) => `${kindOf(counter).toLowerCase() || "—"} · ${counter.name || "—"}`,
 
   describe: (counter) =>
     `${TYPE_ICONS[kindOf(counter)] || "🔢"} **${kindOf(counter).toLowerCase()}** ` +
@@ -114,14 +117,13 @@ module.exports = defineCollectionPanel({
   },
 
   async update({ guild, settings, key, values, t }) {
-    const counter = settings.counters.find((entry) => kindOf(entry) === key);
+    const counter = settings.counters.find((entry) => String(entry.channel_id) === key);
     if (!counter) return { ok: false, message: t("collections.gone") };
 
-    // The kind is what the channel counts, and one channel counts one thing; a
-    // different kind is a different counter.
-    if (values.type !== key && settings.counters.some((entry) => kindOf(entry) === values.type)) {
-      return { ok: false, message: t("panels.counters.exists") };
-    }
+    // One channel counts one thing, and one server counts each thing once: taking
+    // a kind another counter already has would leave two channels saying it.
+    const taken = settings.counters.some((entry) => String(entry.channel_id) !== key && kindOf(entry) === values.type);
+    if (taken) return { ok: false, message: t("panels.counters.exists") };
 
     counter.counter_type = values.type;
     counter.name = values.name;
@@ -135,7 +137,7 @@ module.exports = defineCollectionPanel({
   },
 
   async remove({ guild, settings, key, t }) {
-    const index = settings.counters.findIndex((entry) => kindOf(entry) === key);
+    const index = settings.counters.findIndex((entry) => String(entry.channel_id) === key);
     if (index === -1) return { ok: false, message: t("collections.gone") };
 
     const [counter] = settings.counters.splice(index, 1);
