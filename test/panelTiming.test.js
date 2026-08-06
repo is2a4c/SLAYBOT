@@ -2,9 +2,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 require("module-alias/register");
 
-const { ack, ackIfSlow, expired, redraw, warn } = require("@src/services/panels/reply");
+const { PATIENCE_MS, ack, ackIfSlow, expired, redraw, warn } = require("@src/services/panels/reply");
 const { defineCollectionPanel } = require("@src/services/panels/collectionPanel");
 const controlPanel = require("@src/handlers/controlPanel");
+const { COLLECTION_IDS } = require("@src/services/panels/registry");
 const draft = require("@src/services/panels/draft");
 const { translate } = require("@src/i18n");
 
@@ -143,15 +144,25 @@ test("an expired click is recognised as such", () => {
 
 /* ----------------------------------------------------------------- the paths */
 
-test("opening a list acknowledges the click before reading the collection", async () => {
+test("a list that reads quickly is drawn in one go, with its buttons live", async () => {
+  const panel = makeSlowPanel(async () => [{ id: "a" }]);
+  const interaction = makeInteraction({ customId: "TIMING:list" });
+
+  await panel.handle(interaction, {}, t);
+
+  assert.equal(interaction.seen.defer, 0, "a warm read costs no acknowledgement, so nothing is greyed out");
+  assert.equal(interaction.seen.drawn[0].how, "update");
+});
+
+test("a list that keeps the click waiting acknowledges it, then edits", async () => {
   const reading = deferred();
   const panel = makeSlowPanel(() => reading.promise);
   const interaction = makeInteraction({ customId: "TIMING:list" });
 
   const handled = panel.handle(interaction, {}, t);
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setTimeout(resolve, PATIENCE_MS + 100));
 
-  assert.equal(interaction.seen.defer, 1, "the click is answered before the database is");
+  assert.equal(interaction.seen.defer, 1, "the click is answered before Discord gives up on it");
   assert.equal(interaction.seen.drawn.length, 0, "and nothing is drawn until there is something to draw");
 
   reading.release([{ id: "a" }]);
@@ -160,13 +171,13 @@ test("opening a list acknowledges the click before reading the collection", asyn
   assert.equal(interaction.seen.drawn[0].how, "edit");
 });
 
-test("opening one entry acknowledges the click before looking it up", async () => {
+test("opening one entry waits on the lookup only as long as it is safe to", async () => {
   const reading = deferred();
   const panel = makeSlowPanel(() => reading.promise);
   const interaction = makeInteraction({ customId: "TIMING:open:a" });
 
   const handled = panel.handle(interaction, {}, t);
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setTimeout(resolve, PATIENCE_MS + 100));
 
   assert.equal(interaction.seen.defer, 1);
 
@@ -176,7 +187,25 @@ test("opening one entry acknowledges the click before looking it up", async () =
   assert.match(interaction.seen.drawn[0].payload.embeds[0].data.description, /`a`/);
 });
 
-test("the hub acknowledges the click before counting what each system holds", async () => {
+test("the hub opens at once when every system answers from memory", async () => {
+  const settings = { counters: [], save: async () => {} };
+  const interaction = makeInteraction({ customId: "PANELHUB:home" });
+
+  const { PANELS } = require("@src/services/panels/registry");
+  const originals = COLLECTION_IDS.map((name) => [name, PANELS[name].isActive]);
+  for (const [name] of originals) PANELS[name].isActive = () => false;
+
+  try {
+    await controlPanel.handle(interaction, settings);
+
+    assert.equal(interaction.seen.defer, 0, "nothing was slow, so nothing was acknowledged");
+    assert.match(interaction.seen.drawn[0].payload.embeds[0].data.title, /Панель управления/);
+  } finally {
+    for (const [name, isActive] of originals) PANELS[name].isActive = isActive;
+  }
+});
+
+test("the hub acknowledges the click when counting what a system holds drags", async () => {
   const counting = deferred();
   const settings = { counters: [], save: async () => {} };
   const interaction = makeInteraction({ customId: "PANELHUB:home" });
@@ -188,7 +217,7 @@ test("the hub acknowledges the click before counting what each system holds", as
 
   try {
     const handled = controlPanel.handle(interaction, settings);
-    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setTimeout(resolve, PATIENCE_MS + 100));
 
     assert.equal(interaction.seen.defer, 1, "the hub does not wait on the database to answer the click");
 
@@ -298,4 +327,45 @@ test("a category with nothing left in it opens without an empty menu", async () 
     row.components.filter((component) => component.options)
   );
   assert.equal(menus.length, 0, "Discord refuses a select menu with no rows");
+});
+
+test("no screen of the command panel carries one custom id twice", async () => {
+  const commandPanel = require("@src/handlers/commandPanel");
+
+  // Discord refuses the whole message over a repeated custom id, so a screen one
+  // step from the catalogue must not offer "back" and "home" as the same button.
+  for (const customId of ["CMDP:home", "CMDP:cat:ADMIN", "CMDP:cat:MUSIC", "CMDP:cat:UTILITY"]) {
+    const interaction = makeInteraction({ customId });
+    await commandPanel.handle(interaction, {});
+
+    const ids = interaction.seen.drawn[0].payload.components
+      .flatMap((row) => row.components)
+      .map((component) => component.data?.custom_id)
+      .filter(Boolean);
+
+    assert.equal(new Set(ids).size, ids.length, `${customId} draws a duplicated custom id: ${ids.join(", ")}`);
+  }
+});
+
+test("two counters of the same kind do not take the panel down with them", async () => {
+  // Servers set up before the panel can hold a pair the kind cannot tell apart,
+  // and Discord refuses a menu that offers one value twice.
+  const settings = {
+    counters: [
+      { counter_type: "MEMBERS", channel_id: "111", name: "Участники" },
+      { counter_type: "members", channel_id: "222", name: "Ещё участники" },
+    ],
+    save: async () => {},
+  };
+  const interaction = makeInteraction({ customId: "PANELHUB:open:counters" });
+
+  await controlPanel.handle(interaction, settings);
+
+  const [menu] = interaction.seen.drawn[0].payload.components
+    .flatMap((row) => row.components)
+    .filter((component) => component.options);
+
+  const values = menu.options.map((option) => option.value ?? option.data?.value);
+  assert.equal(new Set(values).size, values.length, `the menu offers a value twice: ${values.join(", ")}`);
+  assert.deepEqual(values, ["111", "222"], "each counter is opened by its own channel");
 });

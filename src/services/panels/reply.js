@@ -34,19 +34,27 @@ function redraw(interaction, payload) {
   return interaction.update(payload);
 }
 
+// How long something may take before the click is acknowledged without it.
+const PATIENCE_MS = 1200;
+
 /**
- * The whole pattern in one call: acknowledge, build, draw.
+ * The whole pattern in one call: build, draw, and acknowledge on the way if the
+ * building takes long enough to be at risk.
+ *
+ * Acknowledging first is the safe order and a visible cost: from the click until
+ * the message is edited, Discord greys out every button on it. A panel read from
+ * a warm cache comes back in milliseconds, so paying that on every click makes
+ * the whole panel feel like it is catching up. The acknowledgement is kept for
+ * the clicks that actually need it.
  *
  * @param {import('discord.js').MessageComponentInteraction} interaction
  * @param {() => Promise<object>|object} build
+ * @param {number} [patience]
  */
-async function slowRedraw(interaction, build) {
-  await ack(interaction);
-  return redraw(interaction, await build());
+async function slowRedraw(interaction, build, patience = PATIENCE_MS) {
+  const payload = await ackIfSlow(interaction, (async () => build())(), patience);
+  return redraw(interaction, payload);
 }
-
-// How long something may take before the click is acknowledged without it.
-const PATIENCE_MS = 1200;
 
 /**
  * Wait for something, acknowledging the click if it takes too long.
