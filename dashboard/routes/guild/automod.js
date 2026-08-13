@@ -3,6 +3,13 @@ const router = express.Router();
 const { getSettings } = require("@schemas/Guild");
 const { applyGuildConfigPatch } = require("@src/services/dashboard/guildConfig");
 const { requireCsrf } = require("../../auth/csrf");
+const {
+  ACTIONS,
+  AutomodEscalationError,
+  addEscalationRule,
+  createEscalationRule,
+  removeEscalationRule,
+} = require("@src/services/automodEscalation");
 
 const SNOWFLAKE = /^\d{17,20}$/;
 const VALID_ACTIONS = ["TIMEOUT", "KICK", "BAN"];
@@ -31,6 +38,7 @@ router.get("/", async (req, res) => {
     guild,
     settings,
     validActions: VALID_ACTIONS,
+    escalationActions: ACTIONS,
     roles: [...guild.roles.cache.filter((r) => r.id !== guild.id && !r.managed).values()],
   });
 });
@@ -48,6 +56,15 @@ router.post("/", requireCsrf, async (req, res) => {
     "automod.anti_spam": body.anti_spam === "on",
     "automod.anti_ghostping": body.anti_ghostping === "on",
     "automod.anti_image_spam": body.anti_image_spam === "on",
+    "automod.anti_caps": body.anti_caps === "on",
+    "automod.caps_min_letters": clampInt(body.caps_min_letters, 1, 1000, 8),
+    "automod.caps_percent": clampInt(body.caps_percent, 10, 100, 75),
+    "automod.anti_emoji": body.anti_emoji === "on",
+    "automod.max_emoji": clampInt(body.max_emoji, 1, 100, 12),
+    "automod.anti_zalgo": body.anti_zalgo === "on",
+    "automod.zalgo_percent": clampInt(body.zalgo_percent, 1, 100, 30),
+    "automod.anti_scam": body.anti_scam === "on",
+    "automod.reset_strikes_on_action": body.reset_strikes_on_action === "on",
     "automod.debug": body.debug === "on",
     "automod.filter_enabled": body.filter_enabled === "on",
     "automod.filter_terms": String(body.filter_terms || "").slice(0, 4000),
@@ -82,6 +99,48 @@ router.post("/", requireCsrf, async (req, res) => {
   });
 
   res.redirect(`${res.locals.basePath}/g/${guild.id}/automod?notice=saved`);
+});
+
+router.post("/escalations", requireCsrf, async (req, res) => {
+  const redirect = `${res.locals.basePath}/g/${req.guild.id}/automod`;
+  try {
+    const settings = await getSettings(req.guild);
+    const rule = createEscalationRule(req.body);
+    const next = addEscalationRule(settings.automod.escalation_rules, rule);
+    await applyGuildConfigPatch(
+      req.guild,
+      { "automod.escalation_rules": next },
+      {
+        id: req.session.user.id,
+        tag: req.session.user.username,
+        action: "automod_escalation_create",
+        reason: `Dashboard: create ${rule.action} escalation at ${rule.threshold} strikes`,
+      }
+    );
+    return res.redirect(`${redirect}?notice=created`);
+  } catch (error) {
+    const message = error instanceof AutomodEscalationError ? error.message : res.locals.t("errors.internalMessage");
+    if (!(error instanceof AutomodEscalationError)) req.client.logger.error("automod escalation create failed", error);
+    return res.redirect(`${redirect}?error=${encodeURIComponent(message)}`);
+  }
+});
+
+router.post("/escalations/:id/delete", requireCsrf, async (req, res) => {
+  const redirect = `${res.locals.basePath}/g/${req.guild.id}/automod`;
+  if (!/^[a-f\d-]{36}$/i.test(req.params.id)) return res.redirect(`${redirect}?error=Invalid%20rule`);
+  const settings = await getSettings(req.guild);
+  const next = removeEscalationRule(settings.automod.escalation_rules, req.params.id);
+  await applyGuildConfigPatch(
+    req.guild,
+    { "automod.escalation_rules": next },
+    {
+      id: req.session.user.id,
+      tag: req.session.user.username,
+      action: "automod_escalation_delete",
+      reason: "Dashboard: delete automod escalation",
+    }
+  );
+  return res.redirect(`${redirect}?notice=deleted`);
 });
 
 module.exports = router;

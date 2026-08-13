@@ -9,6 +9,10 @@ const {
   shouldBlockInvites,
   shouldBlockLinks,
   splitFilterEntries,
+  inspectCaps,
+  countEmoji,
+  inspectZalgo,
+  matchesScam,
 } = require("../src/handlers/automod");
 
 test.beforeEach(() => antispamCache.clear());
@@ -93,4 +97,27 @@ test("repeat detection honours the configured window and repeat count", () => {
   assert.equal(isRepeatedMessage(message, config, 2000), false);
   assert.equal(isRepeatedMessage(message, config, 3000), true);
   assert.equal(isRepeatedMessage(message, config, 14000), false, "the counter resets outside the window");
+});
+
+test("CAPS inspection counts Unicode letters without treating digits as uppercase", () => {
+  assert.deepEqual(inspectCaps("HELLO 123 мир"), { letters: 8, percent: 63 });
+  assert.deepEqual(inspectCaps("123 !!!"), { letters: 0, percent: 0 });
+});
+
+test("emoji inspection counts Unicode and Discord custom emoji", () => {
+  assert.equal(countEmoji("😀🔥 <:party:123456789012345678>"), 3);
+  assert.equal(countEmoji("plain text"), 0);
+});
+
+test("Zalgo inspection measures combining marks after Unicode decomposition", () => {
+  assert.equal(inspectZalgo("plain").percent, 0);
+  const result = inspectZalgo("z̵̛͝a̶̕l̷g̴o̷");
+  assert.ok(result.marks >= 5);
+  assert.ok(result.percent >= 100);
+});
+
+test("scam detection requires a suspicious host or multiple social-engineering signals", () => {
+  assert.equal(matchesScam("Free Nitro — verify now https://example.test/login"), true);
+  assert.equal(matchesScam("Read about free software at https://example.test"), false);
+  assert.equal(matchesScam("https://discord-nitro.gift/claim"), true);
 });

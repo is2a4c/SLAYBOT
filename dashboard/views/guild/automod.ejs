@@ -22,6 +22,7 @@
     <label for="strikes"><%= t("automod.strikes") %></label>
     <input type="number" id="strikes" name="strikes" min="1" max="100" value="<%= settings.automod.strikes %>" />
   </div>
+  <div class="checkbox-field field"><input type="checkbox" id="reset_strikes_on_action" name="reset_strikes_on_action" <%= settings.automod.reset_strikes_on_action ? "checked" : "" %> /><label for="reset_strikes_on_action"><%= t("automod.resetStrikes") %></label></div>
   </div>
 
   <h2><%= t("automod.rulesHeading") %></h2>
@@ -50,9 +51,19 @@
     <input type="checkbox" id="anti_image_spam" name="anti_image_spam" <%= settings.automod.anti_image_spam ? "checked" : "" %> />
     <label for="anti_image_spam">Image Spam Guard</label>
   </div>
+  <div class="checkbox-field field"><input type="checkbox" id="anti_caps" name="anti_caps" <%= settings.automod.anti_caps ? "checked" : "" %> /><label for="anti_caps"><%= t("automod.antiCaps") %></label></div>
+  <div class="checkbox-field field"><input type="checkbox" id="anti_emoji" name="anti_emoji" <%= settings.automod.anti_emoji ? "checked" : "" %> /><label for="anti_emoji"><%= t("automod.antiEmoji") %></label></div>
+  <div class="checkbox-field field"><input type="checkbox" id="anti_zalgo" name="anti_zalgo" <%= settings.automod.anti_zalgo ? "checked" : "" %> /><label for="anti_zalgo"><%= t("automod.antiZalgo") %></label></div>
+  <div class="checkbox-field field"><input type="checkbox" id="anti_scam" name="anti_scam" <%= settings.automod.anti_scam ? "checked" : "" %> /><label for="anti_scam"><%= t("automod.antiScam") %></label></div>
   <div class="checkbox-field field">
     <input type="checkbox" id="debug" name="debug" <%= settings.automod.debug ? "checked" : "" %> />
     <label for="debug"><%= t("automod.debug") %></label>
+  </div>
+  <div class="form-grid">
+    <div class="field"><label for="caps_min_letters"><%= t("automod.capsMinLetters") %></label><input type="number" id="caps_min_letters" name="caps_min_letters" min="1" max="1000" value="<%= settings.automod.caps_min_letters ?? 8 %>" /></div>
+    <div class="field"><label for="caps_percent"><%= t("automod.capsPercent") %></label><input type="number" id="caps_percent" name="caps_percent" min="10" max="100" value="<%= settings.automod.caps_percent ?? 75 %>" /></div>
+    <div class="field"><label for="max_emoji"><%= t("automod.maxEmoji") %></label><input type="number" id="max_emoji" name="max_emoji" min="1" max="100" value="<%= settings.automod.max_emoji ?? 12 %>" /></div>
+    <div class="field"><label for="zalgo_percent"><%= t("automod.zalgoPercent") %></label><input type="number" id="zalgo_percent" name="zalgo_percent" min="1" max="100" value="<%= settings.automod.zalgo_percent ?? 30 %>" /></div>
   </div>
   </div>
   <div class="field">
@@ -121,4 +132,22 @@
 
   <div class="form-actions"><span class="hint"><%= t("automod.saveHint") %></span><button type="submit" class="btn"><%= t("common.save") %></button></div>
 </form>
+
+<section class="panel">
+  <div class="panel-header"><h2><%= t("automod.escalationHeading") %></h2><p class="hint"><%= t("automod.escalationHint") %></p></div>
+  <% if ((settings.automod.escalation_rules || []).length) { %>
+    <div class="table-wrap"><table><thead><tr><th><%= t("automod.escalationThreshold") %></th><th><%= t("automod.escalationAction") %></th><th><%= t("automod.timeoutMinutes") %></th><th></th></tr></thead><tbody>
+      <% settings.automod.escalation_rules.forEach((rule) => { %><tr><td><%= rule.threshold %></td><td><%= rule.action %></td><td><%= rule.action === "TIMEOUT" ? rule.timeout_minutes : "—" %></td><td><form method="post" action="<%= basePath %>/g/<%= guild.id %>/automod/escalations/<%= rule.id %>/delete"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><button type="submit" class="btn btn-danger"><%= t("common.delete") %></button></form></td></tr><% }) %>
+    </tbody></table></div>
+  <% } else { %><p class="empty-state"><%= t("automod.escalationEmpty") %></p><% } %>
+  <form method="post" action="<%= basePath %>/g/<%= guild.id %>/automod/escalations">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <div class="form-grid">
+      <div class="field"><label for="escalation_threshold"><%= t("automod.escalationThreshold") %></label><input id="escalation_threshold" name="threshold" type="number" min="1" max="1000" required /></div>
+      <div class="field"><label for="escalation_action"><%= t("automod.escalationAction") %></label><select id="escalation_action" name="action"><% escalationActions.forEach((action) => { %><option value="<%= action %>"><%= action %></option><% }) %></select></div>
+      <div class="field"><label for="timeout_minutes"><%= t("automod.timeoutMinutes") %></label><input id="timeout_minutes" name="timeout_minutes" type="number" min="1" max="40320" value="1440" /></div>
+    </div>
+    <button type="submit" class="btn"><%= t("automod.addEscalation") %></button>
+  </form>
+</section>
 <%- include("../partials/foot") %>

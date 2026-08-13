@@ -1,7 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const { containsLink, containsDiscordInvite } = require("@helpers/Utils");
 const { getMember } = require("@schemas/Member");
-const { addModAction } = require("@helpers/ModUtils");
+const { addModAction, timeoutTarget } = require("@helpers/ModUtils");
 const { AUTOMOD } = require("@root/config");
 const { addAutoModLogToDb } = require("@schemas/AutomodLogs");
 const {
@@ -11,6 +11,7 @@ const {
   DEFAULT_THRESHOLD,
 } = require("@src/services/imageSpamClassifier");
 const { getAiService } = require("@src/services/ai/AiService");
+const { selectEscalationRule } = require("@src/services/automodEscalation");
 
 const antispamCache = new Map();
 const DEFAULT_SPAM_WINDOW_SECONDS = 3;
@@ -92,6 +93,41 @@ function shouldBlockInvites(content, automod) {
     (match) => match[1].replace(/[^\w-].*$/, "").toLowerCase()
   );
   return codes.length === 0 || codes.some((code) => !allowed.has(code));
+}
+
+function inspectCaps(content) {
+  const letters = String(content || "").match(/\p{L}/gu) || [];
+  const uppercase = letters.filter(
+    (letter) => letter === letter.toLocaleUpperCase() && letter !== letter.toLocaleLowerCase()
+  );
+  return {
+    letters: letters.length,
+    percent: letters.length ? Math.round((uppercase.length / letters.length) * 100) : 0,
+  };
+}
+
+function countEmoji(content) {
+  const unicode = String(content || "").match(/\p{Extended_Pictographic}/gu) || [];
+  const custom = String(content || "").match(/<a?:\w{2,32}:\d{17,20}>/g) || [];
+  return unicode.length + custom.length;
+}
+
+function inspectZalgo(content) {
+  const decomposed = String(content || "").normalize("NFD");
+  const marks = decomposed.match(/\p{M}/gu)?.length || 0;
+  const bases = decomposed.match(/[\p{L}\p{N}]/gu)?.length || 0;
+  return { marks, percent: bases ? Math.round((marks / bases) * 100) : 0 };
+}
+
+function matchesScam(content) {
+  const text = normalizeFilterText(content);
+  const suspiciousHost =
+    /(?:https?:\/\/)?(?:[^\s/]*xn--[^\s/]*|discord(?:-?gift|-?nitro|app)?\.(?:click|gift|win|xyz|top))\b/u.test(text);
+  const reward = /\b(?:free|gift|nitro|airdrop|prize|reward|steam|скин|нитро|подарок|приз|раздач)\w*/u.test(text);
+  const pressure =
+    /\b(?:claim|verify|login|wallet|password|scan|urgent|получ|подтверд|войти|кошел|парол|срочно)\w*/u.test(text);
+  const link = extractLinkDomains(text).length > 0;
+  return suspiciousHost || (link && reward && pressure);
 }
 
 function isAntiSpamWhitelisted(message, automod) {
@@ -288,6 +324,43 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
 
   const fields = [];
 
+  if (automod.anti_caps) {
+    const caps = inspectCaps(content);
+    const minimum = Math.min(1000, Math.max(1, Number(automod.caps_min_letters) || 8));
+    const threshold = Math.min(100, Math.max(10, Number(automod.caps_percent) || 75));
+    if (caps.letters >= minimum && caps.percent >= threshold) {
+      fields.push({ name: "Excessive CAPS", value: `${caps.percent}%/${threshold}%`, inline: true });
+      shouldDelete = true;
+      strikesTotal += 1;
+    }
+  }
+
+  if (automod.anti_emoji) {
+    const emoji = countEmoji(content);
+    const maximum = Math.min(100, Math.max(1, Number(automod.max_emoji) || 12));
+    if (emoji > maximum) {
+      fields.push({ name: "Emoji Flood", value: `${emoji}/${maximum}`, inline: true });
+      shouldDelete = true;
+      strikesTotal += 1;
+    }
+  }
+
+  if (automod.anti_zalgo) {
+    const zalgo = inspectZalgo(content);
+    const threshold = Math.min(100, Math.max(1, Number(automod.zalgo_percent) || 30));
+    if (zalgo.marks >= 3 && zalgo.percent >= threshold) {
+      fields.push({ name: "Zalgo Text", value: `${zalgo.percent}%/${threshold}%`, inline: true });
+      shouldDelete = true;
+      strikesTotal += 1;
+    }
+  }
+
+  if (automod.anti_scam && matchesScam(content)) {
+    fields.push({ name: "Scam Pattern", value: "Suspicious link and social-engineering signals", inline: true });
+    shouldDelete = true;
+    strikesTotal += 1;
+  }
+
   const filteredTerm = matchesContentFilter(content, automod);
   if (filteredTerm) {
     filterTriggered = true;
@@ -440,7 +513,13 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
   if (strikesTotal > 0) {
     // add strikes to member
     const memberDb = await getMember(guild.id, author.id);
+    const previousStrikes = memberDb.strikes;
     memberDb.strikes += strikesTotal;
+    const escalation = selectEscalationRule(automod.escalation_rules, memberDb.strikes, previousStrikes);
+    const nextThreshold = [...(automod.escalation_rules || [])]
+      .filter((entry) => entry.threshold > memberDb.strikes)
+      .sort((left, right) => left.threshold - right.threshold)[0]?.threshold;
+    const displayedLimit = escalation?.threshold || nextThreshold || automod.strikes;
 
     // DM strike details
     const strikeEmbed = new EmbedBuilder()
@@ -451,7 +530,7 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
       .setDescription(
         `You have received ${strikesTotal} strikes!\n\n` +
           `**Guild:** ${guild.name}\n` +
-          `**Total Strikes:** ${memberDb.strikes} out of ${automod.strikes}`
+          `**Total Strikes:** ${memberDb.strikes} out of ${displayedLimit}`
       );
 
     author.send({ embeds: [strikeEmbed] }).catch((ex) => {
@@ -459,12 +538,16 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
     });
 
     // check if max strikes are received
-    if (memberDb.strikes >= automod.strikes) {
-      // Reset Strikes
-      memberDb.strikes = 0;
+    if (escalation || (!automod.escalation_rules?.length && memberDb.strikes >= automod.strikes)) {
+      const action = escalation?.action || automod.action;
+      const timeoutMs = (Number(escalation?.timeout_minutes) || 1440) * 60 * 1000;
+      if (!automod.escalation_rules?.length || automod.reset_strikes_on_action) memberDb.strikes = 0;
 
-      // Add Moderation Action
-      await addModAction(guild.members.me, member, "Automod: Max strikes received", automod.action).catch((ex) => {
+      const actionPromise =
+        action === "TIMEOUT" && escalation
+          ? timeoutTarget(guild.members.me, member, timeoutMs, `Automod: escalation at ${escalation.threshold} strikes`)
+          : addModAction(guild.members.me, member, "Automod: strike threshold received", action);
+      await actionPromise.catch((ex) => {
         guild.client.logger.error("Automod action failed", ex);
       });
     }
@@ -487,6 +570,10 @@ module.exports = {
   matchesContentFilter,
   shouldBlockInvites,
   shouldBlockLinks,
+  inspectCaps,
+  countEmoji,
+  inspectZalgo,
+  matchesScam,
   splitFilterEntries,
   isAntiSpamWhitelisted,
   isRepeatedMessage,

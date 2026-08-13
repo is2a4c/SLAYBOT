@@ -86,6 +86,7 @@ test("every editable guild setting is reachable from the control panel", () => {
     "voice_roles.channels",
     "stats.rewards.level",
     "stats.rewards.voice",
+    "automod.escalation_rules",
   ]);
 
   for (const path of Object.keys(schema.paths)) {
