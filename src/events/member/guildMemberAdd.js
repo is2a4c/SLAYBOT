@@ -42,4 +42,10 @@ module.exports = async (client, member) => {
   // A greeting configured with a colour Discord refuses would otherwise reject
   // here, unhandled, and take the rest of the join handling with it.
   greetingHandler.sendWelcome(member, inviterData).catch((err) => client.logger.error("sendWelcome", err));
+  if (settings.control_center?.notifications?.welcome_dm && !member.user.bot) {
+    greetingHandler
+      .buildGreeting(member, "WELCOME", settings.welcome, inviterData)
+      .then((payload) => payload && member.send(payload))
+      .catch((err) => client.logger.debug(`sendWelcomeDm failed for ${member.id}`, err));
+  }
 };

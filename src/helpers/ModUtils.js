@@ -4,7 +4,7 @@ const { MODERATION, EMBED_COLORS } = require("@root/config");
 // Utils
 const { containsLink } = require("@helpers/Utils");
 const { error } = require("@helpers/Logger");
-const { sendWarningDm } = require("@src/services/moderationNotifications");
+const { sendModerationDm, sendWarningDm } = require("@src/services/moderationNotifications");
 
 // Schemas
 const { getSettings } = require("@schemas/Guild");
@@ -360,6 +360,14 @@ module.exports = class ModUtils {
     try {
       await target.timeout(ms, reason);
       await logModeration(issuer, target, reason, "Timeout");
+      await sendModerationDm({
+        target,
+        guild: issuer.guild,
+        settings: await getSettings(issuer.guild),
+        action: "TIMEOUT",
+        issuer,
+        reason,
+      });
       return true;
     } catch (ex) {
       error("timeoutTarget", ex);
@@ -401,6 +409,14 @@ module.exports = class ModUtils {
     try {
       await target.kick(reason);
       await logModeration(issuer, target, reason, "Kick");
+      await sendModerationDm({
+        target,
+        guild: issuer.guild,
+        settings: await getSettings(issuer.guild),
+        action: "KICK",
+        issuer,
+        reason,
+      });
       return true;
     } catch (ex) {
       error("kickTarget", ex);
@@ -444,6 +460,14 @@ module.exports = class ModUtils {
     try {
       await issuer.guild.bans.create(target.id, { deleteMessageSeconds: 0, reason });
       await logModeration(issuer, target, reason, "Ban");
+      await sendModerationDm({
+        target,
+        guild: issuer.guild,
+        settings: await getSettings(issuer.guild),
+        action: "BAN",
+        issuer,
+        reason,
+      });
       return true;
     } catch (ex) {
       error(`banTarget`, ex);

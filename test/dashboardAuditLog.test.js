@@ -6,7 +6,7 @@ const mongoose = require("mongoose");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 
 const DashboardAuditLog = require("../src/database/schemas/DashboardAuditLog");
-const { logAudit, listAuditLog } = require("../src/services/dashboard/auditLog");
+const { auditCsv, auditQuery, logAudit, listAuditLog } = require("../src/services/dashboard/auditLog");
 
 let mongo;
 
@@ -72,4 +72,36 @@ test("listAuditLog filters by guildId and returns newest first", async () => {
 
   const allEntries = await listAuditLog();
   assert.equal(allEntries.length, 3);
+});
+
+test("audit filters combine exact dimensions with escaped text search", async () => {
+  const query = auditQuery({
+    guildId: "guild-a",
+    action: "subscription_create",
+    actorId: "111111111111111111",
+    targetType: "feed",
+    search: "hello.*",
+  });
+  assert.equal(query.guildId, "guild-a");
+  assert.equal(query.action, "subscription_create");
+  assert.equal(query.actorId, "111111111111111111");
+  assert.equal(query.targetType, "feed");
+  assert.equal(query.$or[0].actorTag.test("hello.*"), true);
+  assert.equal(query.$or[0].actorTag.test("helloZZ"), false);
+});
+
+test("CSV export quotes fields and neutralizes spreadsheet formulas", () => {
+  const csv = auditCsv([
+    {
+      created_at: new Date("2026-08-14T12:00:00Z"),
+      action: "update",
+      actorTag: '=HYPERLINK("bad")',
+      actorId: "1",
+      targetType: "guild",
+      targetId: "2",
+      reason: 'comma, quote"',
+    },
+  ]);
+  assert.match(csv, /"'=HYPERLINK\(""bad""\)"/);
+  assert.match(csv, /"comma, quote"""/);
 });

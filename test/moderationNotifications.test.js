@@ -2,7 +2,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 require("module-alias/register");
 
-const { buildWarningDm, sendWarningDm } = require("@src/services/moderationNotifications");
+const {
+  buildModerationDm,
+  buildWarningDm,
+  sendModerationDm,
+  sendWarningDm,
+} = require("@src/services/moderationNotifications");
 
 function details(overrides = {}) {
   return {
@@ -69,4 +74,26 @@ test("closed DMs do not fail the moderation action", async () => {
 
   const delivered = await sendWarningDm({ target, settings: {}, ...details() });
   assert.equal(delivered, false);
+});
+
+test("kick, ban, and timeout notifications respect their independent switches", async () => {
+  const sent = [];
+  const guild = { ...details().guild, client: { logger: { debug: () => {} } } };
+  const target = { id: "100000000000000003", username: "Member", send: async (payload) => sent.push(payload) };
+  const payload = buildModerationDm({ ...details(), guild, target, action: "KICK" });
+  assert.match(payload.embeds[0].toJSON().description, /кик/);
+
+  assert.equal(
+    await sendModerationDm({
+      ...details(),
+      guild,
+      target,
+      action: "KICK",
+      settings: { control_center: { notifications: { dm_on_kick: false } } },
+    }),
+    false
+  );
+  assert.equal(sent.length, 0);
+  assert.equal(await sendModerationDm({ ...details(), guild, target, action: "BAN", settings: {} }), true);
+  assert.equal(sent.length, 1);
 });

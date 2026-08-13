@@ -94,3 +94,19 @@ test("the custom text-command switch is live while unimplemented switches stay s
   assert.equal(patch["control_center.common.text_commands"], true);
   assert.equal(patch["control_center.common.slash_commands"], undefined);
 });
+
+test("notification controls backed by event handlers are live", () => {
+  const fields = findModule("notifications").groups.flatMap((group) => group.fields);
+  for (const id of [
+    "welcomeDm",
+    "boostEnabled",
+    "boostChannel",
+    "boostMessage",
+    "dmBan",
+    "dmKick",
+    "dmMute",
+    "dmWarn",
+  ]) {
+    assert.equal(fields.find((field) => field.id === id).runtime, true, id);
+  }
+});

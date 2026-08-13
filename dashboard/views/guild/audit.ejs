@@ -5,6 +5,15 @@
   <p class="subtitle"><%= t("audit.guildHint") %></p>
 </div></header>
 
+<form class="panel command-toolbar" method="get" action="<%= basePath %>/g/<%= guild.id %>/audit">
+  <div class="field command-search"><label for="audit-search"><%= t("audit.search") %></label><input id="audit-search" name="search" value="<%= filters.search %>" maxlength="80" /></div>
+  <div class="field"><label for="audit-action"><%= t("common.action") %></label><input id="audit-action" name="action" value="<%= filters.action %>" maxlength="100" /></div>
+  <div class="field"><label for="audit-actor"><%= t("audit.actorId") %></label><input id="audit-actor" name="actorId" value="<%= filters.actorId %>" maxlength="20" /></div>
+  <div class="field"><label for="audit-target"><%= t("audit.targetType") %></label><input id="audit-target" name="targetType" value="<%= filters.targetType %>" maxlength="100" /></div>
+  <button class="btn" type="submit"><%= t("common.filter") %></button>
+  <% if (canGuild("audit.export")) { const exportQuery = new URLSearchParams(filters).toString(); %><a class="btn secondary" href="<%= basePath %>/g/<%= guild.id %>/audit/export.csv?<%= exportQuery %>"><%= t("audit.exportCsv") %></a><% } %>
+</form>
+
 <% if (entries.length === 0) { %>
   <div class="panel empty"><%= t("common.noEntries") %></div>
 <% } else { %>

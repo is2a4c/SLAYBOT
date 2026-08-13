@@ -156,3 +156,8 @@ own information architecture and design language.
   cooldowns, invocation cleanup, ordered send-message and role-change actions,
   safe template variables, scoped storage, and automatic guild cleanup. Arbitrary
   JavaScript/template-code execution is intentionally not supported.
+- Runtime welcome DM, server-boost publication, and independent warning,
+  timeout, kick, and ban DM switches. Closed member DMs never roll back a
+  moderation action.
+- Dashboard audit filtering by action, actor, target type, or text plus a
+  permission-gated CSV export with spreadsheet-formula neutralisation.

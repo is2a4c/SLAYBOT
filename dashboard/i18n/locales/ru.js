@@ -654,6 +654,10 @@ module.exports = {
     globalTitle: "Глобальный Audit Log",
     globalHint: "Все действия staff/владельцев во всей панели. Записи нельзя изменить или удалить.",
     subtitle: "Неизменяемая история действий внутри панели.",
+    search: "Поиск по действию, участнику, цели или причине",
+    actorId: "Discord ID инициатора",
+    targetType: "Тип цели",
+    exportCsv: "Экспорт CSV",
   },
   owner: {
     title: "Owner Control Center",

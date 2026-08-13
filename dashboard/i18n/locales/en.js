@@ -654,6 +654,10 @@ module.exports = {
     globalTitle: "Global audit log",
     globalHint: "Every staff and owner action across the dashboard. Entries cannot be edited or deleted.",
     subtitle: "An immutable history of actions performed through the dashboard.",
+    search: "Search action, actor, target, or reason",
+    actorId: "Actor Discord ID",
+    targetType: "Target type",
+    exportCsv: "Export CSV",
   },
   owner: {
     title: "Owner Control Center",

@@ -11,7 +11,7 @@ const toggle = (id, path, extra = {}) => field(id, path, "toggle", extra);
 const text = (id, path, maxLength = 1000, extra = {}) => field(id, path, "text", { maxLength, ...extra });
 const number = (id, path, min, max, extra = {}) => field(id, path, "number", { min, max, ...extra });
 const choice = (id, path, choices) => field(id, path, "choice", { choices });
-const channel = (id, path, channelKind = "text") => field(id, path, "channel", { channelKind });
+const channel = (id, path, channelKind = "text", extra = {}) => field(id, path, "channel", { channelKind, ...extra });
 const role = (id, path) => field(id, path, "role");
 const roleList = (id, path, max = 25) => field(id, path, "roleList", { max });
 const channelList = (id, path, channelKind = "text", max = 25) => field(id, path, "channelList", { channelKind, max });
@@ -170,7 +170,7 @@ const CONTROL_MODULES = [
           toggle("welcomeEnabled", "welcome.enabled"),
           channel("welcomeChannel", "welcome.channel"),
           text("welcomeMessage", "welcome.content", 1000, { multiline: true }),
-          toggle("welcomeDm", "control_center.notifications.welcome_dm"),
+          toggle("welcomeDm", "control_center.notifications.welcome_dm", { runtime: true }),
           toggle("farewellEnabled", "farewell.enabled"),
           channel("farewellChannel", "farewell.channel"),
           text("farewellMessage", "farewell.content", 1000, { multiline: true }),
@@ -179,18 +179,21 @@ const CONTROL_MODULES = [
       {
         id: "events",
         fields: [
-          toggle("boostEnabled", "control_center.notifications.boost_enabled"),
-          channel("boostChannel", "control_center.notifications.boost_channel"),
-          text("boostMessage", "control_center.notifications.boost_message", 1000, { multiline: true }),
+          toggle("boostEnabled", "control_center.notifications.boost_enabled", { runtime: true }),
+          channel("boostChannel", "control_center.notifications.boost_channel", "text", { runtime: true }),
+          text("boostMessage", "control_center.notifications.boost_message", 1000, {
+            multiline: true,
+            runtime: true,
+          }),
         ],
       },
       {
         id: "directMessages",
         fields: [
-          toggle("dmBan", "control_center.notifications.dm_on_ban"),
-          toggle("dmKick", "control_center.notifications.dm_on_kick"),
-          toggle("dmMute", "control_center.notifications.dm_on_mute"),
-          toggle("dmWarn", "control_center.notifications.dm_on_warn"),
+          toggle("dmBan", "control_center.notifications.dm_on_ban", { runtime: true }),
+          toggle("dmKick", "control_center.notifications.dm_on_kick", { runtime: true }),
+          toggle("dmMute", "control_center.notifications.dm_on_mute", { runtime: true }),
+          toggle("dmWarn", "control_center.notifications.dm_on_warn", { runtime: true }),
         ],
       },
     ],

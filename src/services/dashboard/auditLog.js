@@ -39,12 +39,50 @@ async function logAudit(entry, logger = require("@helpers/Logger")) {
  * @param {string|null} [filter.guildId]
  * @param {number} [limit]
  */
-async function listAuditLog({ guildId = null, limit = 100 } = {}) {
+function auditQuery({ guildId = null, action = null, actorId = null, targetType = null, search = null } = {}) {
   const query = guildId ? { guildId } : {};
+  if (action) query.action = String(action).slice(0, 100);
+  if (actorId && /^\d{17,20}$/.test(String(actorId))) query.actorId = String(actorId);
+  if (targetType) query.targetType = String(targetType).slice(0, 100);
+  const term = String(search || "")
+    .trim()
+    .slice(0, 80);
+  if (term) {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(escaped, "i");
+    query.$or = [{ actorTag: pattern }, { targetId: pattern }, { reason: pattern }, { action: pattern }];
+  }
+  return query;
+}
+
+async function listAuditLog({ guildId = null, action, actorId, targetType, search, limit = 100 } = {}) {
+  const query = auditQuery({ guildId, action, actorId, targetType, search });
   return DashboardAuditLog.find(query)
     .sort({ created_at: -1 })
     .limit(Math.min(500, Math.max(1, limit)))
     .lean();
 }
 
-module.exports = { logAudit, listAuditLog };
+function csvCell(value) {
+  let text = value === null || value === undefined ? "" : String(value);
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function auditCsv(entries) {
+  const rows = [["time", "action", "actor_tag", "actor_id", "target_type", "target_id", "reason"]];
+  for (const entry of entries) {
+    rows.push([
+      new Date(entry.created_at).toISOString(),
+      entry.action,
+      entry.actorTag,
+      entry.actorId,
+      entry.targetType,
+      entry.targetId,
+      entry.reason,
+    ]);
+  }
+  return `${rows.map((row) => row.map(csvCell).join(",")).join("\n")}\n`;
+}
+
+module.exports = { auditCsv, auditQuery, logAudit, listAuditLog };
