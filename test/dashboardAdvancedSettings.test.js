@@ -4,7 +4,12 @@ require("module-alias/register");
 require("@schemas/Guild");
 
 const mongoose = require("mongoose");
-const { ADVANCED_FIELDS, buildAdvancedPatch, fieldsForView } = require("../dashboard/services/advancedSettings");
+const {
+  ADVANCED_FIELDS,
+  buildAdvancedPatch,
+  fieldsForView,
+  shouldRepublishTicketPanel,
+} = require("../dashboard/services/advancedSettings");
 
 const TEXT_ID = "100000000000000001";
 const VOICE_ID = "100000000000000002";
@@ -24,6 +29,19 @@ function mockGuild() {
 test("every advanced field points to a real guild schema path", () => {
   const schema = mongoose.model("guild").schema;
   for (const field of ADVANCED_FIELDS) assert.ok(schema.path(field.path), `${field.id}: ${field.path}`);
+});
+
+test("complex feature sections expose every scalar guild setting", () => {
+  const schema = mongoose.model("guild").schema;
+  const exposed = new Set(ADVANCED_FIELDS.map((field) => field.path));
+  const groups = ["ticket", "welcome", "farewell", "starboard", "suggestions", "modmail"];
+  const internalOrCollection = new Set(["ticket.panel_message_id", "ticket.categories"]);
+
+  for (const path of Object.keys(schema.paths)) {
+    if (!groups.some((group) => path.startsWith(`${group}.`))) continue;
+    if (path.includes(".$") || internalOrCollection.has(path)) continue;
+    assert.ok(exposed.has(path), `${path} is not available in the advanced dashboard`);
+  }
 });
 
 test("advanced settings expose every declared field exactly once", () => {
@@ -76,4 +94,36 @@ test("unchecked advanced switches are explicitly disabled", () => {
   const patch = buildAdvancedPatch(mockGuild(), {}, { ai: { enabled: true }, modmail: { enabled: true } });
   assert.equal(patch["ai.enabled"], false);
   assert.equal(patch["modmail.enabled"], false);
+});
+
+test("ticket panel is republished only when its public card changes", () => {
+  const settings = {
+    ticket: {
+      panel_channel_id: TEXT_ID,
+      panel_message_id: "100000000000000010",
+      panel_title: "Support",
+      panel_description: "Open here",
+    },
+    branding: { color: "#112233" },
+  };
+
+  assert.equal(shouldRepublishTicketPanel(settings, { "ticket.limit": 20 }), false);
+  assert.equal(shouldRepublishTicketPanel(settings, { "ticket.panel_title": "Help" }), true);
+  assert.equal(shouldRepublishTicketPanel(settings, { "ticket.panel_channel_id": null }), true);
+  assert.equal(shouldRepublishTicketPanel(settings, { "branding.color": "#A855F7" }), true);
+  assert.equal(
+    shouldRepublishTicketPanel(
+      { ticket: { panel_channel_id: null, panel_message_id: null }, branding: {} },
+      { "ticket.panel_title": "Help", "ticket.panel_channel_id": null }
+    ),
+    false
+  );
+  assert.equal(
+    shouldRepublishTicketPanel(
+      { ticket: { panel_channel_id: TEXT_ID, panel_message_id: null }, branding: {} },
+      { "ticket.limit": 20, "ticket.panel_channel_id": TEXT_ID }
+    ),
+    true,
+    "a configured panel missing its message is repaired on save"
+  );
 });

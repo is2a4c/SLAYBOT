@@ -48,6 +48,9 @@ const ADVANCED_SECTIONS = [
   {
     id: "greetings",
     fields: [
+      toggle("welcomeEnabled", "welcome.enabled"),
+      channel("welcomeChannel", "welcome.channel"),
+      text("welcomeContent", "welcome.content", 1000, { multiline: true, nullable: true }),
       toggle("welcomeBots", "welcome.allow_bots"),
       text("welcomeTitle", "welcome.embed.title", 256, { nullable: true }),
       text("welcomeAuthor", "welcome.embed.author", 256, { nullable: true }),
@@ -57,6 +60,9 @@ const ADVANCED_SECTIONS = [
       text("welcomeFooter", "welcome.embed.footer", 200, { nullable: true }),
       text("welcomeImage", "welcome.embed.image", 300, { nullable: true, format: "https" }),
       toggle("welcomeTimestamp", "welcome.embed.timestamp"),
+      toggle("farewellEnabled", "farewell.enabled"),
+      channel("farewellChannel", "farewell.channel"),
+      text("farewellContent", "farewell.content", 1000, { multiline: true, nullable: true }),
       toggle("farewellBots", "farewell.allow_bots"),
       text("farewellTitle", "farewell.embed.title", 256, { nullable: true }),
       text("farewellAuthor", "farewell.embed.author", 256, { nullable: true }),
@@ -74,6 +80,7 @@ const ADVANCED_SECTIONS = [
       channel("ticketLog", "ticket.log_channel"),
       number("ticketLimit", "ticket.limit", 1, 100),
       roleList("ticketStaff", "ticket.staff_roles"),
+      channel("ticketPanelChannel", "ticket.panel_channel_id"),
       channel("ticketCategory", "ticket.category_id", "category"),
       text("ticketTitle", "ticket.panel_title", 100),
       text("ticketDescription", "ticket.panel_description", 1000, { multiline: true, nullable: true }),
@@ -145,6 +152,8 @@ const ADVANCED_SECTIONS = [
   {
     id: "suggestions",
     fields: [
+      toggle("suggestionsEnabled", "suggestions.enabled"),
+      channel("suggestionsChannel", "suggestions.channel_id"),
       channel("suggestionsApproved", "suggestions.approved_channel"),
       channel("suggestionsRejected", "suggestions.rejected_channel"),
       roleList("suggestionsStaff", "suggestions.staff_roles"),
@@ -298,4 +307,31 @@ function fieldsForView(settings) {
   }));
 }
 
-module.exports = { ADVANCED_FIELDS, ADVANCED_SECTIONS, buildAdvancedPatch, fieldsForView, getPath };
+const TICKET_PANEL_PATHS = new Set([
+  "ticket.panel_channel_id",
+  "ticket.panel_title",
+  "ticket.panel_description",
+  "branding.name",
+  "branding.color",
+  "branding.footer",
+  "branding.iconURL",
+]);
+
+function shouldRepublishTicketPanel(settings, patch) {
+  const currentChannel = settings.ticket?.panel_channel_id || null;
+  const nextChannel = Object.hasOwn(patch, "ticket.panel_channel_id")
+    ? patch["ticket.panel_channel_id"]
+    : currentChannel;
+  if (!settings.ticket?.panel_message_id) return Boolean(nextChannel);
+
+  return [...TICKET_PANEL_PATHS].some((path) => Object.hasOwn(patch, path) && getPath(settings, path) !== patch[path]);
+}
+
+module.exports = {
+  ADVANCED_FIELDS,
+  ADVANCED_SECTIONS,
+  buildAdvancedPatch,
+  fieldsForView,
+  getPath,
+  shouldRepublishTicketPanel,
+};
