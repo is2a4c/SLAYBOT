@@ -18,6 +18,7 @@ const {
 } = require("@src/handlers");
 const { InteractionType } = require("discord.js");
 const { ackIfSlow, expired } = require("@src/services/panels/reply");
+const { tryCustomContextCommand, tryCustomSlashCommand } = require("@src/services/customCommands/CustomCommandRuntime");
 
 // Discord gives three seconds to answer a click before it gives up on us, so
 // anything approaching that is worth having in the log with its custom id.
@@ -89,14 +90,33 @@ async function route(client, interaction) {
 
   // Slash Commands
   if (interaction.isChatInputCommand()) {
-    await commandHandler.handleSlashCommand(interaction);
+    // A name the bot does not own is a server's own command, published for this
+    // guild alone. Built-in commands are matched first, so a custom one can
+    // never take a built-in name over.
+    if (client.slashCommands.has(interaction.commandName)) {
+      await commandHandler.handleSlashCommand(interaction);
+    } else {
+      const custom = await tryCustomSlashCommand(interaction, await getSettings(interaction.guild)).catch((error) => {
+        client.logger.error("customCommand slash", error);
+        return { handled: false };
+      });
+      if (!custom.handled) await commandHandler.handleSlashCommand(interaction);
+    }
   }
 
   // Context Menu
   else if (interaction.isContextMenuCommand()) {
     const context = client.contextMenus.get(interaction.commandName);
     if (context) await contextHandler.handleContext(interaction, context);
-    else return interaction.reply({ content: "An error has occurred", ephemeral: true }).catch(() => {});
+    else {
+      const custom = await tryCustomContextCommand(interaction, await getSettings(interaction.guild)).catch((error) => {
+        client.logger.error("customCommand context", error);
+        return { handled: false };
+      });
+      if (!custom.handled) {
+        return interaction.reply({ content: "An error has occurred", ephemeral: true }).catch(() => {});
+      }
+    }
   }
 
   // Buttons

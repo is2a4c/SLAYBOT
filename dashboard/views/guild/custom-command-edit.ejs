@@ -5,7 +5,51 @@
   <div class="field"><label for="command-name"><%= t("customCommands.name") %></label><input id="command-name" name="name" value="<%= command.name %>" pattern="[a-z0-9_-]{1,32}" maxlength="32" required /></div><div class="field"><label for="command-group"><%= t("customCommands.group") %></label><input id="command-group" name="group" value="<%= command.group %>" maxlength="32" /></div><div class="field field-wide"><label for="command-description"><%= t("customCommands.description") %></label><input id="command-description" name="description" value="<%= command.description || '' %>" maxlength="100" /></div>
   <div class="field"><label for="command-cooldown"><%= t("customCommands.cooldown") %></label><input id="command-cooldown" type="number" name="cooldown" min="0" max="86400" value="<%= command.cooldown_seconds %>" /></div><label class="checkbox-field field"><input type="checkbox" name="enabled" <%= command.enabled ? "checked" : "" %> /><span><%= t("customCommands.enabled") %></span></label><label class="checkbox-field field"><input type="checkbox" name="deleteInvocation" <%= command.delete_invocation ? "checked" : "" %> /><span><%= t("customCommands.deleteInvocation") %></span></label>
   <div class="field"><label for="command-roles"><%= t("customCommands.allowedRoles") %></label><select id="command-roles" name="allowedRoles" multiple size="5"><% options.roles.forEach((role) => { %><option value="<%= role.id %>" <%= command.allowed_roles.includes(role.id) ? "selected" : "" %>>@<%= role.name %></option><% }) %></select></div><div class="field"><label for="command-channels"><%= t("customCommands.allowedChannels") %></label><select id="command-channels" name="allowedChannels" multiple size="5"><% options.channels.forEach((channel) => { %><option value="<%= channel.id %>" <%= command.allowed_channels.includes(channel.id) ? "selected" : "" %>>#<%= channel.name %></option><% }) %></select></div>
+  <div class="field field-wide"><fieldset class="trigger-set"><legend><%= t("customCommands.triggers") %></legend>
+    <label class="checkbox-field"><input type="checkbox" name="triggerPrefix" <%= command.triggers.prefix ? "checked" : "" %> /><span><%= t("customCommands.triggerPrefix") %></span></label>
+    <label class="checkbox-field"><input type="checkbox" name="triggerSlash" <%= command.triggers.slash ? "checked" : "" %> /><span><%= t("customCommands.triggerSlash") %></span></label>
+    <label class="checkbox-field"><input type="checkbox" name="triggerMessageContext" <%= command.triggers.message_context ? "checked" : "" %> /><span><%= t("customCommands.triggerMessageContext") %></span></label>
+    <label class="checkbox-field"><input type="checkbox" name="triggerMemberContext" <%= command.triggers.member_context ? "checked" : "" %> /><span><%= t("customCommands.triggerMemberContext") %></span></label>
+  </fieldset><p class="hint"><%= t("customCommands.triggersHint") %></p></div>
+  <div class="field field-wide"><label for="command-context-label"><%= t("customCommands.contextLabel") %></label><input id="command-context-label" name="contextLabel" value="<%= command.context_label || '' %>" maxlength="32" placeholder="<%= command.name %>" /></div>
   <div class="field field-wide"><button class="btn" type="submit"><%= t("common.save") %></button></div></form></section>
+
+<section class="panel"><div class="section-heading"><h2><%= t("customCommands.parameters") %></h2><span class="control-count"><%= command.subcommands.length ? t("customCommands.subcommandMode") : t("customCommands.rootMode") %></span></div>
+  <p class="hint"><%= t("customCommands.parametersHint") %></p>
+
+  <% if (!command.subcommands.length) { %>
+    <% if (!command.options.length) { %><div class="empty"><%= t("customCommands.noParameters") %></div><% } else { %>
+      <div class="stack-list"><% command.options.forEach((option) => { %>
+        <div class="stack-row"><div><small><%= option.type %><%= option.required ? ` · ${t("customCommands.required")}` : "" %></small><strong><%= option.name %></strong><small><%= option.description %><%= option.choices.length ? ` · ${option.choices.map((choice) => choice.name).join(", ")}` : "" %></small></div>
+          <form method="post" action="<%= basePath %>/g/<%= guild.id %>/custom-commands/<%= command._id %>/options/delete"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><input type="hidden" name="optionName" value="<%= option.name %>" /><button class="btn danger" type="submit"><%= t("common.delete") %></button></form></div>
+      <% }) %></div>
+    <% } %>
+  <% } else { %>
+    <div class="stack-list"><% command.subcommands.forEach((subcommand) => { %>
+      <div class="stack-row"><div><small><%= t("customCommands.subcommand") %></small><strong><%= command.name %> <%= subcommand.name %></strong><small><%= subcommand.description %></small>
+        <% subcommand.options.forEach((option) => { %>
+          <form class="inline-form" method="post" action="<%= basePath %>/g/<%= guild.id %>/custom-commands/<%= command._id %>/options/delete"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><input type="hidden" name="subcommand" value="<%= subcommand.name %>" /><input type="hidden" name="optionName" value="<%= option.name %>" /><small><%= option.name %><%= option.required ? "*" : "" %></small><button class="btn danger" type="submit"><%= t("common.delete") %></button></form>
+        <% }) %></div>
+        <form method="post" action="<%= basePath %>/g/<%= guild.id %>/custom-commands/<%= command._id %>/subcommands/delete" data-confirm="<%= t('common.dangerousAction') %>"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><input type="hidden" name="subcommandName" value="<%= subcommand.name %>" /><button class="btn danger" type="submit"><%= t("common.delete") %></button></form></div>
+    <% }) %></div>
+  <% } %>
+
+  <form method="post" action="<%= basePath %>/g/<%= guild.id %>/custom-commands/<%= command._id %>/options" class="form-grid"><input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <div class="field"><label for="option-name"><%= t("customCommands.parameterName") %></label><input id="option-name" name="optionName" pattern="[a-z0-9_-]{1,32}" maxlength="32" required /></div>
+    <div class="field"><label for="option-type"><%= t("common.type") %></label><select id="option-type" name="optionType"><% Object.entries(optionTypes).forEach(([label, value]) => { %><option value="<%= value %>"><%= t(`customCommands.optionTypes.${label}`) %></option><% }) %></select></div>
+    <div class="field field-wide"><label for="option-description"><%= t("customCommands.description") %></label><input id="option-description" name="optionDescription" maxlength="100" /></div>
+    <div class="field"><label for="option-subcommand"><%= t("customCommands.subcommand") %></label><select id="option-subcommand" name="subcommand"><option value=""><%= t("customCommands.rootMode") %></option><% command.subcommands.forEach((subcommand) => { %><option value="<%= subcommand.name %>"><%= subcommand.name %></option><% }) %></select></div>
+    <label class="checkbox-field field"><input type="checkbox" name="optionRequired" /><span><%= t("customCommands.required") %></span></label>
+    <div class="field field-wide"><label for="option-choices"><%= t("customCommands.choices") %></label><textarea id="option-choices" name="choices" rows="3" placeholder="Small = 1"></textarea><div class="hint"><%= t("customCommands.choicesHint") %></div></div>
+    <div class="field field-wide"><button class="btn" type="submit"><%= t("customCommands.addParameter") %></button></div>
+  </form>
+
+  <form method="post" action="<%= basePath %>/g/<%= guild.id %>/custom-commands/<%= command._id %>/subcommands" class="form-grid"><input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <div class="field"><label for="subcommand-name"><%= t("customCommands.subcommandName") %></label><input id="subcommand-name" name="subcommandName" pattern="[a-z0-9_-]{1,32}" maxlength="32" required /></div>
+    <div class="field"><label for="subcommand-description"><%= t("customCommands.description") %></label><input id="subcommand-description" name="subcommandDescription" maxlength="100" /></div>
+    <div class="field field-wide"><button class="btn" type="submit"><%= t("customCommands.addSubcommand") %></button></div>
+  </form>
+</section>
 
 <section class="panel"><div class="section-heading"><h2><%= t("customCommands.actions") %></h2><span class="control-count"><%= command.actions.length %>/10</span></div><% if (!command.actions.length) { %><div class="empty"><%= t("customCommands.noActions") %></div><% } else { %><div class="stack-list"><% command.actions.forEach((action, index) => { const preview = ["SEND_MESSAGE", "SEND_DM"].includes(action.type) ? (action.content || action.embed_title || action.embed_description || "").slice(0, 160) : action.type === "CHANGE_ROLES" ? `+${action.add_roles.length} / −${action.remove_roles.length}` : action.emoji; %><div class="stack-row"><div><small><%= index + 1 %> · <%= action.type %></small><strong><%= action.name %></strong><small><%= preview %></small></div><form method="post" action="<%= basePath %>/g/<%= guild.id %>/custom-commands/<%= command._id %>/actions/<%= action.id %>/delete" data-confirm="<%= t('common.dangerousAction') %>"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><button class="btn danger" type="submit"><%= t("common.delete") %></button></form></div><% }) %></div><% } %></section>
 

@@ -1,16 +1,43 @@
 const { EmbedBuilder } = require("discord.js");
 const { model } = require("@schemas/CustomCommand");
+const { contextLabel } = require("./applicationCommands");
+const { asMessage } = require("@src/services/commands/message");
 
 const cooldowns = new Map();
 
+/**
+ * The variables a custom command may use.
+ *
+ * Every one of them is a name substituted for a value. There is deliberately no
+ * expression, no call and no code: a server administrator writing a message must
+ * not be able to make the bot run something.
+ *
+ * @param {string} value
+ * @param {object} context
+ * @returns {string}
+ */
 function renderTemplate(value, context) {
-  return String(value || "")
+  let text = String(value || "")
     .replaceAll("{server}", context.guild.name)
     .replaceAll("{member:id}", context.member.id)
     .replaceAll("{member:name}", context.member.displayName)
     .replaceAll("{member:mention}", `<@${context.member.id}>`)
     .replaceAll("{channel}", `<#${context.channel.id}>`)
     .replaceAll("{arguments}", context.arguments.join(" "));
+
+  const target = context.target;
+  text = text
+    .replaceAll("{target:id}", target?.id || "")
+    .replaceAll("{target:name}", target?.name || "")
+    .replaceAll("{target:mention}", target?.id ? `<@${target.id}>` : "")
+    .replaceAll("{target:content}", target?.content || "");
+
+  // Named parameters of a slash command, by the name the dashboard gave them.
+  for (const [name, given] of Object.entries(context.options || {})) {
+    text = text.replaceAll(`{option:${name}}`, String(given ?? ""));
+  }
+
+  return text;
 }
 
 function accessProblem(command, message) {
@@ -74,7 +101,9 @@ async function executeSendDm(action, message, context) {
 }
 
 async function executeAddReaction(action, message) {
-  if (action.emoji) await message.react(action.emoji).catch(() => {});
+  // A slash or context invocation has no message to react to; the rest of the
+  // command still runs rather than failing on the one action that cannot.
+  if (action.emoji && typeof message.react === "function") await message.react(action.emoji).catch(() => {});
 }
 
 function manageableRoles(member, ids) {
@@ -91,14 +120,21 @@ async function executeChangeRoles(action, message) {
   if (add.length) await message.member.roles.add(add, "SLAYBOT custom command");
 }
 
-async function executeCommand(command, message, args) {
+async function executeCommand(command, message, args, extra = {}) {
   const problem = accessProblem(command, message);
   if (problem) {
     await message.safeReply(problem);
     return { handled: true, executed: false };
   }
 
-  const context = { guild: message.guild, channel: message.channel, member: message.member, arguments: args };
+  const context = {
+    guild: message.guild,
+    channel: message.channel,
+    member: message.member,
+    arguments: args,
+    target: extra.target || null,
+    options: extra.options || {},
+  };
   for (const action of command.actions || []) {
     if (action.type === "SEND_MESSAGE") await executeSendMessage(action, message, context);
     if (action.type === "SEND_DM") await executeSendDm(action, message, context);
@@ -131,14 +167,143 @@ async function tryCustomCommand(message, settings, dependencies = {}) {
   return executeCommand(command, message, args);
 }
 
+/**
+ * What a slash invocation was filled in with, by option name, plus the same
+ * values as the words a prefix invocation would have carried.
+ *
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction
+ * @returns {{args: string[], options: Record<string, string>, subcommand: string|null}}
+ */
+function readSlashOptions(interaction) {
+  const subcommand = interaction.options?.getSubcommand?.(false) || null;
+  const given = interaction.options?.data || [];
+  const flat = subcommand ? given.flatMap((entry) => entry.options || []) : given;
+
+  const options = {};
+  for (const entry of flat) {
+    options[entry.name] = entry.value === undefined || entry.value === null ? "" : String(entry.value);
+  }
+
+  return {
+    subcommand,
+    options,
+    args: [subcommand, ...Object.values(options)].filter((value) => value !== null && value !== ""),
+  };
+}
+
+/**
+ * Answer the interaction ourselves when nothing the command did answered it.
+ *
+ * A deferred reply that is never followed up sits in the channel as a permanent
+ * "thinking", which reads as the bot having crashed.
+ *
+ * @param {import('discord.js').Interaction} interaction
+ */
+async function settle(interaction, answered) {
+  if (answered.count > 0) return;
+  await interaction.editReply({ content: "Done." }).catch(() => {});
+}
+
+/**
+ * Run a custom command from an interaction rather than a typed message.
+ *
+ * The command itself is untouched: it is handed the same stand-in message the
+ * command panel uses, so one implementation serves all four triggers.
+ *
+ * @param {import('discord.js').Interaction} interaction
+ * @param {object} command
+ * @param {{args?: string[], options?: object, target?: object}} [input]
+ */
+async function runFromInteraction(interaction, command, input = {}) {
+  const args = input.args || [];
+  const answered = { count: 0 };
+
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply({ ephemeral: true }).catch(() => {});
+  }
+
+  const message = asMessage(interaction, { command, args, prefix: "/" });
+  const reply = message.safeReply;
+  const counted = async (payload) => {
+    answered.count += 1;
+    return reply(payload);
+  };
+  message.safeReply = counted;
+  message.reply = counted;
+  message.followUp = counted;
+
+  const result = await executeCommand(command, message, args, { options: input.options, target: input.target });
+  await settle(interaction, answered);
+  return result;
+}
+
+/**
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction
+ * @param {object} settings
+ */
+async function tryCustomSlashCommand(interaction, settings, dependencies = {}) {
+  if (settings?.control_center?.common?.slash_commands === false) return { handled: false };
+
+  const command = await (dependencies.model || model).findOne({
+    guild_id: interaction.guildId,
+    name: String(interaction.commandName || "").toLowerCase(),
+    enabled: true,
+    "triggers.slash": true,
+  });
+  if (!command) return { handled: false };
+
+  const { args, options } = readSlashOptions(interaction);
+  return runFromInteraction(interaction, command, { args, options });
+}
+
+/**
+ * The member or message a context-menu entry was used on.
+ *
+ * @param {import('discord.js').ContextMenuCommandInteraction} interaction
+ */
+function contextTarget(interaction) {
+  if (interaction.isMessageContextMenuCommand?.()) {
+    const target = interaction.targetMessage;
+    return target ? { id: target.id, name: target.author?.username || "", content: target.content || "" } : null;
+  }
+  const member = interaction.targetMember || interaction.targetUser;
+  return member ? { id: member.id, name: member.displayName || member.username || "", content: "" } : null;
+}
+
+/**
+ * @param {import('discord.js').ContextMenuCommandInteraction} interaction
+ * @param {object} settings
+ */
+async function tryCustomContextCommand(interaction, settings, dependencies = {}) {
+  if (settings?.control_center?.common?.slash_commands === false) return { handled: false };
+
+  const trigger = interaction.isMessageContextMenuCommand?.() ? "message_context" : "member_context";
+  const candidates = await (dependencies.model || model).find({
+    guild_id: interaction.guildId,
+    enabled: true,
+    [`triggers.${trigger}`]: true,
+  });
+
+  const command = candidates.find((entry) => contextLabel(entry) === interaction.commandName);
+  if (!command) return { handled: false };
+
+  const target = contextTarget(interaction);
+  return runFromInteraction(interaction, command, { args: target?.id ? [target.id] : [], target });
+}
+
 module.exports = {
   accessProblem,
+  contextTarget,
   executeCommand,
   executeAddReaction,
   executeSendDm,
   manageableRoles,
   messagePayload,
+  readSlashOptions,
   renderTemplate,
+  runFromInteraction,
   scheduleDeletion,
   tryCustomCommand,
+  tryCustomContextCommand,
+  tryCustomSlashCommand,
 };

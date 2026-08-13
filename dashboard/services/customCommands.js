@@ -1,5 +1,22 @@
 const crypto = require("node:crypto");
-const { MAX_ACTIONS, MAX_CUSTOM_COMMANDS, model } = require("@schemas/CustomCommand");
+const { ApplicationCommandType } = require("discord.js");
+const {
+  CHOICE_TYPES,
+  MAX_ACTIONS,
+  MAX_CHOICES,
+  MAX_CUSTOM_COMMANDS,
+  MAX_OPTIONS,
+  MAX_SUBCOMMANDS,
+  NAME_PATTERN,
+  OPTION_TYPES,
+  model,
+} = require("@schemas/CustomCommand");
+const {
+  contextLabel,
+  reservedNames,
+  syncGuildCommands,
+  unpublishCommand,
+} = require("@src/services/customCommands/applicationCommands");
 const { resolveComponentEmoji } = require("@helpers/SelfRoles");
 
 class CustomCommandError extends Error {
@@ -79,6 +96,33 @@ async function updateCommand(guild, id, input, client, commandModel = model) {
   command.cooldown_seconds = Math.min(86400, Math.max(0, Number.parseInt(input.cooldown, 10) || 0));
   command.allowed_roles = ids(guild, input.allowedRoles, "role");
   command.allowed_channels = ids(guild, input.allowedChannels, "channel");
+  const triggers = {
+    prefix: input.triggerPrefix === "on",
+    slash: input.triggerSlash === "on",
+    message_context: input.triggerMessageContext === "on",
+    member_context: input.triggerMemberContext === "on",
+  };
+  // A command with every trigger switched off can never run and would be
+  // invisible everywhere but this page; the prefix is what it falls back to.
+  if (!Object.values(triggers).some(Boolean)) triggers.prefix = true;
+  command.triggers = triggers;
+
+  command.context_label =
+    String(input.contextLabel || "")
+      .trim()
+      .slice(0, 32) || null;
+
+  if (triggers.message_context || triggers.member_context) {
+    const label = contextLabel(command);
+    const reserved = reservedNames(client);
+    if (triggers.message_context && reserved.get(ApplicationCommandType.Message)?.has(label)) {
+      throw new CustomCommandError("That context menu label belongs to a built-in entry.");
+    }
+    if (triggers.member_context && reserved.get(ApplicationCommandType.User)?.has(label)) {
+      throw new CustomCommandError("That context menu label belongs to a built-in entry.");
+    }
+  }
+
   try {
     await command.save();
   } catch (error) {
@@ -161,21 +205,207 @@ async function deleteAction(guildId, commandId, actionId, commandModel = model) 
   return command;
 }
 
-async function deleteCommand(guildId, id, commandModel = model) {
-  if (!/^[a-f\d]{24}$/i.test(String(id || ""))) throw new CustomCommandError("Invalid custom command id.");
-  const result = await commandModel.deleteOne({ _id: id, guild_id: guildId });
+/**
+ * The published entries come down before the document does: once it is gone
+ * nothing records what it registered, and the entries would be left in Discord
+ * with nothing behind them.
+ *
+ * @param {import('discord.js').Guild} guild
+ * @param {string} id
+ * @param {object} [logger]
+ */
+async function deleteCommand(guild, id, logger, commandModel = model) {
+  const command = await findCommand(guild.id, id, commandModel);
+  await unpublishCommand(guild, command, logger);
+  const result = await commandModel.deleteOne({ _id: command._id, guild_id: guild.id });
   if (!result.deletedCount) throw new CustomCommandError("Custom command no longer exists.");
+  return command;
+}
+
+/* ------------------------------------------------- slash command parameters */
+
+/**
+ * The choice list of one parameter, written as one `label = value` per line.
+ *
+ * @param {string} raw
+ * @param {number} type the Discord option type the choices belong to
+ * @returns {{name: string, value: string}[]}
+ */
+function parseChoices(raw, type) {
+  if (!CHOICE_TYPES.includes(type)) return [];
+
+  const choices = String(raw || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, MAX_CHOICES)
+    .map((line) => {
+      const [label, ...rest] = line.split("=");
+      const value = (rest.join("=") || label).trim();
+      return { name: label.trim().slice(0, 100), value: value.slice(0, 100) };
+    })
+    .filter((choice) => choice.name && choice.value);
+
+  // Discord rejects the whole command when a numeric option offers a choice
+  // that is not a number, so the bad line is dropped rather than the command.
+  if (type === OPTION_TYPES.STRING) return choices;
+  return choices.filter((choice) => Number.isFinite(Number(choice.value)));
+}
+
+/**
+ * One parameter, as the dashboard form describes it.
+ *
+ * @param {object} input
+ * @returns {object}
+ */
+function optionFromInput(input) {
+  const name = String(input.optionName || "")
+    .trim()
+    .toLowerCase();
+  if (!NAME_PATTERN.test(name)) {
+    throw new CustomCommandError("Use 1-32 lowercase letters, numbers, underscores, or hyphens for a parameter name.");
+  }
+
+  const type = Number.parseInt(input.optionType, 10);
+  if (!Object.values(OPTION_TYPES).includes(type)) throw new CustomCommandError("Choose a parameter type.");
+
+  const description =
+    String(input.optionDescription || "")
+      .trim()
+      .slice(0, 100) || name;
+
+  return {
+    name,
+    description,
+    type,
+    required: input.optionRequired === "on",
+    choices: parseChoices(input.choices, type),
+  };
+}
+
+/**
+ * Where a parameter belongs: the command itself, or one of its subcommands.
+ *
+ * Discord takes one or the other and rejects a command carrying both, so the
+ * two lists are kept mutually exclusive here rather than at publication time.
+ *
+ * @param {object} command
+ * @param {string} [subcommandName]
+ */
+function optionHost(command, subcommandName) {
+  if (!subcommandName) {
+    if (command.subcommands.length) {
+      throw new CustomCommandError("A command with subcommands cannot also take parameters of its own.");
+    }
+    return command.options;
+  }
+
+  const subcommand = command.subcommands.find((entry) => entry.name === String(subcommandName).toLowerCase());
+  if (!subcommand) throw new CustomCommandError("Subcommand no longer exists.");
+  return subcommand.options;
+}
+
+async function addOption(guildId, commandId, input, commandModel = model) {
+  const command = await findCommand(guildId, commandId, commandModel);
+  const option = optionFromInput(input);
+  const host = optionHost(command, input.subcommand);
+
+  if (host.length >= MAX_OPTIONS) throw new CustomCommandError(`A command can have at most ${MAX_OPTIONS} parameters.`);
+  if (host.some((entry) => entry.name === option.name)) {
+    throw new CustomCommandError("A parameter with that name already exists here.");
+  }
+  // Discord requires every required option before every optional one.
+  if (option.required) host.splice(host.filter((entry) => entry.required).length, 0, option);
+  else host.push(option);
+
+  await command.save();
+  return command;
+}
+
+async function deleteOption(guildId, commandId, name, subcommandName, commandModel = model) {
+  const command = await findCommand(guildId, commandId, commandModel);
+  const host = optionHost(command, subcommandName);
+  const index = host.findIndex((entry) => entry.name === String(name).toLowerCase());
+  if (index === -1) throw new CustomCommandError("Parameter no longer exists.");
+  host.splice(index, 1);
+  await command.save();
+  return command;
+}
+
+async function addSubcommand(guildId, commandId, input, commandModel = model) {
+  const command = await findCommand(guildId, commandId, commandModel);
+  if (command.options.length) {
+    throw new CustomCommandError("A command with parameters of its own cannot also have subcommands.");
+  }
+  if (command.subcommands.length >= MAX_SUBCOMMANDS) {
+    throw new CustomCommandError(`A command can have at most ${MAX_SUBCOMMANDS} subcommands.`);
+  }
+
+  const name = String(input.subcommandName || "")
+    .trim()
+    .toLowerCase();
+  if (!NAME_PATTERN.test(name)) {
+    throw new CustomCommandError("Use 1-32 lowercase letters, numbers, underscores, or hyphens for a subcommand name.");
+  }
+  if (command.subcommands.some((entry) => entry.name === name)) {
+    throw new CustomCommandError("A subcommand with that name already exists.");
+  }
+
+  command.subcommands.push({
+    name,
+    description:
+      String(input.subcommandDescription || "")
+        .trim()
+        .slice(0, 100) || name,
+    options: [],
+  });
+  await command.save();
+  return command;
+}
+
+async function deleteSubcommand(guildId, commandId, name, commandModel = model) {
+  const command = await findCommand(guildId, commandId, commandModel);
+  const before = command.subcommands.length;
+  command.subcommands = command.subcommands.filter((entry) => entry.name !== String(name).toLowerCase());
+  if (command.subcommands.length === before) throw new CustomCommandError("Subcommand no longer exists.");
+  await command.save();
+  return command;
+}
+
+/* ---------------------------------------------------------------- publishing */
+
+/**
+ * Bring the guild's published commands in line with what it now has stored.
+ *
+ * Called after every change that could alter what Discord should be showing,
+ * including deleting a command — its entries have to come down with it.
+ *
+ * @param {import('discord.js').Guild} guild
+ * @param {object} [logger]
+ * @param {object} [commandModel]
+ */
+async function publishCommands(guild, logger, commandModel = model) {
+  const commands = await commandModel.find({ guild_id: guild.id }).sort({ name: 1 });
+  return syncGuildCommands({ guild, commands, logger });
 }
 
 module.exports = {
   CustomCommandError,
   actionFromInput,
   addAction,
+  addOption,
+  addSubcommand,
   commandName,
   createCommand,
   deleteAction,
   deleteCommand,
+  deleteOption,
+  deleteSubcommand,
   findCommand,
   listCommands: (guildId) => model.find({ guild_id: guildId }).sort({ name: 1 }).lean(),
+  optionFromInput,
+  optionHost,
+  parseChoices,
+  publishCommands,
   updateCommand,
 };
