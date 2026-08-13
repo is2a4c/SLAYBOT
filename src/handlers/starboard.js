@@ -43,24 +43,28 @@ function resolveMirrorAction({ count, threshold, hasMirror, blocked = false, rem
  * @param {object} config
  */
 function buildStarboardMessage(message, count, config) {
-  const embed = new EmbedBuilder()
-    .setColor(config.color || EMBED_COLORS.BOT_EMBED)
-    .setAuthor({
+  const embed = new EmbedBuilder().setColor(config.color || EMBED_COLORS.BOT_EMBED);
+
+  if (config.show_author !== false) {
+    embed.setAuthor({
       name: message.author.globalName || message.author.username,
       iconURL: message.author.displayAvatarURL(),
-    })
-    .setTimestamp(message.createdAt);
+    });
+  }
+  if (config.show_timestamp !== false) embed.setTimestamp(message.createdAt);
 
   const description = [];
-  if (message.content) description.push(message.content.slice(0, 3800));
-  description.push(`\n[Jump to message](${message.url})`);
-  embed.setDescription(description.join("\n"));
+  const contentLength = Math.min(3800, Math.max(100, Number(config.content_length) || 3800));
+  if (message.content) description.push(message.content.slice(0, contentLength));
+  if (config.show_jump_link !== false) description.push(`[Jump to message](${message.url})`);
+  if (description.length) embed.setDescription(description.join("\n\n"));
 
   const image = message.attachments.find((attachment) => attachment.contentType?.startsWith("image/"));
-  if (image) embed.setImage(image.url);
+  const displayedImage = image && config.show_images !== false ? image : null;
+  if (displayedImage) embed.setImage(displayedImage.url);
 
-  const attachmentList = message.attachments.filter((attachment) => attachment.id !== image?.id);
-  if (attachmentList.size > 0) {
+  const attachmentList = message.attachments.filter((attachment) => attachment.id !== displayedImage?.id);
+  if (attachmentList.size > 0 && config.show_attachments !== false) {
     embed.addFields({
       name: "Attachments",
       value: attachmentList
@@ -71,7 +75,10 @@ function buildStarboardMessage(message, count, config) {
   }
 
   return {
-    content: `${config.emoji} **${count}** · <#${message.channelId}>`,
+    content:
+      config.show_source === false
+        ? `${config.emoji} **${count}**`
+        : `${config.emoji} **${count}** · <#${message.channelId}>`,
     embeds: [embed],
   };
 }

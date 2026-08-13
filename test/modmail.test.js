@@ -2,7 +2,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 require("module-alias/register");
 
-const { buildIncomingEmbed, buildReplyEmbed, resolveTargetGuild } = require("../src/handlers/modmail");
+const {
+  buildIncomingEmbed,
+  buildReplyEmbed,
+  resolveArchiveDuration,
+  resolveTargetGuild,
+} = require("../src/handlers/modmail");
 
 test("a single shared guild with modmail enabled is picked automatically", () => {
   const result = resolveTargetGuild({
@@ -66,4 +71,31 @@ test("staff replies can hide the responder behind the server name", () => {
   const anonymous = buildReplyEmbed(guild, "Mod Bob", "on it", true).data;
   assert.equal(anonymous.author.name, "Slay staff");
   assert.ok(!JSON.stringify(anonymous).includes("Bob"), "the staff name must not leak anywhere in the payload");
+});
+
+test("modmail colours and attachment forwarding follow guild settings", () => {
+  const user = { id: "1", username: "ann", globalName: null, displayAvatarURL: () => "" };
+  const attachments = new Map([["1", { name: "proof.png", url: "https://cdn/proof.png" }]]);
+  const incoming = buildIncomingEmbed(
+    user,
+    { content: "help", attachments },
+    {
+      incoming_color: "#123456",
+      show_attachments: false,
+    }
+  ).data;
+  const reply = buildReplyEmbed({ name: "Slay", iconURL: () => null }, "Mod", "ok", false, {
+    reply_color: "#654321",
+  }).data;
+
+  assert.equal(incoming.color, 0x123456);
+  assert.equal(incoming.fields, undefined);
+  assert.equal(reply.color, 0x654321);
+});
+
+test("unsupported long thread archive periods safely fall back", () => {
+  assert.equal(resolveArchiveDuration({ features: [] }, "10080"), 1440);
+  assert.equal(resolveArchiveDuration({ features: ["THREE_DAY_THREAD_ARCHIVE"] }, "4320"), 4320);
+  assert.equal(resolveArchiveDuration({ features: ["SEVEN_DAY_THREAD_ARCHIVE"] }, "10080"), 10080);
+  assert.equal(resolveArchiveDuration({ features: [] }, "invalid"), 1440);
 });

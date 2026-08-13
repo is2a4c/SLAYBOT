@@ -328,11 +328,34 @@ const PANELS = {
     [
       channel("panel", "📮", "panel_channel_id", TEXT_CHANNELS, { after: publish.ticketPanel }),
       opens("categories", "🗂️", "ticketcategories"),
+      channel("parentCategory", "📁", "category_id", [ChannelType.GuildCategory]),
       number("categoryTimeout", "⏱️", "category_timeout_seconds", 15, 300),
       text("channelTemplate", "🏷️", "channel_name_template", { maxLength: 100 }),
-      text("closeLabel", "🔒", "close_button_label", { maxLength: 80 }),
     ],
-    [text("openingMessage", "💬", "opening_message", { long: true, maxLength: 1000 })],
+    [
+      text("openingMessage", "💬", "opening_message", { long: true, maxLength: 1000 }),
+      text("openingColor", "🎨", "opening_color", {
+        maxLength: 7,
+        required: false,
+        validate: color,
+        example: "#A855F7",
+      }),
+      text("openingFooter", "🔻", "opening_footer", { maxLength: 200, required: false }),
+      toggle("pingMember", "📣", "ping_member"),
+      toggle("transcripts", "📄", "transcripts"),
+    ],
+    [
+      toggle("dmCreate", "📨", "dm_on_create"),
+      toggle("dmClose", "📪", "dm_on_close"),
+      text("closeLabel", "🔒", "close_button_label", { maxLength: 80 }),
+      choice(
+        "closeStyle",
+        "🎨",
+        "close_button_style",
+        ["PRIMARY", "SECONDARY", "SUCCESS", "DANGER"],
+        "panels.choices.buttonStyle"
+      ),
+    ],
   ]),
 
   verification: system("verification", "verification", [
@@ -371,8 +394,14 @@ const PANELS = {
       text("color", "🎨", "embed.color", { maxLength: 7, required: false, validate: color, example: "#A855F7" }),
     ],
     [
+      toggle("bots", "🤖", "allow_bots"),
+      text("title", "🏷️", "embed.title", { maxLength: 256, required: false }),
+      text("author", "✍️", "embed.author", { maxLength: 256, required: false }),
       text("footer", "🔻", "embed.footer", { maxLength: 200, required: false }),
       toggle("thumbnail", "🖼️", "embed.thumbnail"),
+    ],
+    [
+      toggle("timestamp", "🕒", "embed.timestamp"),
       text("image", "🏞️", "embed.image", {
         maxLength: 300,
         required: false,
@@ -396,8 +425,14 @@ const PANELS = {
       text("color", "🎨", "embed.color", { maxLength: 7, required: false, validate: color, example: "#A855F7" }),
     ],
     [
+      toggle("bots", "🤖", "allow_bots"),
+      text("title", "🏷️", "embed.title", { maxLength: 256, required: false }),
+      text("author", "✍️", "embed.author", { maxLength: 256, required: false }),
       text("footer", "🔻", "embed.footer", { maxLength: 200, required: false }),
       toggle("thumbnail", "🖼️", "embed.thumbnail"),
+    ],
+    [
+      toggle("timestamp", "🕒", "embed.timestamp"),
       text("image", "🏞️", "embed.image", {
         maxLength: 300,
         required: false,
@@ -474,6 +509,14 @@ const PANELS = {
       channelList("ignored", "🚫", "ignored_channels"),
       text("color", "🎨", "color", { maxLength: 7, required: false, validate: color, example: "#A855F7" }),
     ],
+    [
+      toggle("showAuthor", "👤", "show_author"),
+      toggle("showSource", "#️⃣", "show_source"),
+      toggle("showJump", "🔗", "show_jump_link"),
+      toggle("showImages", "🖼️", "show_images"),
+      toggle("showAttachments", "📎", "show_attachments"),
+    ],
+    [toggle("showTimestamp", "🕒", "show_timestamp"), number("contentLength", "📏", "content_length", 100, 3800)],
   ]),
 
   suggestions: system("suggestions", "suggestions", [
@@ -483,6 +526,38 @@ const PANELS = {
       channel("approved", "✅", "approved_channel"),
       channel("rejected", "❌", "rejected_channel"),
       roleList("staff", "👥", "staff_roles"),
+    ],
+    [
+      toggle("anonymous", "🕶️", "anonymous"),
+      toggle("voting", "🗳️", "voting_enabled"),
+      text("upvote", "⬆️", "upvote_emoji", { maxLength: 100 }),
+      text("downvote", "⬇️", "downvote_emoji", { maxLength: 100 }),
+      toggle("moveProcessed", "🚚", "move_processed"),
+    ],
+    [
+      text("defaultColor", "🎨", "default_color", {
+        maxLength: 7,
+        required: false,
+        validate: color,
+        example: "#3498DB",
+      }),
+      text("approvedColor", "✅", "approved_color", {
+        maxLength: 7,
+        required: false,
+        validate: color,
+        example: "#57F287",
+      }),
+      text("rejectedColor", "❌", "rejected_color", {
+        maxLength: 7,
+        required: false,
+        validate: color,
+        example: "#ED4245",
+      }),
+    ],
+    [
+      text("approveLabel", "✅", "approve_label", { maxLength: 80 }),
+      text("rejectLabel", "❌", "reject_label", { maxLength: 80 }),
+      text("deleteLabel", "🗑️", "delete_label", { maxLength: 80 }),
     ],
   ]),
 
@@ -498,6 +573,39 @@ const PANELS = {
       text("threadTemplate", "🏷️", "thread_name_template", { maxLength: 100 }),
       text("notePrefix", "🗒️", "internal_note_prefix", { maxLength: 10, required: false }),
       toggle("mentionStaff", "📣", "mention_staff"),
+      choice(
+        "archive",
+        "🗄️",
+        "archive_duration_minutes",
+        ["60", "1440", "4320", "10080"],
+        "panels.choices.archiveDuration"
+      ),
+      toggle("attachments", "📎", "show_attachments"),
+    ],
+    [
+      text("intro", "👋", "intro_message", { long: true, maxLength: 1000 }),
+      text("introColor", "🎨", "intro_color", {
+        maxLength: 7,
+        required: false,
+        validate: color,
+        example: "#3498DB",
+      }),
+      text("incomingColor", "📥", "incoming_color", {
+        maxLength: 7,
+        required: false,
+        validate: color,
+        example: "#3498DB",
+      }),
+      text("replyColor", "📤", "reply_color", {
+        maxLength: 7,
+        required: false,
+        validate: color,
+        example: "#57F287",
+      }),
+    ],
+    [
+      text("memberAck", "📨", "member_ack_emoji", { maxLength: 100, required: false }),
+      text("staffAck", "✅", "staff_ack_emoji", { maxLength: 100, required: false }),
     ],
   ]),
 

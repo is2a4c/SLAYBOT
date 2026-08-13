@@ -11,6 +11,13 @@ const CHANNEL_PERMISSIONS = [
 
 const MAX_CONTENT = 3900;
 
+function resolveArchiveDuration(guild, configured) {
+  const duration = Number(configured) || 1440;
+  if (duration === 10080 && !guild.features?.includes("SEVEN_DAY_THREAD_ARCHIVE")) return 1440;
+  if (duration === 4320 && !guild.features?.includes("THREE_DAY_THREAD_ARCHIVE")) return 1440;
+  return [60, 1440, 4320, 10080].includes(duration) ? duration : 1440;
+}
+
 /**
  * Which guild a DM should open a thread in.
  *
@@ -41,9 +48,9 @@ function resolveTargetGuild({ guilds }) {
  * @param {import('discord.js').User} user
  * @param {import('discord.js').Message} message
  */
-function buildIncomingEmbed(user, message) {
+function buildIncomingEmbed(user, message, config = {}) {
   const embed = new EmbedBuilder()
-    .setColor(EMBED_COLORS.BOT_EMBED)
+    .setColor(config.incoming_color || EMBED_COLORS.BOT_EMBED)
     .setAuthor({
       name: `${user.globalName || user.username} · ${user.id}`,
       iconURL: user.displayAvatarURL() || undefined,
@@ -52,7 +59,7 @@ function buildIncomingEmbed(user, message) {
     .setTimestamp();
 
   const attachments = [...message.attachments.values()];
-  if (attachments.length) {
+  if (attachments.length && config.show_attachments !== false) {
     embed.addFields({
       name: "Attachments",
       value: attachments
@@ -70,9 +77,9 @@ function buildIncomingEmbed(user, message) {
  * @param {string} staffName
  * @param {string} content
  */
-function buildReplyEmbed(guild, staffName, content, anonymous) {
+function buildReplyEmbed(guild, staffName, content, anonymous, config = {}) {
   return new EmbedBuilder()
-    .setColor(EMBED_COLORS.SUCCESS)
+    .setColor(config.reply_color || EMBED_COLORS.SUCCESS)
     .setAuthor({
       name: anonymous ? `${guild.name} staff` : `${staffName} · ${guild.name}`,
       iconURL: guild.iconURL() || undefined,
@@ -121,6 +128,7 @@ async function ensureThread({ guild, user, settings }) {
       name: threadName || `${user.username}-${user.id.slice(-4)}`,
       type: ChannelType.PrivateThread,
       invitable: false,
+      autoArchiveDuration: resolveArchiveDuration(guild, config.archive_duration_minutes),
       reason: `Modmail thread for ${user.id}`,
     })
     .catch(() => null);
@@ -130,11 +138,19 @@ async function ensureThread({ guild, user, settings }) {
   const record = await createThread({ guildId: guild.id, userId: user.id, threadId: thread.id });
 
   const intro = new EmbedBuilder()
-    .setColor(EMBED_COLORS.BOT_EMBED)
+    .setColor(config.intro_color || EMBED_COLORS.BOT_EMBED)
     .setAuthor({ name: `${user.globalName || user.username} · ${user.id}`, iconURL: user.displayAvatarURL() })
     .setDescription(
       [
-        `New modmail thread. Reply with \`/modmail reply\` or just type here if replies are mirrored.`,
+        String(
+          config.intro_message ||
+            "New modmail thread. Reply with `/modmail reply` or type here when reply mirroring is enabled."
+        )
+          .replace(/{member}/g, user.toString())
+          .replace(/{username}/g, user.username)
+          .replace(/{id}/g, user.id)
+          .replace(/{server}/g, guild.name)
+          .slice(0, 1000),
         `**Member:** ${user} \`${user.id}\``,
         `**Account created:** <t:${Math.floor(user.createdTimestamp / 1000)}:R>`,
       ].join("\n")
@@ -152,6 +168,7 @@ module.exports = {
   buildIncomingEmbed,
   buildReplyEmbed,
   ensureThread,
+  resolveArchiveDuration,
   resolveTargetGuild,
 
   /**
@@ -205,7 +222,9 @@ module.exports = {
       return;
     }
 
-    await thread.send({ embeds: [buildIncomingEmbed(message.author, message)] }).catch(() => {});
+    await thread
+      .send({ embeds: [buildIncomingEmbed(message.author, message, target.settings.modmail)] })
+      .catch(() => {});
 
     if (record) {
       record.last_user_message_at = new Date();
@@ -213,7 +232,9 @@ module.exports = {
       await record.save().catch(() => {});
     }
 
-    await message.react("📨").catch(() => {});
+    if (target.settings.modmail.member_ack_emoji) {
+      await message.react(target.settings.modmail.member_ack_emoji).catch(() => {});
+    }
   },
 
   /**
@@ -242,7 +263,8 @@ module.exports = {
             message.guild,
             message.member?.displayName || message.author.username,
             message.content || "_no text_",
-            settings.modmail.anonymous
+            settings.modmail.anonymous,
+            settings.modmail
           ),
         ],
       })
@@ -256,6 +278,8 @@ module.exports = {
     record.last_staff_message_at = new Date();
     record.messages += 1;
     await record.save().catch(() => {});
-    await message.react("✅").catch(() => {});
+    if (settings.modmail.staff_ack_emoji) {
+      await message.react(settings.modmail.staff_ack_emoji).catch(() => {});
+    }
   },
 };

@@ -60,13 +60,15 @@ async function suggest(member, suggestion, settings) {
   if (!settings.suggestions.channel_id) return "Suggestion channel not configured!";
   const channel = member.guild.channels.cache.get(settings.suggestions.channel_id);
   if (!channel) return "Suggestion channel not found!";
+  const config = settings.suggestions;
 
   const embed = new EmbedBuilder()
     .setAuthor({ name: "New Suggestion" })
-    .setThumbnail(member.user.avatarURL())
-    .setColor(SUGGESTIONS.DEFAULT_EMBED)
+    .setColor(config.default_color || SUGGESTIONS.DEFAULT_EMBED)
     .setDescription(
-      stripIndent`
+      config.anonymous
+        ? suggestion
+        : stripIndent`
         ${suggestion}
 
         **Submitter** 
@@ -74,6 +76,7 @@ async function suggest(member, suggestion, settings) {
       `
     )
     .setTimestamp();
+  if (!config.anonymous) embed.setThumbnail(member.user.avatarURL());
 
   const analysis = await analyzeSuggestionSafely(member, suggestion, settings);
   if (analysis) {
@@ -87,9 +90,18 @@ async function suggest(member, suggestion, settings) {
   }
 
   let buttonsRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("SUGGEST_APPROVE").setLabel("Approve").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("SUGGEST_REJECT").setLabel("Reject").setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId("SUGGEST_DELETE").setLabel("Delete").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder()
+      .setCustomId("SUGGEST_APPROVE")
+      .setLabel(String(config.approve_label || "Approve").slice(0, 80))
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId("SUGGEST_REJECT")
+      .setLabel(String(config.reject_label || "Reject").slice(0, 80))
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId("SUGGEST_DELETE")
+      .setLabel(String(config.delete_label || "Delete").slice(0, 80))
+      .setStyle(ButtonStyle.Secondary)
   );
 
   try {
@@ -98,8 +110,10 @@ async function suggest(member, suggestion, settings) {
       components: [buttonsRow],
     });
 
-    await sentMsg.react(SUGGESTIONS.EMOJI.UP_VOTE);
-    await sentMsg.react(SUGGESTIONS.EMOJI.DOWN_VOTE);
+    if (config.voting_enabled !== false) {
+      await sentMsg.react(config.upvote_emoji || SUGGESTIONS.EMOJI.UP_VOTE);
+      await sentMsg.react(config.downvote_emoji || SUGGESTIONS.EMOJI.DOWN_VOTE);
+    }
 
     await addSuggestion(sentMsg, member.id, suggestion);
 

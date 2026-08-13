@@ -16,12 +16,33 @@ const { stripIndents } = require("common-tags");
 /**
  * @param {import('discord.js').Message} message
  */
-const getStats = (message) => {
-  const upVotes = (message.reactions.resolve(SUGGESTIONS.EMOJI.UP_VOTE)?.count || 1) - 1;
-  const downVotes = (message.reactions.resolve(SUGGESTIONS.EMOJI.DOWN_VOTE)?.count || 1) - 1;
+const getStats = (message, settings) => {
+  const config = settings.suggestions || {};
+  const upVotes = (message.reactions.resolve(config.upvote_emoji || SUGGESTIONS.EMOJI.UP_VOTE)?.count || 1) - 1;
+  const downVotes = (message.reactions.resolve(config.downvote_emoji || SUGGESTIONS.EMOJI.DOWN_VOTE)?.count || 1) - 1;
 
   return [upVotes, downVotes];
 };
+
+function buildButtons(settings, disabled) {
+  const config = settings.suggestions || {};
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("SUGGEST_APPROVE")
+      .setLabel(String(config.approve_label || "Approve").slice(0, 80))
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(disabled === "APPROVED"),
+    new ButtonBuilder()
+      .setCustomId("SUGGEST_REJECT")
+      .setLabel(String(config.reject_label || "Reject").slice(0, 80))
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(disabled === "REJECTED"),
+    new ButtonBuilder()
+      .setCustomId("SUGGEST_DELETE")
+      .setLabel(String(config.delete_label || "Delete").slice(0, 80))
+      .setStyle(ButtonStyle.Secondary)
+  );
+}
 
 /**
  * @param {number} upVotes
@@ -79,19 +100,11 @@ async function approveSuggestion(member, channel, messageId, reason) {
 
   if (!message.embeds[0]) return "Suggestion embed not found";
 
-  let buttonsRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId("SUGGEST_APPROVE")
-      .setLabel("Approve")
-      .setStyle(ButtonStyle.Success)
-      .setDisabled(true),
-    new ButtonBuilder().setCustomId("SUGGEST_REJECT").setLabel("Reject").setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId("SUGGEST_DELETE").setLabel("Delete").setStyle(ButtonStyle.Secondary)
-  );
+  const buttonsRow = buildButtons(settings, "APPROVED");
 
   const approvedEmbed = new EmbedBuilder()
     .setDescription(message.embeds[0].data.description)
-    .setColor(SUGGESTIONS.APPROVED_EMBED)
+    .setColor(settings.suggestions.approved_color || SUGGESTIONS.APPROVED_EMBED)
     .setAuthor({ name: "Suggestion Approved" })
     .setFooter({ text: `Approved By ${member.user.username}`, iconURL: member.displayAvatarURL() })
     .setTimestamp();
@@ -99,27 +112,29 @@ async function approveSuggestion(member, channel, messageId, reason) {
   const fields = [];
 
   // add stats if it doesn't exist
-  const statsField = message.embeds[0].fields.find((field) => field.name === "Stats");
-  if (!statsField) {
-    const [upVotes, downVotes] = getStats(message);
-    doc.stats.upvotes = upVotes;
-    doc.stats.downvotes = downVotes;
-    fields.push({ name: "Stats", value: getVotesMessage(upVotes, downVotes) });
-  } else {
-    fields.push(statsField);
+  if (settings.suggestions.voting_enabled !== false) {
+    const statsField = message.embeds[0].fields.find((field) => field.name === "Stats");
+    if (!statsField) {
+      const [upVotes, downVotes] = getStats(message, settings);
+      doc.stats.upvotes = upVotes;
+      doc.stats.downvotes = downVotes;
+      fields.push({ name: "Stats", value: getVotesMessage(upVotes, downVotes) });
+    } else {
+      fields.push(statsField);
+    }
   }
 
   // update reason
   if (reason) fields.push({ name: "Reason", value: "```" + reason + "```" });
 
-  approvedEmbed.addFields(fields);
+  if (fields.length) approvedEmbed.addFields(fields);
 
   try {
     doc.status = "APPROVED";
     doc.status_updates.push({ user_id: member.id, status: "APPROVED", reason, timestamp: new Date() });
 
     let approveChannel;
-    if (settings.suggestions.approved_channel) {
+    if (settings.suggestions.move_processed !== false && settings.suggestions.approved_channel) {
       approveChannel = guild.channels.cache.get(settings.suggestions.approved_channel);
     }
 
@@ -172,15 +187,11 @@ async function rejectSuggestion(member, channel, messageId, reason) {
 
   if (!message.embeds[0]) return "Suggestion embed not found";
 
-  let buttonsRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("SUGGEST_APPROVE").setLabel("Approve").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("SUGGEST_REJECT").setLabel("Reject").setStyle(ButtonStyle.Danger).setDisabled(true),
-    new ButtonBuilder().setCustomId("SUGGEST_DELETE").setLabel("Delete").setStyle(ButtonStyle.Secondary)
-  );
+  const buttonsRow = buildButtons(settings, "REJECTED");
 
   const rejectedEmbed = new EmbedBuilder()
     .setDescription(message.embeds[0].data.description)
-    .setColor(SUGGESTIONS.DENIED_EMBED)
+    .setColor(settings.suggestions.rejected_color || SUGGESTIONS.DENIED_EMBED)
     .setAuthor({ name: "Suggestion Rejected" })
     .setFooter({ text: `Rejected By ${member.user.username}`, iconURL: member.displayAvatarURL() })
     .setTimestamp();
@@ -188,27 +199,29 @@ async function rejectSuggestion(member, channel, messageId, reason) {
   const fields = [];
 
   // add stats if it doesn't exist
-  const statsField = message.embeds[0].fields.find((field) => field.name === "Stats");
-  if (!statsField) {
-    const [upVotes, downVotes] = getStats(message);
-    doc.stats.upvotes = upVotes;
-    doc.stats.downvotes = downVotes;
-    fields.push({ name: "Stats", value: getVotesMessage(upVotes, downVotes) });
-  } else {
-    fields.push(statsField);
+  if (settings.suggestions.voting_enabled !== false) {
+    const statsField = message.embeds[0].fields.find((field) => field.name === "Stats");
+    if (!statsField) {
+      const [upVotes, downVotes] = getStats(message, settings);
+      doc.stats.upvotes = upVotes;
+      doc.stats.downvotes = downVotes;
+      fields.push({ name: "Stats", value: getVotesMessage(upVotes, downVotes) });
+    } else {
+      fields.push(statsField);
+    }
   }
 
   // update reason
   if (reason) fields.push({ name: "Reason", value: "```" + reason + "```" });
 
-  rejectedEmbed.addFields(fields);
+  if (fields.length) rejectedEmbed.addFields(fields);
 
   try {
     doc.status = "REJECTED";
     doc.status_updates.push({ user_id: member.id, status: "REJECTED", reason, timestamp: new Date() });
 
     let rejectChannel;
-    if (settings.suggestions.rejected_channel) {
+    if (settings.suggestions.move_processed !== false && settings.suggestions.rejected_channel) {
       rejectChannel = guild.channels.cache.get(settings.suggestions.rejected_channel);
     }
 

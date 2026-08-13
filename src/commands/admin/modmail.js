@@ -290,10 +290,14 @@ async function contact(interaction, settings, content) {
 
   await thread.send({
     embeds: [
-      modmailHandler.buildIncomingEmbed(interaction.user, {
-        content,
-        attachments: new Map(),
-      }),
+      modmailHandler.buildIncomingEmbed(
+        interaction.user,
+        {
+          content,
+          attachments: new Map(),
+        },
+        settings.modmail
+      ),
     ],
   });
 
@@ -321,7 +325,8 @@ async function reply(interaction, settings, content) {
     interaction.guild,
     interaction.member.displayName,
     content,
-    settings.modmail.anonymous
+    settings.modmail.anonymous,
+    settings.modmail
   );
 
   const sent = await user.send({ embeds: [embed] }).catch(() => null);

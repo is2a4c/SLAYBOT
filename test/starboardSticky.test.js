@@ -62,6 +62,46 @@ test("the mirror carries the jump link, the count and the first image", () => {
   assert.match(embed.fields[0].value, /log\.txt/);
 });
 
+test("the guild can trim and hide individual starboard card parts", () => {
+  const attachments = new Map([
+    ["1", { id: "1", name: "shot.png", contentType: "image/png", url: "https://cdn/shot.png" }],
+  ]);
+  attachments.find = (fn) => [...attachments.values()].find(fn);
+  attachments.filter = (fn) => {
+    const kept = [...attachments.values()].filter(fn);
+    return { size: kept.length, map: (mapper) => kept.map(mapper) };
+  };
+
+  const payload = buildStarboardMessage(
+    {
+      content: "x".repeat(500),
+      url: "https://discord.com/channels/1/2/3",
+      channelId: "2",
+      createdAt: new Date("2026-07-30T00:00:00.000Z"),
+      author: { username: "ann", globalName: null, displayAvatarURL: () => "https://cdn/avatar.png" },
+      attachments,
+    },
+    7,
+    {
+      emoji: "⭐",
+      content_length: 100,
+      show_author: false,
+      show_source: false,
+      show_jump_link: false,
+      show_images: false,
+      show_attachments: true,
+      show_timestamp: false,
+    }
+  );
+
+  assert.equal(payload.content, "⭐ **7**");
+  assert.equal(payload.embeds[0].data.description.length, 100);
+  assert.equal(payload.embeds[0].data.author, undefined);
+  assert.equal(payload.embeds[0].data.image, undefined);
+  assert.match(payload.embeds[0].data.fields[0].value, /shot\.png/);
+  assert.equal(payload.embeds[0].data.timestamp, undefined);
+});
+
 /* ------------------------------------------------------------ sticky messages */
 
 const sticky = (overrides = {}) => ({

@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+require("module-alias/register");
 
 const {
   canCloseTicket,
@@ -10,6 +11,12 @@ const {
   syncCategoryStaffRoleAccess,
   syncStaffRoleAccess,
 } = require("../src/helpers/TicketPermissions");
+const { requiredClosePermissions } = require("../src/handlers/ticket");
+
+test("closing without transcripts does not require message history", () => {
+  assert.deepEqual(requiredClosePermissions({ transcripts: false }), ["ManageChannels"]);
+  assert.deepEqual(requiredClosePermissions({ transcripts: true }), ["ManageChannels", "ReadMessageHistory"]);
+});
 
 function member(roleIds = [], permissions = []) {
   return {

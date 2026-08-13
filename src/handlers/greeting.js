@@ -62,6 +62,10 @@ const buildGreeting = async (member, type, config, inviterData) => {
 
   // build embed
   const embed = new EmbedBuilder();
+  if (config.embed.title) embed.setTitle(await parse(config.embed.title, member, inviterData));
+  if (config.embed.author) {
+    embed.setAuthor({ name: await parse(config.embed.author, member, inviterData) });
+  }
   if (config.embed.description) {
     const parsed = await parse(config.embed.description, member, inviterData);
     embed.setDescription(parsed);
@@ -76,9 +80,16 @@ const buildGreeting = async (member, type, config, inviterData) => {
     const parsed = await parse(config.embed.image, member);
     embed.setImage(parsed);
   }
+  if (config.embed.timestamp) embed.setTimestamp();
 
   // set default message
-  if (!config.content && !config.embed.description && !config.embed.footer) {
+  const hasEmbed = ["title", "author", "description", "color", "thumbnail", "footer", "image", "timestamp"].some(
+    (key) => {
+      const value = config.embed?.[key];
+      return value !== null && value !== undefined && value !== false && value !== "";
+    }
+  );
+  if (!config.content && !hasEmbed) {
     content =
       type === "WELCOME"
         ? `Welcome to the server, ${member.displayName} 🎉`
@@ -97,6 +108,7 @@ const buildGreeting = async (member, type, config, inviterData) => {
 async function sendWelcome(member, inviterData = {}) {
   const config = (await getSettings(member.guild))?.welcome;
   if (!config || !config.enabled) return;
+  if (member.user.bot && !config.allow_bots) return;
 
   // check if channel exists
   const channel = member.guild.channels.cache.get(config.channel);
@@ -116,6 +128,7 @@ async function sendWelcome(member, inviterData = {}) {
 async function sendFarewell(member, inviterData = {}) {
   const config = (await getSettings(member.guild))?.farewell;
   if (!config || !config.enabled) return;
+  if (member.user.bot && !config.allow_bots) return;
 
   // check if channel exists
   const channel = member.guild.channels.cache.get(config.channel);
