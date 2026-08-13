@@ -12,7 +12,11 @@ const ecosystem = new EcosystemService();
  */
 const getVoiceStateKey = (guildId, memberId) => `${guildId}|${memberId}`;
 
-const xpToAdd = () => getRandomInt(19) + 1;
+const xpToAdd = (config = {}) => {
+  const min = Math.min(1000, Math.max(0, Number(config.min_per_message ?? 1)));
+  const max = Math.min(1000, Math.max(min, Number(config.max_per_message ?? 19)));
+  return getRandomInt(max - min + 1) + min;
+};
 
 /**
  * @param {string} content
@@ -54,7 +58,8 @@ module.exports = {
     const key = `${message.guildId}|${message.member.id}`;
     if (cooldownCache.has(key)) {
       const difference = (Date.now() - cooldownCache.get(key)) * 0.001;
-      if (difference < message.client.config.STATS.XP_COOLDOWN) {
+      const cooldown = settings?.stats?.xp?.cooldown_seconds ?? message.client.config.STATS.XP_COOLDOWN;
+      if (difference < cooldown) {
         await statsDb.save();
         return;
       }
@@ -62,17 +67,18 @@ module.exports = {
     }
 
     // Update member's XP in DB
-    const earnedXp = xpToAdd();
+    const earnedXp = xpToAdd(settings?.stats?.xp);
     statsDb.xp += earnedXp;
 
     // Check if member has levelled up
     let { xp, level } = statsDb;
-    let needed = level * level * 100;
+    const multiplier = Math.min(10000, Math.max(10, Number(settings?.stats?.xp?.level_multiplier) || 100));
+    let needed = level * level * multiplier;
 
     while (xp >= needed) {
       level += 1;
       xp -= needed;
-      needed = level * level * 100;
+      needed = level * level * multiplier;
     }
 
     if (level !== statsDb.level) {

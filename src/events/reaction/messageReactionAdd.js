@@ -33,9 +33,10 @@ module.exports = async (client, reaction, user) => {
   // Handle Reaction Emojis
   if (!emoji.id) {
     // Translation By Flags
-    if (message.content && (await getSettings(message.guild)).flag_translation.enabled) {
+    const settings = message.guild ? await getSettings(message.guild) : null;
+    if (message.content && settings?.flag_translation.enabled) {
       if (isValidEmoji(emoji.name)) {
-        translationHandler.handleFlagReaction(emoji.name, message, user);
+        translationHandler.handleFlagReaction(emoji.name, message, user, settings);
       }
     }
   }

@@ -114,7 +114,7 @@ async function handleAnnouncement(payload, { client, task }) {
             await grantTempRole({
               member,
               role,
-              durationMs: 24 * 60 * 60 * 1000,
+              durationMs: Math.min(168, Math.max(1, Number(config.role_duration_hours) || 24)) * 60 * 60 * 1000,
               reason: "Birthday",
             }).catch(() => {});
           }

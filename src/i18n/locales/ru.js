@@ -43,6 +43,12 @@ module.exports = {
         ru: "русский",
         en: "английский",
       },
+      filterMode: { CONTAINS: "содержит фразу", WORD: "целое слово", EXACT: "всё сообщение целиком" },
+      linkMode: {
+        ALL: "блокировать все",
+        ALLOWLIST: "разрешать только список",
+        BLOCKLIST: "блокировать только список",
+      },
     },
 
     hub: {
@@ -77,6 +83,24 @@ module.exports = {
         brandColor: "Цвет оформления",
         brandFooter: "Подпись под эмбедом",
         brandIcon: "Иконка оформления",
+        xpCooldown: "Пауза XP, секунд",
+        xpMin: "Минимум XP",
+        xpMax: "Максимум XP",
+        xpMultiplier: "Множитель уровней",
+        translationCooldown: "Пауза перевода, секунд",
+        tuning: "Тонкая настройка XP",
+      },
+    },
+
+    servertuning: {
+      title: "XP и переводы",
+      description: "Скорость набора уровней и пауза между переводами по флагам.",
+      fields: {
+        xpCooldown: "Пауза XP, секунд",
+        xpMin: "Минимум XP",
+        xpMax: "Максимум XP",
+        xpMultiplier: "Множитель уровней",
+        translationCooldown: "Пауза перевода, секунд",
       },
     },
 
@@ -166,6 +190,10 @@ module.exports = {
         description: "Описание панели",
         panel: "Разместить панель",
         categories: "Категории тикетов",
+        categoryTimeout: "Ожидание категории, секунд",
+        channelTemplate: "Шаблон имени канала",
+        openingMessage: "Первое сообщение",
+        closeLabel: "Текст кнопки закрытия",
       },
     },
 
@@ -184,6 +212,8 @@ module.exports = {
         button: "Текст кнопки",
         panel: "Разместить панель",
         color: "Цвет панели",
+        challengeTtl: "Срок капчи, минут",
+        maxTries: "Попыток ввода",
       },
     },
 
@@ -238,6 +268,26 @@ module.exports = {
         whitelistChannels: "Каналы без автомода",
         whitelistRoles: "Роли без антиспама",
         whitelistUsers: "Участники без антиспама",
+        filters: "Фильтры и списки",
+      },
+    },
+
+    automodfilters: {
+      title: "Фильтры автомодерации",
+      description: "Запрещённые фразы, исключения, ссылки, приглашения и точные параметры антиспама.",
+      fields: {
+        enabled: "Включить словарь",
+        terms: "Запрещённые слова и фразы",
+        exceptions: "Исключения из словаря",
+        matchMode: "Как искать совпадение",
+        caseSensitive: "Учитывать регистр",
+        delete: "Удалять совпавшее сообщение",
+        strikes: "Страйков за совпадение",
+        spamWindow: "Окно повторов, секунд",
+        spamRepeats: "Повторов до срабатывания",
+        linkMode: "Режим фильтра ссылок",
+        linkDomains: "Домены ссылок",
+        inviteCodes: "Разрешённые коды приглашений",
       },
     },
 
@@ -278,6 +328,9 @@ module.exports = {
         staff: "Роли поддержки",
         anonymous: "Скрывать имя стаффа",
         mirror: "Пересылать ответы",
+        threadTemplate: "Шаблон имени треда",
+        notePrefix: "Префикс внутренней заметки",
+        mentionStaff: "Упоминать команду при открытии",
       },
     },
 
@@ -292,6 +345,7 @@ module.exports = {
         hour: "Час объявления",
         offset: "Смещение UTC",
         color: "Цвет",
+        roleDuration: "Длительность роли, часов",
       },
     },
 

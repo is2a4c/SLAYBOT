@@ -162,16 +162,17 @@ module.exports = {
     }
 
     const code = generateCode(config.captcha_length || 6);
+    const ttlMinutes = Math.min(60, Math.max(1, Number(config.challenge_ttl_minutes) || 10));
     await startChallenge({
       guildId: interaction.guildId,
       userId: interaction.user.id,
       code,
-      ttlMs: CHALLENGE_TTL_MS,
+      ttlMs: ttlMinutes * 60 * 1000,
     });
 
     const image = await renderCaptchaImage(code);
     await interaction.editReply({
-      content: "Read the code from the image, then press **Enter code** and type it in. It expires in 10 minutes.",
+      content: `Read the code from the image, then press **Enter code** and type it in. It expires in ${ttlMinutes} minute${ttlMinutes === 1 ? "" : "s"}.`,
       files: [image],
       components: [
         new ActionRowBuilder().addComponents(
@@ -218,7 +219,8 @@ module.exports = {
 
     if (!matchesCode(challenge.code, interaction.fields.getTextInputValue("code"))) {
       const updated = await registerTry(interaction.guildId, interaction.user.id);
-      const left = MAX_TRIES - (updated?.tries || 1);
+      const maxTries = Math.min(10, Math.max(1, Number(config.max_tries) || MAX_TRIES));
+      const left = maxTries - (updated?.tries || 1);
 
       if (left <= 0) {
         await clearChallenge(interaction.guildId, interaction.user.id).catch(() => {});

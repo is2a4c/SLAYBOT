@@ -52,6 +52,9 @@
             <a class="nav-item <%= routeActive(guildRoot + "/config") ? "active" : "" %>" href="<%= basePath + guildRoot %>/config" <%- routeActive(guildRoot + "/config") ? 'aria-current="page"' : "" %>>
               <%- include("icon", { name: "settings" }) %><span><%= t("nav.config") %></span>
             </a>
+            <a class="nav-item <%= routeActive(guildRoot + "/advanced") ? "active" : "" %>" href="<%= basePath + guildRoot %>/advanced" <%- routeActive(guildRoot + "/advanced") ? 'aria-current="page"' : "" %>>
+              <%- include("icon", { name: "command" }) %><span><%= t("nav.advanced") %></span>
+            </a>
           <% } %>
           <% if (canGuild("automod.edit")) { %>
             <a class="nav-item <%= routeActive(guildRoot + "/automod") ? "active" : "" %>" href="<%= basePath + guildRoot %>/automod" <%- routeActive(guildRoot + "/automod") ? 'aria-current="page"' : "" %>>

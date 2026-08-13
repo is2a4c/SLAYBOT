@@ -6,6 +6,8 @@ const { requireCsrf } = require("../../auth/csrf");
 
 const SNOWFLAKE = /^\d{17,20}$/;
 const VALID_ACTIONS = ["TIMEOUT", "KICK", "BAN"];
+const FILTER_MODES = ["CONTAINS", "WORD", "EXACT"];
+const LINK_MODES = ["ALL", "ALLOWLIST", "BLOCKLIST"];
 
 function parseIdList(raw, validate) {
   return String(raw || "")
@@ -46,6 +48,19 @@ router.post("/", requireCsrf, async (req, res) => {
     "automod.anti_spam": body.anti_spam === "on",
     "automod.anti_ghostping": body.anti_ghostping === "on",
     "automod.anti_image_spam": body.anti_image_spam === "on",
+    "automod.debug": body.debug === "on",
+    "automod.filter_enabled": body.filter_enabled === "on",
+    "automod.filter_terms": String(body.filter_terms || "").slice(0, 4000),
+    "automod.filter_exceptions": String(body.filter_exceptions || "").slice(0, 4000),
+    "automod.filter_match_mode": FILTER_MODES.includes(body.filter_match_mode) ? body.filter_match_mode : "CONTAINS",
+    "automod.filter_case_sensitive": body.filter_case_sensitive === "on",
+    "automod.filter_delete": body.filter_delete === "on",
+    "automod.filter_strikes": clampInt(body.filter_strikes, 0, 10, 1),
+    "automod.spam_window_seconds": clampInt(body.spam_window_seconds, 1, 300, 3),
+    "automod.spam_max_repeats": clampInt(body.spam_max_repeats, 2, 20, 2),
+    "automod.link_mode": LINK_MODES.includes(body.link_mode) ? body.link_mode : "ALL",
+    "automod.link_domains": String(body.link_domains || "").slice(0, 4000),
+    "automod.allowed_invite_codes": String(body.allowed_invite_codes || "").slice(0, 4000),
     "automod.image_spam_threshold": clampInt(body.image_spam_threshold, 50, 100, 70),
     "automod.anti_massmention": clampInt(body.anti_massmention, 0, 50, 0),
     "automod.max_lines": clampInt(body.max_lines, 0, 50, 0),
@@ -53,6 +68,10 @@ router.post("/", requireCsrf, async (req, res) => {
     "automod.max_role_mentions": clampInt(body.max_role_mentions, 0, 20, 3),
     "automod.spam_whitelist_roles": parseIdList(body.spam_whitelist_roles, (id) => guild.roles.cache.has(id)),
     "automod.spam_whitelist_users": parseIdList(body.spam_whitelist_users, () => true),
+    "automod.wh_channels": parseIdList(body.wh_channels, (id) => {
+      const channel = guild.channels.cache.get(id);
+      return channel?.isTextBased() && !channel.isThread();
+    }),
   };
 
   await applyGuildConfigPatch(guild, patch, {

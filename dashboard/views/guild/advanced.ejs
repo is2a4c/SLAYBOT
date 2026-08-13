@@ -1,0 +1,36 @@
+<%- include("../partials/head", { title, guild }) %>
+<header class="page-header"><div class="page-heading">
+  <p class="eyebrow"><%= t("nav.management") %></p>
+  <h1><%= t("advanced.title") %></h1>
+  <p class="subtitle"><%= t("advanced.subtitle") %></p>
+</div></header>
+
+<form class="advanced-form" method="post" action="<%= basePath %>/g/<%= guild.id %>/advanced">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+  <% sections.forEach((section, index) => { %>
+    <details class="panel settings-section" <%= index === 0 ? "open" : "" %>>
+      <summary><span><%= t(`advanced.sections.${section.id}`) %></span><small><%= t("advanced.fieldCount", { count: section.fields.length }) %></small></summary>
+      <div class="settings-section-body form-grid">
+        <% section.fields.forEach((field) => { const inputId = `advanced_${field.id}`; %>
+          <% if (field.type === "toggle") { %>
+            <div class="checkbox-field field"><input type="checkbox" id="<%= inputId %>" name="<%= field.id %>" <%= field.value ? "checked" : "" %> /><label for="<%= inputId %>"><%= t(`advanced.fields.${field.id}`) %></label></div>
+          <% } else if (field.type === "choice") { %>
+            <div class="field"><label for="<%= inputId %>"><%= t(`advanced.fields.${field.id}`) %></label><select id="<%= inputId %>" name="<%= field.id %>"><% if (field.nullable) { %><option value=""><%= t("advanced.followDiscord") %></option><% } %><% field.choices.forEach((entry) => { %><option value="<%= entry %>" <%= field.value === entry ? "selected" : "" %>><%= entry %></option><% }) %></select></div>
+          <% } else if (field.type === "channel") { const list = options[field.channelKind] || options.text; %>
+            <div class="field"><label for="<%= inputId %>"><%= t(`advanced.fields.${field.id}`) %></label><select id="<%= inputId %>" name="<%= field.id %>"><option value=""><%= t("common.notSelected") %></option><% list.forEach((entry) => { %><option value="<%= entry.id %>" <%= field.value === entry.id ? "selected" : "" %>><%= field.channelKind === "text" ? "#" : "" %><%= entry.name %></option><% }) %></select></div>
+          <% } else if (field.type === "role") { %>
+            <div class="field"><label for="<%= inputId %>"><%= t(`advanced.fields.${field.id}`) %></label><select id="<%= inputId %>" name="<%= field.id %>"><option value=""><%= t("common.notSelected") %></option><% options.roles.forEach((entry) => { %><option value="<%= entry.id %>" <%= field.value === entry.id ? "selected" : "" %>>@<%= entry.name %></option><% }) %></select></div>
+          <% } else if (field.type === "roleList" || field.type === "channelList") { %>
+            <div class="field"><label for="<%= inputId %>"><%= t(`advanced.fields.${field.id}`) %></label><input type="text" id="<%= inputId %>" name="<%= field.id %>" value="<%= (field.value || []).join(', ') %>" /><div class="hint"><%= t("advanced.idListHint") %></div></div>
+          <% } else if (field.multiline) { %>
+            <div class="field field-wide"><label for="<%= inputId %>"><%= t(`advanced.fields.${field.id}`) %></label><textarea id="<%= inputId %>" name="<%= field.id %>" rows="4" maxlength="<%= field.maxLength %>"><%= field.value || "" %></textarea></div>
+          <% } else { %>
+            <div class="field"><label for="<%= inputId %>"><%= t(`advanced.fields.${field.id}`) %></label><input type="<%= field.type === 'number' ? 'number' : 'text' %>" id="<%= inputId %>" name="<%= field.id %>" value="<%= field.value ?? '' %>" <% if (field.type === "number") { %>min="<%= field.min %>" max="<%= field.max %>"<% } else { %>maxlength="<%= field.maxLength %>"<% } %> /></div>
+          <% } %>
+        <% }) %>
+      </div>
+    </details>
+  <% }) %>
+  <div class="panel sticky-save"><span class="hint"><%= t("advanced.saveHint") %></span><button type="submit" class="btn"><%= t("common.save") %></button></div>
+</form>
+<%- include("../partials/foot") %>

@@ -60,6 +60,32 @@ test("every panel field points at a setting the schema actually has", () => {
   }
 });
 
+test("every editable guild setting is reachable from the control panel", () => {
+  const exposed = new Set(everyField().map(({ path }) => path));
+  const internal = new Set([
+    "data.name",
+    "data.region",
+    "data.owner",
+    "data.joinedAt",
+    "data.leftAt",
+    "data.bots",
+    "data.inviteUrl",
+    "ticket.panel_message_id",
+    "temp_voice.panel_message_id",
+    "verification.message_id",
+  ]);
+  // These are collection editors opened from their parent settings panel.
+  const collections = new Set(["ticket.categories", "invite.ranks", "counters", "voice_roles.channels"]);
+
+  for (const path of Object.keys(schema.paths)) {
+    if (path === "_id" || path === "__v" || path.includes(".$*")) continue;
+    assert.ok(
+      exposed.has(path) || internal.has(path) || collections.has(path),
+      `editable setting "${path}" is not reachable from a control panel`
+    );
+  }
+});
+
 test("every panel field matches the shape of the setting it writes", () => {
   for (const { name, field, path } of everyField()) {
     const declared = schema.path(path).instance || "Mixed";

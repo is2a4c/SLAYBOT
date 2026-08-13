@@ -110,9 +110,15 @@ async function ensureThread({ guild, user, settings }) {
     await closeThread({ guildId: guild.id, threadId: existing.thread_id, closedBy: null, reason: "thread deleted" });
   }
 
+  const threadName = String(config.thread_name_template || "{username}-{id4}")
+    .replace(/{username}/g, user.username)
+    .replace(/{name}/g, user.globalName || user.username)
+    .replace(/{id}/g, user.id)
+    .replace(/{id4}/g, user.id.slice(-4))
+    .slice(0, 100);
   const thread = await channel.threads
     .create({
-      name: `${user.username}-${user.id.slice(-4)}`.slice(0, 100),
+      name: threadName || `${user.username}-${user.id.slice(-4)}`,
       type: ChannelType.PrivateThread,
       invitable: false,
       reason: `Modmail thread for ${user.id}`,
@@ -134,7 +140,8 @@ async function ensureThread({ guild, user, settings }) {
       ].join("\n")
     );
 
-  const mentions = (config.staff_roles || []).map((roleId) => `<@&${roleId}>`).join(" ");
+  const mentions =
+    config.mention_staff === false ? "" : (config.staff_roles || []).map((roleId) => `<@&${roleId}>`).join(" ");
   await thread.send({ content: mentions || undefined, embeds: [intro] }).catch(() => {});
 
   return { thread, record, error: null };
@@ -219,7 +226,8 @@ module.exports = {
     if (!message.channel.isThread()) return;
     if (message.channel.parentId !== settings.modmail.channel_id) return;
     // A leading dot marks an internal note that is not forwarded.
-    if (message.content.startsWith(".")) return;
+    const notePrefix = settings.modmail.internal_note_prefix ?? ".";
+    if (notePrefix && message.content.startsWith(notePrefix)) return;
 
     const record = await getThreadById(message.guildId, message.channelId);
     if (!record?.open) return;

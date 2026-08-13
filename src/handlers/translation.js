@@ -11,14 +11,15 @@ const cooldownCache = new Map();
 /**
  * @param {import('discord.js').User} user
  */
-const getTranslationCooldown = (user) => {
-  if (cooldownCache.has(user.id)) {
-    const remaining = (Date.now() - cooldownCache.get(user.id)) * 0.001;
-    if (remaining > TRANSLATE_COOLDOWN) {
-      cooldownCache.delete(user.id);
+const getTranslationCooldown = (user, guildId, cooldownSeconds = TRANSLATE_COOLDOWN) => {
+  const key = `${guildId || "dm"}|${user.id}`;
+  if (cooldownCache.has(key)) {
+    const remaining = (Date.now() - cooldownCache.get(key)) * 0.001;
+    if (remaining > cooldownSeconds) {
+      cooldownCache.delete(key);
       return 0;
     }
-    return TRANSLATE_COOLDOWN - remaining;
+    return cooldownSeconds - remaining;
   }
   return 0;
 };
@@ -28,9 +29,13 @@ const getTranslationCooldown = (user) => {
  * @param {import("discord.js").Message} message
  * @param {import("discord.js").User} user
  */
-async function handleFlagReaction(emoji, message, user) {
+async function handleFlagReaction(emoji, message, user, settings = {}) {
   // cooldown check
-  const remaining = getTranslationCooldown(user);
+  const cooldownSeconds = Math.min(
+    3600,
+    Math.max(0, Number(settings?.flag_translation?.cooldown_seconds ?? TRANSLATE_COOLDOWN))
+  );
+  const remaining = getTranslationCooldown(user, message.guildId, cooldownSeconds);
   if (remaining > 0) {
     return message.channel.safeSend(`${user} You must wait ${timeformat(remaining)} before translating again!`, 5);
   }
@@ -79,12 +84,13 @@ async function handleFlagReaction(emoji, message, user) {
     });
 
   message.channel.safeSend({ embeds: [embed], components: [btnRow] }).then(
-    () => cooldownCache.set(user.id, Date.now()) // set cooldown
+    () => cooldownCache.set(`${message.guildId || "dm"}|${user.id}`, Date.now()) // set cooldown
   );
 
   logTranslation(message, emoji);
 }
 
 module.exports = {
+  getTranslationCooldown,
   handleFlagReaction,
 };

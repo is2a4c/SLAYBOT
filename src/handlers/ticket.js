@@ -25,12 +25,7 @@ const CLOSE_PERMS = ["ManageChannels", "ReadMessageHistory"];
  * @param {import('discord.js').Channel} channel
  */
 function isTicketChannel(channel) {
-  return (
-    channel.type === ChannelType.GuildText &&
-    channel.name.startsWith("tіcket-") &&
-    channel.topic &&
-    channel.topic.startsWith("tіcket|")
-  );
+  return channel.type === ChannelType.GuildText && channel.topic && channel.topic.startsWith("tіcket|");
 }
 
 /**
@@ -200,7 +195,7 @@ async function handleTicketOpen(interaction) {
       .awaitMessageComponent({
         componentType: ComponentType.StringSelect,
         filter: (i) => i.customId === "ticket-menu" && i.user.id === user.id && i.message.id === prompt.id,
-        time: 60 * 1000,
+        time: Math.min(300, Math.max(15, Number(settings.ticket.category_timeout_seconds) || 60)) * 1000,
       })
       .catch((err) => {
         if (err.message.includes("time")) return;
@@ -243,8 +238,14 @@ async function handleTicketOpen(interaction) {
       });
     }
 
+    const channelName = String(settings.ticket.channel_name_template || "tіcket-{number}")
+      .replace(/{number}/g, ticketNumber)
+      .replace(/{user}/g, user.username)
+      .replace(/{id}/g, user.id)
+      .replace(/[^\p{L}\p{N}_-]+/gu, "-")
+      .slice(0, 100);
     const tktChannel = await guild.channels.create({
-      name: `tіcket-${ticketNumber}`,
+      name: channelName || `tіcket-${ticketNumber}`,
       type: ChannelType.GuildText,
       topic: `tіcket|${user.id}|${catName || "Default"}`,
       permissionOverwrites,
@@ -253,16 +254,17 @@ async function handleTicketOpen(interaction) {
     const embed = new EmbedBuilder()
       .setAuthor({ name: `Ticket #${ticketNumber}` })
       .setDescription(
-        `Hello ${user.toString()}
-        Support will be with you shortly
-        ${catName ? `\n**Category:** ${catName}` : ""}
-        `
+        String(settings.ticket.opening_message || "Hello {member}\nSupport will be with you shortly\n{category}")
+          .replace(/{member}/g, user.toString())
+          .replace(/{username}/g, user.username)
+          .replace(/{category}/g, catName ? `**Category:** ${catName}` : "")
+          .slice(0, 4096)
       )
       .setFooter({ text: "You may close your ticket anytime by clicking the button below" });
 
     let buttonsRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel("Close Ticket")
+        .setLabel(String(settings.ticket.close_button_label || "Close Ticket").slice(0, 80))
         .setCustomId("TICKET_CLOSE")
         .setEmoji("🔒")
         .setStyle(ButtonStyle.Primary)

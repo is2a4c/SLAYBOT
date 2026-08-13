@@ -5,6 +5,7 @@ const { requireGuildAccess, requireGuildPermission } = require("../../auth/middl
 router.use(requireGuildAccess);
 
 router.use("/config", requireGuildPermission("config.edit"), require("./config"));
+router.use("/advanced", requireGuildPermission("config.edit"), require("./advanced"));
 router.use("/automod", requireGuildPermission("automod.edit"), require("./automod"));
 router.use("/commands", requireGuildPermission("guilds.view"), require("./commands"));
 router.use("/modlog", requireGuildPermission("audit.view"), require("./modlog"));

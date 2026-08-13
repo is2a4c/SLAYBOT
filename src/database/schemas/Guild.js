@@ -32,6 +32,10 @@ const Schema = new mongoose.Schema({
     xp: {
       message: { type: String, default: STATS.DEFAULT_LVL_UP_MSG },
       channel: String,
+      cooldown_seconds: { type: Number, default: 60, min: 0, max: 3600 },
+      min_per_message: { type: Number, default: 1, min: 0, max: 1000 },
+      max_per_message: { type: Number, default: 19, min: 0, max: 1000 },
+      level_multiplier: { type: Number, default: 100, min: 10, max: 10000 },
     },
   },
   ticket: {
@@ -47,6 +51,14 @@ const Schema = new mongoose.Schema({
       default: "Please click the button below to create a ticket",
       maxlength: 1000,
     },
+    category_timeout_seconds: { type: Number, default: 60, min: 15, max: 300 },
+    channel_name_template: { type: String, default: "tіcket-{number}", maxlength: 100 },
+    opening_message: {
+      type: String,
+      default: "Hello {member}\nSupport will be with you shortly\n{category}",
+      maxlength: 1000,
+    },
+    close_button_label: { type: String, default: "Close Ticket", maxlength: 80 },
     categories: [
       {
         _id: false,
@@ -73,6 +85,18 @@ const Schema = new mongoose.Schema({
       type: [String],
       default: [],
     },
+    spam_window_seconds: { type: Number, default: 3, min: 1, max: 300 },
+    spam_max_repeats: { type: Number, default: 2, min: 2, max: 20 },
+    filter_enabled: { type: Boolean, default: false },
+    filter_terms: { type: String, default: "", maxlength: 4000 },
+    filter_exceptions: { type: String, default: "", maxlength: 4000 },
+    filter_match_mode: { type: String, enum: ["CONTAINS", "WORD", "EXACT"], default: "CONTAINS" },
+    filter_case_sensitive: { type: Boolean, default: false },
+    filter_delete: { type: Boolean, default: true },
+    filter_strikes: { type: Number, default: 1, min: 0, max: 10 },
+    link_mode: { type: String, enum: ["ALL", "ALLOWLIST", "BLOCKLIST"], default: "ALL" },
+    link_domains: { type: String, default: "", maxlength: 4000 },
+    allowed_invite_codes: { type: String, default: "", maxlength: 4000 },
     anti_image_spam: { type: Boolean, default: false },
     image_spam_threshold: { type: Number, default: 70, min: 50, max: 100 },
     anti_ghostping: Boolean,
@@ -92,6 +116,7 @@ const Schema = new mongoose.Schema({
   },
   flag_translation: {
     enabled: Boolean,
+    cooldown_seconds: { type: Number, default: 120, min: 0, max: 3600 },
   },
   modlog_channel: String,
   max_warn: {
@@ -192,6 +217,9 @@ const Schema = new mongoose.Schema({
     anonymous: { type: Boolean, default: false },
     // Forward every staff message in the thread; a leading dot keeps it internal.
     mirror_replies: { type: Boolean, default: true },
+    thread_name_template: { type: String, default: "{username}-{id4}", maxlength: 100 },
+    internal_note_prefix: { type: String, default: ".", maxlength: 10 },
+    mention_staff: { type: Boolean, default: true },
   },
   verification: {
     enabled: { type: Boolean, default: false },
@@ -208,6 +236,8 @@ const Schema = new mongoose.Schema({
     button_label: { type: String, default: "Verify" },
     color: { type: String, default: null },
     captcha_length: { type: Number, default: 6, min: 4, max: 8 },
+    challenge_ttl_minutes: { type: Number, default: 10, min: 1, max: 60 },
+    max_tries: { type: Number, default: 3, min: 1, max: 10 },
   },
   birthdays: {
     enabled: { type: Boolean, default: false },
@@ -219,6 +249,7 @@ const Schema = new mongoose.Schema({
     // Local announcement hour and the guild's offset from UTC.
     hour: { type: Number, default: 9, min: 0, max: 23 },
     utc_offset: { type: Number, default: 0, min: -12, max: 14 },
+    role_duration_hours: { type: Number, default: 24, min: 1, max: 168 },
   },
   starboard: {
     enabled: { type: Boolean, default: false },

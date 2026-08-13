@@ -13,7 +13,86 @@ const {
 const { getAiService } = require("@src/services/ai/AiService");
 
 const antispamCache = new Map();
-const MESSAGE_SPAM_THRESHOLD = 3000;
+const DEFAULT_SPAM_WINDOW_SECONDS = 3;
+
+function splitFilterEntries(value, max = 100) {
+  return String(value || "")
+    .split(/[\n,]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .slice(0, max);
+}
+
+function normalizeFilterText(value, caseSensitive = false) {
+  const normalized = String(value || "").normalize("NFKC");
+  return caseSensitive ? normalized : normalized.toLocaleLowerCase();
+}
+
+function termMatches(content, term, mode) {
+  if (mode === "EXACT") return content.trim() === term.trim();
+  if (mode === "WORD") {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^\\p{L}\\p{N}_])${escaped}($|[^\\p{L}\\p{N}_])`, "u").test(content);
+  }
+  return content.includes(term);
+}
+
+function matchesContentFilter(content, automod) {
+  if (!automod?.filter_enabled || !content) return null;
+  const caseSensitive = Boolean(automod.filter_case_sensitive);
+  const normalized = normalizeFilterText(content, caseSensitive);
+  const mode = ["CONTAINS", "WORD", "EXACT"].includes(automod.filter_match_mode)
+    ? automod.filter_match_mode
+    : "CONTAINS";
+  const normalizeEntries = (value) =>
+    splitFilterEntries(value).map((entry) => normalizeFilterText(entry, caseSensitive));
+
+  if (normalizeEntries(automod.filter_exceptions).some((entry) => termMatches(normalized, entry, mode))) return null;
+  return normalizeEntries(automod.filter_terms).find((entry) => termMatches(normalized, entry, mode)) || null;
+}
+
+function extractLinkDomains(content) {
+  const matches = String(content || "").match(/(?:https?:\/\/|www\.)[^\s<>()]+/gi) || [];
+  return matches
+    .map((raw) => {
+      try {
+        return new URL(raw.startsWith("www.") ? `https://${raw}` : raw).hostname.toLowerCase().replace(/^www\./, "");
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+function domainMatches(hostname, configured) {
+  const domain = configured
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .split("/")[0];
+  return hostname === domain || hostname.endsWith(`.${domain}`);
+}
+
+function shouldBlockLinks(content, automod) {
+  if (!automod?.anti_links || !containsLink(content)) return false;
+  const mode = ["ALL", "ALLOWLIST", "BLOCKLIST"].includes(automod.link_mode) ? automod.link_mode : "ALL";
+  if (mode === "ALL") return true;
+  const domains = splitFilterEntries(automod.link_domains).map((entry) => entry.toLowerCase());
+  const hosts = extractLinkDomains(content);
+  if (mode === "ALLOWLIST")
+    return hosts.length === 0 || hosts.some((host) => !domains.some((item) => domainMatches(host, item)));
+  return hosts.some((host) => domains.some((item) => domainMatches(host, item)));
+}
+
+function shouldBlockInvites(content, automod) {
+  if (!automod?.anti_invites || !containsDiscordInvite(content)) return false;
+  const allowed = new Set(splitFilterEntries(automod.allowed_invite_codes).map((entry) => entry.toLowerCase()));
+  if (!allowed.size) return true;
+  const codes = [...String(content || "").matchAll(/(?:discord\.gg|discord(?:app)?\.com\/invite)\/([^\s/]+)/gi)].map(
+    (match) => match[1].replace(/[^\w-].*$/, "").toLowerCase()
+  );
+  return codes.length === 0 || codes.some((code) => !allowed.has(code));
+}
 
 function isAntiSpamWhitelisted(message, automod) {
   const userIds = automod.spam_whitelist_users || [];
@@ -30,27 +109,24 @@ function isAntiSpamWhitelisted(message, automod) {
   return false;
 }
 
-function isRepeatedMessage(message, timestamp = Date.now()) {
+function isRepeatedMessage(message, automod = {}, timestamp = Date.now()) {
   const key = message.author.id + "|" + message.guildId;
   const antispamInfo = antispamCache.get(key);
-  const repeated =
-    antispamInfo?.content === message.content && timestamp - antispamInfo.timestamp < MESSAGE_SPAM_THRESHOLD;
+  const windowMs =
+    Math.min(300, Math.max(1, Number(automod.spam_window_seconds) || DEFAULT_SPAM_WINDOW_SECONDS)) * 1000;
+  const maxRepeats = Math.min(20, Math.max(2, Number(automod.spam_max_repeats) || 2));
+  const sameWindow = antispamInfo?.content === message.content && timestamp - antispamInfo.timestamp < windowMs;
+  const repeats = sameWindow ? antispamInfo.repeats + 1 : 1;
 
-  if (!repeated) {
-    antispamCache.set(key, {
-      content: message.content,
-      timestamp,
-    });
-  }
-
-  return repeated;
+  antispamCache.set(key, { content: message.content, timestamp, repeats, windowMs });
+  return repeats >= maxRepeats;
 }
 
 // Cleanup the cache
 setInterval(
   () => {
     antispamCache.forEach((value, key) => {
-      if (Date.now() - value.timestamp > MESSAGE_SPAM_THRESHOLD) {
+      if (Date.now() - value.timestamp > (value.windowMs || DEFAULT_SPAM_WINDOW_SECONDS * 1000)) {
         antispamCache.delete(key);
       }
     });
@@ -195,7 +271,7 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
   const { automod } = settings;
   const ordinaryMember = shouldModerate(message);
 
-  if (automod.wh_channels.includes(message.channelId)) {
+  if ((automod.wh_channels || []).includes(message.channelId)) {
     return { triggered: false, deleted: false, strikes: 0 };
   }
   if (!automod.debug && !ordinaryMember) {
@@ -208,8 +284,21 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
   let shouldDelete = false;
   let strikesTotal = 0;
   let shadowTriggered = false;
+  let filterTriggered = false;
 
   const fields = [];
+
+  const filteredTerm = matchesContentFilter(content, automod);
+  if (filteredTerm) {
+    filterTriggered = true;
+    fields.push({
+      name: "Content Filter",
+      value: `Matched configured ${automod.filter_match_mode || "CONTAINS"} filter`,
+      inline: true,
+    });
+    shouldDelete ||= automod.filter_delete !== false;
+    strikesTotal += Math.min(10, Math.max(0, Number(automod.filter_strikes) || 0));
+  }
 
   // Debug mode intentionally exercises automod against moderators/owners too,
   // so a real message follows the same image-classification path as members.
@@ -288,7 +377,7 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
 
   // Anti links
   if (automod.anti_links) {
-    if (containsLink(content)) {
+    if (shouldBlockLinks(content, automod)) {
       fields.push({ name: "Links Found", value: "✓", inline: true });
       shouldDelete = true;
       strikesTotal += 1;
@@ -298,7 +387,7 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
   // Anti Spam
   const antiSpamWhitelisted = isAntiSpamWhitelisted(message, automod);
   if (automod.anti_spam && !antiSpamWhitelisted) {
-    if (isRepeatedMessage(message)) {
+    if (isRepeatedMessage(message, automod)) {
       fields.push({ name: "AntiSpam Detection", value: "✓", inline: true });
       shouldDelete = true;
       strikesTotal += 1;
@@ -307,7 +396,7 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
 
   // Anti Invites
   if (automod.anti_invites) {
-    if (containsDiscordInvite(content)) {
+    if (shouldBlockInvites(content, automod)) {
       fields.push({ name: "Discord Invites", value: "✓", inline: true });
       shouldDelete = true;
       strikesTotal += 1;
@@ -326,7 +415,7 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
     }
   }
 
-  if (strikesTotal > 0 || shadowTriggered) {
+  if (strikesTotal > 0 || shadowTriggered || filterTriggered) {
     // log to db
     const reason = fields.map((field) => field.name + ": " + field.value).join("\n");
     addAutoModLogToDb(member, content, reason, strikesTotal).catch(() => {});
@@ -384,7 +473,7 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
   }
 
   return {
-    triggered: strikesTotal > 0,
+    triggered: strikesTotal > 0 || filterTriggered,
     deleted,
     strikes: strikesTotal,
     shadowTriggered,
@@ -395,6 +484,10 @@ module.exports = {
   performAutomod,
   inspectImageSpam,
   inspectTextRisk,
+  matchesContentFilter,
+  shouldBlockInvites,
+  shouldBlockLinks,
+  splitFilterEntries,
   isAntiSpamWhitelisted,
   isRepeatedMessage,
   antispamCache,

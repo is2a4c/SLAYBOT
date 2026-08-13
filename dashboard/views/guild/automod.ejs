@@ -50,6 +50,10 @@
     <input type="checkbox" id="anti_image_spam" name="anti_image_spam" <%= settings.automod.anti_image_spam ? "checked" : "" %> />
     <label for="anti_image_spam">Image Spam Guard</label>
   </div>
+  <div class="checkbox-field field">
+    <input type="checkbox" id="debug" name="debug" <%= settings.automod.debug ? "checked" : "" %> />
+    <label for="debug"><%= t("automod.debug") %></label>
+  </div>
   </div>
   <div class="field">
     <label for="image_spam_threshold"><%= t("automod.imageSpamThreshold") %></label>
@@ -74,7 +78,37 @@
     <input type="number" id="max_role_mentions" name="max_role_mentions" min="0" max="20" value="<%= settings.automod.max_role_mentions %>" />
   </div>
 
+  <h2><%= t("automod.contentFiltersHeading") %></h2>
+  <div class="toggle-grid">
+    <div class="checkbox-field field"><input type="checkbox" id="filter_enabled" name="filter_enabled" <%= settings.automod.filter_enabled ? "checked" : "" %> /><label for="filter_enabled"><%= t("automod.filterEnabled") %></label></div>
+    <div class="checkbox-field field"><input type="checkbox" id="filter_case_sensitive" name="filter_case_sensitive" <%= settings.automod.filter_case_sensitive ? "checked" : "" %> /><label for="filter_case_sensitive"><%= t("automod.filterCaseSensitive") %></label></div>
+    <div class="checkbox-field field"><input type="checkbox" id="filter_delete" name="filter_delete" <%= settings.automod.filter_delete !== false ? "checked" : "" %> /><label for="filter_delete"><%= t("automod.filterDelete") %></label></div>
+  </div>
+  <div class="form-grid">
+    <div class="field field-wide"><label for="filter_terms"><%= t("automod.filterTerms") %></label><textarea id="filter_terms" name="filter_terms" rows="5" maxlength="4000"><%= settings.automod.filter_terms || "" %></textarea><div class="hint"><%= t("automod.filterListHint") %></div></div>
+    <div class="field field-wide"><label for="filter_exceptions"><%= t("automod.filterExceptions") %></label><textarea id="filter_exceptions" name="filter_exceptions" rows="3" maxlength="4000"><%= settings.automod.filter_exceptions || "" %></textarea></div>
+    <div class="field"><label for="filter_match_mode"><%= t("automod.filterMode") %></label><select id="filter_match_mode" name="filter_match_mode"><% ["CONTAINS", "WORD", "EXACT"].forEach((entry) => { %><option value="<%= entry %>" <%= settings.automod.filter_match_mode === entry ? "selected" : "" %>><%= t(`automod.filterModes.${entry}`) %></option><% }) %></select></div>
+    <div class="field"><label for="filter_strikes"><%= t("automod.filterStrikes") %></label><input type="number" id="filter_strikes" name="filter_strikes" min="0" max="10" value="<%= settings.automod.filter_strikes ?? 1 %>" /></div>
+  </div>
+
+  <h2><%= t("automod.linkFiltersHeading") %></h2>
+  <div class="form-grid">
+    <div class="field"><label for="link_mode"><%= t("automod.linkMode") %></label><select id="link_mode" name="link_mode"><% ["ALL", "ALLOWLIST", "BLOCKLIST"].forEach((entry) => { %><option value="<%= entry %>" <%= settings.automod.link_mode === entry ? "selected" : "" %>><%= t(`automod.linkModes.${entry}`) %></option><% }) %></select></div>
+    <div class="field field-wide"><label for="link_domains"><%= t("automod.linkDomains") %></label><textarea id="link_domains" name="link_domains" rows="3" maxlength="4000"><%= settings.automod.link_domains || "" %></textarea></div>
+    <div class="field field-wide"><label for="allowed_invite_codes"><%= t("automod.allowedInviteCodes") %></label><textarea id="allowed_invite_codes" name="allowed_invite_codes" rows="3" maxlength="4000"><%= settings.automod.allowed_invite_codes || "" %></textarea></div>
+  </div>
+
+  <h2><%= t("automod.spamTuningHeading") %></h2>
+  <div class="form-grid">
+    <div class="field"><label for="spam_window_seconds"><%= t("automod.spamWindow") %></label><input type="number" id="spam_window_seconds" name="spam_window_seconds" min="1" max="300" value="<%= settings.automod.spam_window_seconds ?? 3 %>" /></div>
+    <div class="field"><label for="spam_max_repeats"><%= t("automod.spamRepeats") %></label><input type="number" id="spam_max_repeats" name="spam_max_repeats" min="2" max="20" value="<%= settings.automod.spam_max_repeats ?? 2 %>" /></div>
+  </div>
+
   <h2><%= t("automod.whitelistHeading") %></h2>
+  <div class="field">
+    <label for="wh_channels"><%= t("automod.whitelistChannels") %></label>
+    <input type="text" id="wh_channels" name="wh_channels" value="<%= (settings.automod.wh_channels || []).join(', ') %>" />
+  </div>
   <div class="field">
     <label for="spam_whitelist_roles"><%= t("automod.whitelistRoles") %></label>
     <input type="text" id="spam_whitelist_roles" name="spam_whitelist_roles" value="<%= (settings.automod.spam_whitelist_roles || []).join(', ') %>" />

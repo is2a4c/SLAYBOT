@@ -133,12 +133,14 @@ const { HOME_ID } = require("./ids");
  */
 const SYSTEM_ICONS = {
   server: "🛠️",
+  servertuning: "🎚️",
   tempvoice: "🎙️",
   ticket: "🎫",
   verification: "🛡️",
   welcome: "👋",
   farewell: "🚪",
   automod: "🤖",
+  automodfilters: "🧹",
   starboard: "⭐",
   suggestions: "📝",
   modmail: "📬",
@@ -282,8 +284,22 @@ const PANELS = {
         validate: httpsUrl,
         example: "https://example.com/icon.png",
       }),
+      opens("tuning", "🎚️", "servertuning"),
     ],
   ]),
+
+  servertuning: {
+    ...system("servertuning", "", [
+      [
+        number("xpCooldown", "⏱️", "stats.xp.cooldown_seconds", 0, 3600),
+        number("xpMin", "➕", "stats.xp.min_per_message", 0, 1000),
+        number("xpMax", "📈", "stats.xp.max_per_message", 0, 1000),
+        number("xpMultiplier", "🧮", "stats.xp.level_multiplier", 10, 10000),
+        number("translationCooldown", "🌍", "flag_translation.cooldown_seconds", 0, 3600),
+      ],
+    ]),
+    hidden: true,
+  },
 
   tempvoice: system("tempvoice", "temp_voice", [
     [
@@ -312,7 +328,11 @@ const PANELS = {
     [
       channel("panel", "📮", "panel_channel_id", TEXT_CHANNELS, { after: publish.ticketPanel }),
       opens("categories", "🗂️", "ticketcategories"),
+      number("categoryTimeout", "⏱️", "category_timeout_seconds", 15, 300),
+      text("channelTemplate", "🏷️", "channel_name_template", { maxLength: 100 }),
+      text("closeLabel", "🔒", "close_button_label", { maxLength: 80 }),
     ],
+    [text("openingMessage", "💬", "opening_message", { long: true, maxLength: 1000 })],
   ]),
 
   verification: system("verification", "verification", [
@@ -330,7 +350,11 @@ const PANELS = {
       text("button", "🔡", "button_label", { maxLength: 60 }),
       channel("panel", "📮", "channel_id", TEXT_CHANNELS, { after: publish.verificationPanel }),
     ],
-    [text("color", "🎨", "color", { maxLength: 7, required: false, validate: color, example: "#A855F7" })],
+    [
+      text("color", "🎨", "color", { maxLength: 7, required: false, validate: color, example: "#A855F7" }),
+      number("challengeTtl", "⏳", "challenge_ttl_minutes", 1, 60),
+      number("maxTries", "🔁", "max_tries", 1, 10),
+    ],
   ]),
 
   welcome: system("welcome", "welcome", [
@@ -408,8 +432,33 @@ const PANELS = {
     [
       roleList("whitelistRoles", "🎫", "spam_whitelist_roles"),
       userList("whitelistUsers", "🙋", "spam_whitelist_users"),
+      opens("filters", "🧹", "automodfilters"),
     ],
   ]),
+
+  automodfilters: {
+    ...system("automodfilters", "automod", [
+      [
+        toggle("enabled", "🔘", "filter_enabled"),
+        text("terms", "🚫", "filter_terms", { long: true, maxLength: 4000, required: false }),
+        text("exceptions", "✅", "filter_exceptions", { long: true, maxLength: 4000, required: false }),
+        choice("matchMode", "🎯", "filter_match_mode", ["CONTAINS", "WORD", "EXACT"], "panels.choices.filterMode"),
+        toggle("caseSensitive", "🔤", "filter_case_sensitive"),
+      ],
+      [
+        toggle("delete", "🗑️", "filter_delete"),
+        number("strikes", "⚠️", "filter_strikes", 0, 10),
+        number("spamWindow", "⏱️", "spam_window_seconds", 1, 300),
+        number("spamRepeats", "🔁", "spam_max_repeats", 2, 20),
+        choice("linkMode", "🌐", "link_mode", ["ALL", "ALLOWLIST", "BLOCKLIST"], "panels.choices.linkMode"),
+      ],
+      [
+        text("linkDomains", "🔗", "link_domains", { long: true, maxLength: 4000, required: false }),
+        text("inviteCodes", "📨", "allowed_invite_codes", { long: true, maxLength: 4000, required: false }),
+      ],
+    ]),
+    hidden: true,
+  },
 
   starboard: system("starboard", "starboard", [
     [
@@ -445,6 +494,11 @@ const PANELS = {
       toggle("anonymous", "🕶️", "anonymous"),
       toggle("mirror", "🪞", "mirror_replies"),
     ],
+    [
+      text("threadTemplate", "🏷️", "thread_name_template", { maxLength: 100 }),
+      text("notePrefix", "🗒️", "internal_note_prefix", { maxLength: 10, required: false }),
+      toggle("mentionStaff", "📣", "mention_staff"),
+    ],
   ]),
 
   birthdays: system("birthdays", "birthdays", [
@@ -458,6 +512,7 @@ const PANELS = {
     [
       number("offset", "🌍", "utc_offset", -12, 14),
       text("color", "🎨", "color", { maxLength: 7, required: false, validate: color, example: "#A855F7" }),
+      number("roleDuration", "⏳", "role_duration_hours", 1, 168),
     ],
   ]),
 

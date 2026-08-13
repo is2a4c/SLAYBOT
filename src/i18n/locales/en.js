@@ -39,6 +39,8 @@ module.exports = {
         ru: "Russian",
         en: "English",
       },
+      filterMode: { CONTAINS: "contains phrase", WORD: "whole word", EXACT: "entire message" },
+      linkMode: { ALL: "block all", ALLOWLIST: "allow listed only", BLOCKLIST: "block listed only" },
       aiMode: {
         SHADOW: "watch only",
         ENFORCE: "act on it",
@@ -77,6 +79,24 @@ module.exports = {
         brandColor: "Accent colour",
         brandFooter: "Embed footer",
         brandIcon: "Panel icon",
+        xpCooldown: "XP cooldown, seconds",
+        xpMin: "Minimum XP",
+        xpMax: "Maximum XP",
+        xpMultiplier: "Level multiplier",
+        translationCooldown: "Translation cooldown, seconds",
+        tuning: "XP tuning",
+      },
+    },
+
+    servertuning: {
+      title: "XP and translations",
+      description: "Level progression speed and the cooldown between flag translations.",
+      fields: {
+        xpCooldown: "XP cooldown, seconds",
+        xpMin: "Minimum XP",
+        xpMax: "Maximum XP",
+        xpMultiplier: "Level multiplier",
+        translationCooldown: "Translation cooldown, seconds",
       },
     },
 
@@ -166,6 +186,10 @@ module.exports = {
         description: "Panel description",
         panel: "Post the panel",
         categories: "Ticket categories",
+        categoryTimeout: "Category timeout, seconds",
+        channelTemplate: "Channel name template",
+        openingMessage: "Opening message",
+        closeLabel: "Close button label",
       },
     },
 
@@ -184,6 +208,8 @@ module.exports = {
         button: "Button label",
         panel: "Post the panel",
         color: "Panel colour",
+        challengeTtl: "CAPTCHA lifetime, minutes",
+        maxTries: "Code attempts",
       },
     },
 
@@ -238,6 +264,26 @@ module.exports = {
         whitelistChannels: "Channels automod skips",
         whitelistRoles: "Roles antispam skips",
         whitelistUsers: "Members antispam skips",
+        filters: "Filters and lists",
+      },
+    },
+
+    automodfilters: {
+      title: "Automod filters",
+      description: "Blocked phrases, exceptions, link and invite lists, and exact anti-spam timing.",
+      fields: {
+        enabled: "Enable word filter",
+        terms: "Blocked words and phrases",
+        exceptions: "Word filter exceptions",
+        matchMode: "Match mode",
+        caseSensitive: "Case-sensitive matching",
+        delete: "Delete matching message",
+        strikes: "Strikes per match",
+        spamWindow: "Repeat window, seconds",
+        spamRepeats: "Repeats before triggering",
+        linkMode: "Link filter mode",
+        linkDomains: "Link domains",
+        inviteCodes: "Allowed invite codes",
       },
     },
 
@@ -278,6 +324,9 @@ module.exports = {
         staff: "Support roles",
         anonymous: "Hide staff names",
         mirror: "Forward replies",
+        threadTemplate: "Thread name template",
+        notePrefix: "Internal note prefix",
+        mentionStaff: "Mention staff on open",
       },
     },
 
@@ -292,6 +341,7 @@ module.exports = {
         hour: "Announcement hour",
         offset: "UTC offset",
         color: "Colour",
+        roleDuration: "Role duration, hours",
       },
     },
 
