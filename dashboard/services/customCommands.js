@@ -1,5 +1,6 @@
 const crypto = require("node:crypto");
 const { MAX_ACTIONS, MAX_CUSTOM_COMMANDS, model } = require("@schemas/CustomCommand");
+const { resolveComponentEmoji } = require("@helpers/SelfRoles");
 
 class CustomCommandError extends Error {
   constructor(message) {
@@ -88,16 +89,28 @@ async function updateCommand(guild, id, input, client, commandModel = model) {
 }
 
 function actionFromInput(guild, input) {
-  const type = input.type === "CHANGE_ROLES" ? "CHANGE_ROLES" : "SEND_MESSAGE";
+  const type = ["SEND_MESSAGE", "SEND_DM", "CHANGE_ROLES", "ADD_REACTION"].includes(input.type)
+    ? input.type
+    : "SEND_MESSAGE";
   const name =
     String(input.actionName || "")
       .trim()
-      .slice(0, 80) || (type === "SEND_MESSAGE" ? "Send message" : "Change roles");
+      .slice(0, 80) || type.toLowerCase().replaceAll("_", " ");
   if (type === "CHANGE_ROLES") {
     const addRoles = ids(guild, input.addRoles, "role");
     const removeRoles = ids(guild, input.removeRoles, "role").filter((id) => !addRoles.includes(id));
     if (!addRoles.length && !removeRoles.length) throw new CustomCommandError("Choose a role to add or remove.");
     return { id: crypto.randomUUID(), name, type, add_roles: addRoles, remove_roles: removeRoles };
+  }
+
+  if (type === "ADD_REACTION") {
+    try {
+      const emoji = resolveComponentEmoji(String(input.emoji || "").trim(), guild);
+      if (!emoji) throw new Error("missing emoji");
+      return { id: crypto.randomUUID(), name, type, emoji };
+    } catch {
+      throw new CustomCommandError("Choose one Unicode emoji or an emoji from this server.");
+    }
   }
 
   const content =
@@ -123,7 +136,10 @@ function actionFromInput(guild, input) {
     embed_title: embedTitle,
     embed_description: embedDescription,
     embed_color: color,
-    channel_id: channelId,
+    channel_id: type === "SEND_MESSAGE" ? channelId : null,
+    tts: input.tts === "on",
+    delete_after_seconds: Math.min(86400, Math.max(0, Number.parseInt(input.deleteAfterSeconds, 10) || 0)),
+    mention_roles: ids(guild, input.mentionRoles, "role"),
   };
 }
 

@@ -45,15 +45,36 @@ function messagePayload(action, context) {
   return {
     content,
     embeds,
-    allowedMentions: { users: [context.member.id], roles: [], parse: [] },
+    tts: Boolean(action.tts),
+    allowedMentions: { users: [context.member.id], roles: action.mention_roles || [], parse: [] },
   };
+}
+
+function scheduleDeletion(sent, seconds) {
+  const delay = Math.min(86400, Math.max(0, Number(seconds) || 0));
+  if (!sent?.delete || !delay) return;
+  setTimeout(() => sent.delete().catch(() => {}), delay * 1000).unref?.();
 }
 
 async function executeSendMessage(action, message, context) {
   const channel = action.channel_id ? message.guild.channels.cache.get(action.channel_id) : message.channel;
   if (!channel?.isTextBased?.()) return;
   const payload = messagePayload(action, context);
-  if (payload) await channel.send(payload);
+  if (payload) {
+    const sent = await channel.send(payload);
+    scheduleDeletion(sent, action.delete_after_seconds);
+  }
+}
+
+async function executeSendDm(action, message, context) {
+  const payload = messagePayload(action, context);
+  if (!payload) return;
+  const sent = await message.member.send(payload).catch(() => null);
+  scheduleDeletion(sent, action.delete_after_seconds);
+}
+
+async function executeAddReaction(action, message) {
+  if (action.emoji) await message.react(action.emoji).catch(() => {});
 }
 
 function manageableRoles(member, ids) {
@@ -80,7 +101,9 @@ async function executeCommand(command, message, args) {
   const context = { guild: message.guild, channel: message.channel, member: message.member, arguments: args };
   for (const action of command.actions || []) {
     if (action.type === "SEND_MESSAGE") await executeSendMessage(action, message, context);
+    if (action.type === "SEND_DM") await executeSendDm(action, message, context);
     if (action.type === "CHANGE_ROLES") await executeChangeRoles(action, message);
+    if (action.type === "ADD_REACTION") await executeAddReaction(action, message);
   }
 
   if (command.delete_invocation && message.deletable) await message.delete().catch(() => {});
@@ -111,8 +134,11 @@ async function tryCustomCommand(message, settings, dependencies = {}) {
 module.exports = {
   accessProblem,
   executeCommand,
+  executeAddReaction,
+  executeSendDm,
   manageableRoles,
   messagePayload,
   renderTemplate,
+  scheduleDeletion,
   tryCustomCommand,
 };

@@ -26,6 +26,7 @@ function guild() {
     name: "Test Server",
     channels: { cache: new Map([[CHANNEL_ID, { id: CHANNEL_ID, isTextBased: () => true, isThread: () => false }]]) },
     roles: { cache: new Map([[ROLE_ID, { id: ROLE_ID, managed: false, editable: true }]]) },
+    emojis: { cache: new Map() },
   };
 }
 
@@ -41,6 +42,8 @@ function message() {
   };
   server.channels.cache.set(CHANNEL_ID, channel);
   const roleCalls = [];
+  const directMessages = [];
+  const reactions = [];
   return {
     guild: server,
     guildId: GUILD_ID,
@@ -57,11 +60,18 @@ function message() {
         add: async (ids) => roleCalls.push(["add", ids]),
         remove: async (ids) => roleCalls.push(["remove", ids]),
       },
+      send: async (payload) => {
+        directMessages.push(payload);
+        return payload;
+      },
     },
     safeReply: async (payload) => sent.push(payload),
     deletable: false,
     sent,
     roleCalls,
+    directMessages,
+    reactions,
+    react: async (emoji) => reactions.push(emoji),
   };
 }
 
@@ -95,9 +105,12 @@ test("templates expose only documented invocation values and suppress broad ment
   const payload = messagePayload({ content: "Hi {member:mention} @everyone" }, context);
   assert.equal(payload.content, "Hi <@100000000000000003> @everyone");
   assert.deepEqual(payload.allowedMentions, { users: ["100000000000000003"], roles: [], parse: [] });
+  const controlled = messagePayload({ content: "<@&role>", mention_roles: [ROLE_ID], tts: true }, context);
+  assert.deepEqual(controlled.allowedMentions.roles, [ROLE_ID]);
+  assert.equal(controlled.tts, true);
 });
 
-test("runtime executes ordered message and role actions", async () => {
+test("runtime executes ordered channel, DM, reaction and role actions", async () => {
   const msg = message();
   const command = {
     _id: "command",
@@ -106,13 +119,38 @@ test("runtime executes ordered message and role actions", async () => {
     allowed_channels: [],
     actions: [
       { type: "SEND_MESSAGE", content: "Hello {member:name}" },
+      { type: "SEND_DM", content: "Private {member:name}" },
+      { type: "ADD_REACTION", emoji: "✅" },
       { type: "CHANGE_ROLES", add_roles: [ROLE_ID], remove_roles: [] },
     ],
   };
   const result = await executeCommand(command, msg, []);
   assert.equal(result.executed, true);
   assert.equal(msg.sent[0].content, "Hello Tester");
+  assert.equal(msg.directMessages[0].content, "Private Tester");
+  assert.deepEqual(msg.reactions, ["✅"]);
   assert.deepEqual(msg.roleCalls, [["add", [ROLE_ID]]]);
+});
+
+test("dashboard validates DM and reaction actions without accepting arbitrary action types", () => {
+  const dm = actionFromInput(guild(), {
+    type: "SEND_DM",
+    content: "Private",
+    channelId: CHANNEL_ID,
+    mentionRoles: [ROLE_ID],
+    tts: "on",
+    deleteAfterSeconds: "90",
+  });
+  assert.equal(dm.type, "SEND_DM");
+  assert.equal(dm.channel_id, null);
+  assert.equal(dm.tts, true);
+  assert.equal(dm.delete_after_seconds, 90);
+  assert.deepEqual(dm.mention_roles, [ROLE_ID]);
+
+  const reaction = actionFromInput(guild(), { type: "ADD_REACTION", emoji: "✅" });
+  assert.equal(reaction.emoji, "✅");
+  assert.throws(() => actionFromInput(guild(), { type: "ADD_REACTION", emoji: "not emoji" }), CustomCommandError);
+  assert.equal(actionFromInput(guild(), { type: "UNKNOWN", content: "safe fallback" }).type, "SEND_MESSAGE");
 });
 
 test("custom invocation honours feature switch, channel, and role access", async () => {

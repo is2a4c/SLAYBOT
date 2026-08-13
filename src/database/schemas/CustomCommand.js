@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const ACTION_TYPES = ["SEND_MESSAGE", "CHANGE_ROLES"];
+const ACTION_TYPES = ["SEND_MESSAGE", "SEND_DM", "CHANGE_ROLES", "ADD_REACTION"];
 const MAX_CUSTOM_COMMANDS = 50;
 const MAX_ACTIONS = 10;
 
@@ -14,6 +14,10 @@ const ActionSchema = new mongoose.Schema(
     embed_description: { type: String, default: null, maxlength: 4096 },
     embed_color: { type: String, default: null, maxlength: 7 },
     channel_id: { type: String, default: null },
+    tts: { type: Boolean, default: false },
+    delete_after_seconds: { type: Number, default: 0, min: 0, max: 86400 },
+    mention_roles: { type: [String], default: [] },
+    emoji: { type: String, default: null, maxlength: 100 },
     add_roles: { type: [String], default: [] },
     remove_roles: { type: [String], default: [] },
   },
