@@ -12,15 +12,13 @@ const musicIdleTimers = new Map();
 module.exports = async (client, oldState, newState) => {
   client.telemetry?.recordVoiceState(oldState, newState);
 
-  // Track voice stats
-  trackVoiceStats(oldState, newState).catch((ex) => client.logger.error("trackVoiceStats", ex));
-
   // Voice roles and temporary channels - only when the channel actually changed
   if (oldState.channelId !== newState.channelId) {
     const guild = newState.guild || oldState.guild;
 
     getSettings(guild)
       .then(async (settings) => {
+        await trackVoiceStats(oldState, newState, settings).catch((ex) => client.logger.error("trackVoiceStats", ex));
         await voiceRoleHandler
           .handleVoiceStateUpdate(oldState, newState, settings)
           .catch((ex) => client.logger.error("voiceRoles", ex));

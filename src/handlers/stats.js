@@ -1,6 +1,7 @@
 const { getMemberStats } = require("@schemas/MemberStats");
 const { getRandomInt } = require("@helpers/Utils");
 const { EcosystemService } = require("@src/services/ecosystem/EcosystemService");
+const { applyRoleRewards } = require("@src/services/stats/RoleRewards");
 
 const cooldownCache = new Map();
 const voiceStates = new Map();
@@ -72,6 +73,7 @@ module.exports = {
 
     // Check if member has levelled up
     let { xp, level } = statsDb;
+    const previousLevel = level;
     const multiplier = Math.min(10000, Math.max(10, Number(settings?.stats?.xp?.level_multiplier) || 100));
     let needed = level * level * multiplier;
 
@@ -93,6 +95,11 @@ module.exports = {
       lvlUpChannel.safeSend(lvlUpMessage);
     }
     await statsDb.save();
+    if (level !== previousLevel) {
+      await applyRoleRewards(message.member, settings?.stats?.rewards?.level, previousLevel, level).catch((error) => {
+        message.client.logger.warn(`Could not apply level rewards for ${message.member.id}: ${error.message}`);
+      });
+    }
     cooldownCache.set(key, Date.now());
     await ecosystemService
       .recordActivity({
@@ -123,7 +130,7 @@ module.exports = {
    * @param {import('discord.js').VoiceState} oldState
    * @param {import('discord.js').VoiceState} newState
    */
-  async trackVoiceStats(oldState, newState) {
+  async trackVoiceStats(oldState, newState, settings) {
     const oldChannel = oldState.channel;
     const newChannel = newState.channel;
     const now = Date.now();
@@ -148,9 +155,15 @@ module.exports = {
       const statsDb = await getMemberStats(member.guild.id, member.id);
       const key = getVoiceStateKey(member.guild.id, member.id);
       if (voiceStates.has(key)) {
+        const previousTime = statsDb.voice.time;
         const time = now - voiceStates.get(key);
         statsDb.voice.time += time / 1000; // add time in seconds
         await statsDb.save();
+        await applyRoleRewards(member, settings?.stats?.rewards?.voice, previousTime, statsDb.voice.time).catch(
+          (error) => {
+            member.client.logger.warn(`Could not apply voice rewards for ${member.id}: ${error.message}`);
+          }
+        );
         voiceStates.delete(key);
       }
     }

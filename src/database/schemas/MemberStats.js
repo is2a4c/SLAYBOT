@@ -40,6 +40,7 @@ const Schema = new mongoose.Schema(
 const Model = mongoose.models["member-stats"] ? mongoose.model("member-stats") : mongoose.model("member-stats", Schema);
 
 module.exports = {
+  model: Model,
   getMemberStats: async (guildId, memberId) => {
     const key = `${guildId}|${memberId}`;
     if (cache.contains(key)) return cache.get(key);

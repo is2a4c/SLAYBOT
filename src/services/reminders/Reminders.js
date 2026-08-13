@@ -26,9 +26,18 @@ function assertDelay(delayMs) {
 }
 
 /**
- * @param {{guildId: string, userId: string, channelId: string, content: string, delayMs: number, repeatMs?: number|null, dm?: boolean}} input
+ * @param {{guildId: string, userId: string, channelId: string, content: string, delayMs: number, repeatMs?: number|null, dm?: boolean, presentation?: object|null}} input
  */
-async function createReminder({ guildId, userId, channelId, content, delayMs, repeatMs = null, dm = false }) {
+async function createReminder({
+  guildId,
+  userId,
+  channelId,
+  content,
+  delayMs,
+  repeatMs = null,
+  dm = false,
+  presentation = null,
+}) {
   assertDelay(delayMs);
 
   const text = String(content || "").trim();
@@ -51,10 +60,47 @@ async function createReminder({ guildId, userId, channelId, content, delayMs, re
     type: TASK_TYPE,
     guildId,
     runAt: remindAt,
-    payload: { userId, channelId, content: text, repeatMs: repeatMs || null, dm: Boolean(dm) },
+    payload: {
+      userId,
+      channelId,
+      content: text,
+      repeatMs: repeatMs || null,
+      dm: Boolean(dm),
+      presentation: normalizePresentation(presentation),
+    },
   });
 
   return { remindAt };
+}
+
+function normalizePresentation(value) {
+  if (!value || typeof value !== "object") return null;
+  const color = /^#[0-9a-f]{6}$/i.test(String(value.color || "")) ? value.color : null;
+  const title =
+    String(value.title || "")
+      .trim()
+      .slice(0, 256) || null;
+  const footer =
+    String(value.footer || "")
+      .trim()
+      .slice(0, 2048) || null;
+  const mention = /^(NONE|CREATOR|EVERYONE|HERE|ROLE:\d{17,20})$/.test(String(value.mention || ""))
+    ? String(value.mention)
+    : "CREATOR";
+  const deleteAfterSeconds = Math.min(86400, Math.max(0, Number.parseInt(value.deleteAfterSeconds, 10) || 0));
+  return { title, footer, color, mention, tts: Boolean(value.tts), deleteAfterSeconds };
+}
+
+function reminderMention(payload) {
+  const mention = payload.presentation?.mention || "CREATOR";
+  if (mention === "NONE") return { content: null, allowedMentions: { parse: [] } };
+  if (mention === "EVERYONE") return { content: "@everyone", allowedMentions: { parse: ["everyone"] } };
+  if (mention === "HERE") return { content: "@here", allowedMentions: { parse: ["everyone"] } };
+  if (mention.startsWith("ROLE:")) {
+    const roleId = mention.slice(5);
+    return { content: `<@&${roleId}>`, allowedMentions: { roles: [roleId], parse: [] } };
+  }
+  return { content: `<@${payload.userId}>`, allowedMentions: { users: [payload.userId], parse: [] } };
 }
 
 /**
@@ -84,18 +130,29 @@ async function cancelReminder({ guildId, userId, index }) {
  * @param {{client: import('discord.js').Client, task: object}} context
  */
 async function handleReminder(payload, { client, task }) {
+  const presentation = normalizePresentation(payload.presentation);
   const embed = new EmbedBuilder()
     .setColor(EMBED_COLORS.BOT_EMBED)
-    .setAuthor({ name: "Reminder" })
+    .setAuthor({ name: presentation?.title || "Reminder" })
     .setDescription(payload.content)
-    .setFooter({ text: `Set ${new Date(task.created_at).toISOString().slice(0, 16).replace("T", " ")} UTC` });
+    .setFooter({
+      text: presentation?.footer || `Set ${new Date(task.created_at).toISOString().slice(0, 16).replace("T", " ")} UTC`,
+    });
+  if (presentation?.color) embed.setColor(presentation.color);
+
+  const mention = reminderMention({ ...payload, presentation });
+  const delivery = { ...mention, embeds: [embed], tts: Boolean(presentation?.tts) };
 
   let delivered = false;
 
   if (!payload.dm) {
     const channel = await client.channels.fetch(payload.channelId).catch(() => null);
     if (channel?.isTextBased()) {
-      delivered = Boolean(await channel.send({ content: `<@${payload.userId}>`, embeds: [embed] }).catch(() => null));
+      const sent = await channel.send(delivery).catch(() => null);
+      delivered = Boolean(sent);
+      if (sent && presentation?.deleteAfterSeconds) {
+        setTimeout(() => sent.delete().catch(() => {}), presentation.deleteAfterSeconds * 1000).unref?.();
+      }
     }
   }
 
@@ -148,5 +205,7 @@ module.exports = {
   describeReminder,
   handleReminder,
   listReminders,
+  normalizePresentation,
+  reminderMention,
   register,
 };

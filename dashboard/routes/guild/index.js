@@ -5,7 +5,11 @@ const { requireGuildAccess, requireGuildPermission } = require("../../auth/middl
 router.use(requireGuildAccess);
 
 router.use("/config", requireGuildPermission("config.edit"), require("./config"));
+router.use("/control", requireGuildPermission("config.edit"), require("./control"));
 router.use("/advanced", requireGuildPermission("config.edit"), require("./advanced"));
+router.use("/subscriptions", requireGuildPermission("config.edit"), require("./subscriptions"));
+router.use("/reminders", requireGuildPermission("config.edit"), require("./reminders"));
+router.use("/ranking", requireGuildPermission("config.edit"), require("./ranking"));
 router.use("/automod", requireGuildPermission("automod.edit"), require("./automod"));
 router.use("/commands", requireGuildPermission("guilds.view"), require("./commands"));
 router.use("/modlog", requireGuildPermission("audit.view"), require("./modlog"));

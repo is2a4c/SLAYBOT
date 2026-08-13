@@ -1,0 +1,30 @@
+<%- include("../partials/head", { title, guild }) %>
+<header class="page-header"><div class="page-heading"><p class="eyebrow"><%= t("ranking.eyebrow") %></p><h1><%= t("ranking.title") %></h1><p class="subtitle"><%= t("ranking.subtitle") %></p></div><span class="badge pass"><%= t("ranking.live") %></span></header>
+<% if (error) { %><div class="error-banner"><%= error %></div><% } %>
+
+<section class="panel collection-create"><h2><%= t("ranking.createReward") %></h2><form method="post" action="<%= basePath %>/g/<%= guild.id %>/ranking/rewards" class="form-grid">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+  <div class="field"><label for="reward-type"><%= t("ranking.rewardType") %></label><select id="reward-type" name="type"><option value="LEVEL"><%= t("ranking.levelReward") %></option><option value="VOICE"><%= t("ranking.voiceReward") %></option></select></div>
+  <div class="field"><label for="reward-threshold"><%= t("ranking.threshold") %></label><input id="reward-threshold" type="number" name="threshold" min="2" required /></div>
+  <div class="field"><label for="reward-add"><%= t("ranking.addRoles") %></label><select id="reward-add" name="addRoles" multiple size="5"><% roles.forEach((role) => { %><option value="<%= role.id %>">@<%= role.name %></option><% }) %></select></div>
+  <div class="field"><label for="reward-remove"><%= t("ranking.removeRoles") %></label><select id="reward-remove" name="removeRoles" multiple size="5"><% roles.forEach((role) => { %><option value="<%= role.id %>">@<%= role.name %></option><% }) %></select></div>
+  <div class="field field-wide"><p class="hint"><%= t("ranking.thresholdHint") %></p><button class="btn" type="submit"><%= t("common.create") %></button></div>
+</form></section>
+
+<section class="metric-grid ranking-reward-grid">
+  <% [["level", settings.stats?.rewards?.level || []], ["voice", settings.stats?.rewards?.voice || []]].forEach(([type, rewards]) => { %>
+    <article class="panel"><div class="section-heading"><h2><%= t(`ranking.${type}Rewards`) %></h2><span class="control-count"><%= rewards.length %></span></div>
+      <% if (!rewards.length) { %><div class="empty"><%= t("ranking.noRewards") %></div><% } else { %><div class="stack-list"><% rewards.forEach((reward) => { %>
+        <div class="stack-row"><div><strong><%= type === "voice" ? Math.round(reward.threshold / 60) + " min" : t("ranking.levelValue", { level: reward.threshold }) %></strong><small>+ <%= (reward.add_roles || []).map((id) => "@" + ((guild.roles.cache.get(id) || {}).name || id)).join(", ") || "—" %><br />− <%= (reward.remove_roles || []).map((id) => "@" + ((guild.roles.cache.get(id) || {}).name || id)).join(", ") || "—" %></small></div>
+        <form method="post" action="<%= basePath %>/g/<%= guild.id %>/ranking/rewards/<%= type %>/<%= reward.id %>/delete" data-confirm="<%= t('common.dangerousAction') %>"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><button class="btn danger" type="submit"><%= t("common.delete") %></button></form></div>
+      <% }) %></div><% } %>
+    </article>
+  <% }) %>
+</section>
+
+<section class="panel"><div class="section-heading"><div><p class="eyebrow"><%= t("ranking.membersEyebrow") %></p><h2><%= t("ranking.members") %></h2></div><span class="control-count"><%= leaderboard.length %></span></div>
+  <% if (!leaderboard.length) { %><div class="empty"><%= t("ranking.noMembers") %></div><% } else { %><div class="table-shell"><table><thead><tr><th><%= t("common.member") %></th><th><%= t("ranking.level") %></th><th>XP</th><th><%= t("ranking.voice") %></th><th></th></tr></thead><tbody>
+  <% leaderboard.forEach((entry) => { const formId = `ranking-member-${entry.member_id}`; %><tr><td><strong><%= entry.member?.displayName || entry.member_id %></strong><small class="table-note"><%= entry.member_id %></small></td><td><input form="<%= formId %>" class="table-input" type="number" name="level" min="1" max="10000" value="<%= entry.level %>" /></td><td><input form="<%= formId %>" class="table-input" type="number" name="xp" min="0" value="<%= entry.xp %>" /></td><td><input form="<%= formId %>" class="table-input" type="number" name="voiceMinutes" min="0" value="<%= Math.floor((entry.voice?.time || 0) / 60) %>" /></td><td><form id="<%= formId %>" method="post" action="<%= basePath %>/g/<%= guild.id %>/ranking/members/<%= entry.member_id %>"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><button class="btn secondary" type="submit"><%= t("common.save") %></button></form></td></tr><% }) %>
+  </tbody></table></div><% } %>
+</section>
+<%- include("../partials/foot") %>

@@ -1,0 +1,42 @@
+<%- include("../partials/head", { title, guild }) %>
+<header class="page-header"><div class="page-heading">
+  <p class="eyebrow"><%= t("subscriptions.eyebrow") %></p>
+  <h1><%= t("subscriptions.title") %></h1>
+  <p class="subtitle"><%= t("subscriptions.subtitle") %></p>
+</div><span class="badge pass"><%= t("subscriptions.live") %></span></header>
+
+<% if (error) { %><div class="error-banner"><%= error %></div><% } %>
+
+<section class="panel collection-create">
+  <h2><%= t("subscriptions.create") %></h2>
+  <form method="post" action="<%= basePath %>/g/<%= guild.id %>/subscriptions" class="form-grid">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <div class="field"><label for="subscription-type"><%= t("common.type") %></label><select id="subscription-type" name="type" required>
+      <% providers.forEach((provider) => { %><option value="<%= provider %>"><%= provider %></option><% }) %>
+    </select></div>
+    <div class="field"><label for="subscription-target"><%= t("subscriptions.target") %></label><input id="subscription-target" name="target" maxlength="300" required placeholder="<%= t('subscriptions.targetHint') %>" /></div>
+    <div class="field"><label for="subscription-channel"><%= t("common.channel") %></label><select id="subscription-channel" name="channelId" required>
+      <% options.channels.forEach((channel) => { %><option value="<%= channel.id %>">#<%= channel.name %></option><% }) %>
+    </select></div>
+    <div class="field"><label for="subscription-role"><%= t("subscriptions.mentionRole") %></label><select id="subscription-role" name="roleId"><option value=""><%= t("common.notSelected") %></option>
+      <% options.roles.forEach((role) => { %><option value="<%= role.id %>">@<%= role.name %></option><% }) %>
+    </select></div>
+    <div class="field field-wide"><label for="subscription-message"><%= t("subscriptions.message") %></label><textarea id="subscription-message" name="message" maxlength="1000" rows="3" placeholder="<%= t('subscriptions.messageHint') %>"></textarea></div>
+    <div class="field field-wide"><button class="btn" type="submit"><%= t("common.create") %></button></div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="section-heading"><div><p class="eyebrow"><%= t("subscriptions.currentEyebrow") %></p><h2><%= t("subscriptions.current") %></h2></div><span class="control-count"><%= subscriptions.length %>/25</span></div>
+  <% if (!subscriptions.length) { %><div class="empty"><%= t("subscriptions.empty") %></div><% } else { %>
+    <div class="table-shell"><table><thead><tr><th><%= t("common.type") %></th><th><%= t("common.target") %></th><th><%= t("common.channel") %></th><th><%= t("common.status") %></th><th></th></tr></thead><tbody>
+      <% subscriptions.forEach((feed) => { %><tr>
+        <td><strong><%= feed.type %></strong></td><td><code><%= feed.target %></code><% if (feed.last_error) { %><small class="table-note danger-text"><%= feed.last_error %></small><% } %></td>
+        <td>#<%= (guild.channels.cache.get(feed.channel_id) || {}).name || feed.channel_id %></td><td><span class="badge <%= feed.enabled ? 'pass' : 'neutral' %>"><%= feed.enabled ? t("subscriptions.enabled") : t("subscriptions.paused") %></span></td>
+        <td class="btn-row"><form method="post" action="<%= basePath %>/g/<%= guild.id %>/subscriptions/<%= feed._id %>/toggle"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><input type="hidden" name="enabled" value="<%= feed.enabled ? 'false' : 'true' %>" /><button class="btn secondary" type="submit"><%= feed.enabled ? t("subscriptions.pause") : t("subscriptions.resume") %></button></form>
+        <form method="post" action="<%= basePath %>/g/<%= guild.id %>/subscriptions/<%= feed._id %>/delete" data-confirm="<%= t('common.dangerousAction') %>"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><button class="btn danger" type="submit"><%= t("common.delete") %></button></form></td>
+      </tr><% }) %>
+    </tbody></table></div>
+  <% } %>
+</section>
+<%- include("../partials/foot") %>

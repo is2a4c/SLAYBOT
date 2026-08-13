@@ -49,11 +49,23 @@
             <%- include("icon", { name: "grid" }) %><span><%= t("nav.overview") %></span>
           </a>
           <% if (canGuild("config.edit")) { %>
+            <a class="nav-item <%= routeActive(guildRoot + "/control") ? "active" : "" %>" href="<%= basePath + guildRoot %>/control/common" <%- routeActive(guildRoot + "/control") ? 'aria-current="page"' : "" %>>
+              <%- include("icon", { name: "grid" }) %><span><%= t("nav.control") %></span>
+            </a>
             <a class="nav-item <%= routeActive(guildRoot + "/config") ? "active" : "" %>" href="<%= basePath + guildRoot %>/config" <%- routeActive(guildRoot + "/config") ? 'aria-current="page"' : "" %>>
               <%- include("icon", { name: "settings" }) %><span><%= t("nav.config") %></span>
             </a>
             <a class="nav-item <%= routeActive(guildRoot + "/advanced") ? "active" : "" %>" href="<%= basePath + guildRoot %>/advanced" <%- routeActive(guildRoot + "/advanced") ? 'aria-current="page"' : "" %>>
               <%- include("icon", { name: "command" }) %><span><%= t("nav.advanced") %></span>
+            </a>
+            <a class="nav-item <%= routeActive(guildRoot + "/subscriptions") ? "active" : "" %>" href="<%= basePath + guildRoot %>/subscriptions" <%- routeActive(guildRoot + "/subscriptions") ? 'aria-current="page"' : "" %>>
+              <%- include("icon", { name: "alert" }) %><span><%= t("nav.subscriptions") %></span>
+            </a>
+            <a class="nav-item <%= routeActive(guildRoot + "/reminders") ? "active" : "" %>" href="<%= basePath + guildRoot %>/reminders" <%- routeActive(guildRoot + "/reminders") ? 'aria-current="page"' : "" %>>
+              <%- include("icon", { name: "history" }) %><span><%= t("nav.reminders") %></span>
+            </a>
+            <a class="nav-item <%= routeActive(guildRoot + "/ranking") ? "active" : "" %>" href="<%= basePath + guildRoot %>/ranking" <%- routeActive(guildRoot + "/ranking") ? 'aria-current="page"' : "" %>>
+              <%- include("icon", { name: "crown" }) %><span><%= t("nav.ranking") %></span>
             </a>
           <% } %>
           <% if (canGuild("automod.edit")) { %>

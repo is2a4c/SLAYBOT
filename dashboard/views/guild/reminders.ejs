@@ -1,0 +1,31 @@
+<%- include("../partials/head", { title, guild }) %>
+<header class="page-header"><div class="page-heading">
+  <p class="eyebrow"><%= t("reminders.eyebrow") %></p><h1><%= t("reminders.title") %></h1><p class="subtitle"><%= t("reminders.subtitle") %></p>
+</div><span class="badge pass"><%= t("reminders.live") %></span></header>
+<% if (error) { %><div class="error-banner"><%= error %></div><% } %>
+
+<section class="panel collection-create">
+  <h2><%= t("reminders.create") %></h2>
+  <form method="post" action="<%= basePath %>/g/<%= guild.id %>/reminders" class="form-grid">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" /><input type="hidden" name="timezoneOffset" data-timezone-offset value="0" />
+    <div class="field"><label for="reminder-channel"><%= t("common.channel") %></label><select id="reminder-channel" name="channelId" required><% channels.forEach((channel) => { %><option value="<%= channel.id %>">#<%= channel.name %></option><% }) %></select></div>
+    <div class="field"><label for="reminder-at"><%= t("reminders.runAt") %></label><input id="reminder-at" type="datetime-local" name="runAt" required /></div>
+    <div class="field"><label for="reminder-repeat"><%= t("reminders.repeat") %></label><input id="reminder-repeat" type="number" name="repeatMinutes" min="0" max="525600" value="0" /></div>
+    <div class="field"><label for="reminder-mention"><%= t("reminders.mention") %></label><select id="reminder-mention" name="mention"><option value="CREATOR"><%= t("reminders.mentionCreator") %></option><option value="NONE"><%= t("reminders.mentionNone") %></option><option value="EVERYONE">@everyone</option><option value="HERE">@here</option></select></div>
+    <div class="field"><label for="reminder-role"><%= t("reminders.mentionRole") %></label><select id="reminder-role" name="mentionRole"><option value=""><%= t("common.notSelected") %></option><% roles.forEach((role) => { %><option value="<%= role.id %>">@<%= role.name %></option><% }) %></select></div>
+    <div class="field"><label for="reminder-color"><%= t("reminders.color") %></label><input id="reminder-color" type="color" name="color" value="#8b5cf6" /></div>
+    <div class="field field-wide"><label for="reminder-title"><%= t("reminders.messageTitle") %></label><input id="reminder-title" name="title" maxlength="256" /></div>
+    <div class="field field-wide"><label for="reminder-content"><%= t("reminders.content") %></label><textarea id="reminder-content" name="content" rows="5" maxlength="1000" required></textarea></div>
+    <div class="field"><label for="reminder-footer"><%= t("reminders.footer") %></label><input id="reminder-footer" name="footer" maxlength="2048" /></div>
+    <div class="field"><label for="reminder-delete"><%= t("reminders.deleteAfter") %></label><input id="reminder-delete" type="number" name="deleteAfterSeconds" min="0" max="86400" value="0" /></div>
+    <label class="checkbox-field field"><input type="checkbox" name="tts" /><span><%= t("reminders.tts") %></span></label>
+    <div class="field field-wide"><button class="btn" type="submit"><%= t("common.create") %></button></div>
+  </form>
+</section>
+
+<section class="panel"><div class="section-heading"><div><p class="eyebrow"><%= t("reminders.queueEyebrow") %></p><h2><%= t("reminders.queue") %></h2></div><span class="control-count"><%= reminders.length %></span></div>
+  <% if (!reminders.length) { %><div class="empty"><%= t("reminders.empty") %></div><% } else { %><div class="table-shell"><table><thead><tr><th><%= t("common.time") %></th><th><%= t("common.channel") %></th><th><%= t("reminders.content") %></th><th><%= t("reminders.repeat") %></th><th></th></tr></thead><tbody>
+    <% reminders.forEach((reminder) => { %><tr><td><time datetime="<%= new Date(reminder.run_at).toISOString() %>"><%= new Date(reminder.run_at).toLocaleString(locale) %></time></td><td>#<%= (guild.channels.cache.get(reminder.payload.channelId) || {}).name || reminder.payload.channelId %></td><td><%= String(reminder.payload.content || "").slice(0, 140) %></td><td><%= reminder.payload.repeatMs ? Math.round(reminder.payload.repeatMs / 60000) + " min" : "—" %></td><td><form method="post" action="<%= basePath %>/g/<%= guild.id %>/reminders/<%= reminder._id %>/delete" data-confirm="<%= t('common.dangerousAction') %>"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><button class="btn danger" type="submit"><%= t("common.delete") %></button></form></td></tr><% }) %>
+  </tbody></table></div><% } %>
+</section>
+<%- include("../partials/foot") %>

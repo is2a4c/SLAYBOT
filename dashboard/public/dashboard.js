@@ -21,6 +21,10 @@
     button.addEventListener("click", () => button.closest("[data-dismissible]")?.remove());
   });
 
+  document.querySelectorAll("[data-timezone-offset]").forEach((input) => {
+    input.value = String(new Date().getTimezoneOffset());
+  });
+
   document.querySelectorAll("[data-confirm]").forEach((form) => {
     form.addEventListener("submit", (event) => {
       if (!window.confirm(form.dataset.confirm)) event.preventDefault();

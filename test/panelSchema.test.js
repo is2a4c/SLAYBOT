@@ -7,6 +7,7 @@ const mongoose = require("mongoose");
 const { EmbedBuilder } = require("discord.js");
 const { PANELS, SETTINGS_IDS } = require("@src/services/panels/registry");
 const { readPath, writePath } = require("@src/services/panels/configPanel");
+const { CONTROL_MODULES } = require("../dashboard/services/controlCenter");
 
 /**
  * The panels write straight into the guild document, so a field pointing at a
@@ -61,7 +62,10 @@ test("every panel field points at a setting the schema actually has", () => {
 });
 
 test("every editable guild setting is reachable from the control panel", () => {
-  const exposed = new Set(everyField().map(({ path }) => path));
+  const dashboardFields = CONTROL_MODULES.flatMap((module) =>
+    module.groups.flatMap((group) => group.fields.map((field) => field.path))
+  );
+  const exposed = new Set([...everyField().map(({ path }) => path), ...dashboardFields]);
   const internal = new Set([
     "data.name",
     "data.region",
@@ -75,7 +79,14 @@ test("every editable guild setting is reachable from the control panel", () => {
     "verification.message_id",
   ]);
   // These are collection editors opened from their parent settings panel.
-  const collections = new Set(["ticket.categories", "invite.ranks", "counters", "voice_roles.channels"]);
+  const collections = new Set([
+    "ticket.categories",
+    "invite.ranks",
+    "counters",
+    "voice_roles.channels",
+    "stats.rewards.level",
+    "stats.rewards.voice",
+  ]);
 
   for (const path of Object.keys(schema.paths)) {
     if (path === "_id" || path === "__v" || path.includes(".$*")) continue;

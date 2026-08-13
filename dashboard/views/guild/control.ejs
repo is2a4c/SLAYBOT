@@ -1,0 +1,68 @@
+<%- include("../partials/head", { title, guild }) %>
+<header class="page-header control-header">
+  <div class="page-heading">
+    <p class="eyebrow"><%= t("control.eyebrow") %></p>
+    <h1><%= t("control.title") %></h1>
+    <p class="subtitle"><%= t("control.subtitle") %></p>
+  </div>
+  <span class="badge warn"><%= t("control.mixedConfig") %></span>
+</header>
+
+<nav class="control-tabs" aria-label="<%= t('control.modulesLabel') %>">
+  <% modules.forEach((module) => { const active = module.id === selected.id; %>
+    <a class="control-tab <%= active ? 'active' : '' %>" href="<%= basePath %>/g/<%= guild.id %>/control/<%= module.id %>" <%- active ? 'aria-current="page"' : '' %>>
+      <span class="control-tab-icon"><%- include("../partials/icon", { name: module.icon }) %></span>
+      <span><%= t(`control.modules.${module.id}`) %></span>
+    </a>
+  <% }) %>
+</nav>
+
+<form class="control-form" method="post" action="<%= basePath %>/g/<%= guild.id %>/control/<%= selected.id %>">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+  <div class="control-module-heading">
+    <div>
+      <p class="eyebrow"><%= t("control.moduleEyebrow") %></p>
+      <h2><%= t(`control.modules.${selected.id}`) %></h2>
+    </div>
+    <span class="control-count"><%= t("control.groupCount", { count: selected.groups.length }) %></span>
+  </div>
+
+  <% selected.groups.forEach((group, index) => { %>
+    <details class="panel settings-section control-section" <%= index === 0 ? "open" : "" %>>
+      <summary>
+        <span><%= t(`control.groups.${selected.id}.${group.id}`) %></span>
+        <small><%= t("control.fieldCount", { count: group.fields.length }) %></small>
+      </summary>
+      <div class="settings-section-body form-grid">
+        <% group.fields.forEach((field) => { const inputId = `control_${selected.id}_${field.id}`; const locked = !field.runtime; %>
+          <% if (field.type === "toggle") { %>
+            <div class="checkbox-field field control-toggle <%= locked ? 'control-staged' : '' %>">
+              <input type="checkbox" id="<%= inputId %>" name="<%= field.id %>" <%= field.value ? "checked" : "" %> <%= locked ? "disabled" : "" %> />
+              <label for="<%= inputId %>"><span><%= t(`control.fields.${field.id}`) %></span><% if (locked) { %><small><%= t("control.stagedField") %></small><% } %></label>
+            </div>
+          <% } else if (field.type === "choice") { %>
+            <div class="field <%= locked ? 'control-staged' : '' %>"><label for="<%= inputId %>"><%= t(`control.fields.${field.id}`) %><% if (locked) { %><small><%= t("control.stagedField") %></small><% } %></label><select id="<%= inputId %>" name="<%= field.id %>" <%= locked ? "disabled" : "" %>>
+              <% field.choices.forEach((entry) => { %><option value="<%= entry %>" <%= field.value === entry || (field.id === "language" && !field.value && entry === "DISCORD") ? "selected" : "" %>><%= t(`control.choices.${field.id}.${entry}`) %></option><% }) %>
+            </select></div>
+          <% } else if (field.type === "channel" || field.type === "role") { const list = field.type === "role" ? options.roles : (options[field.channelKind] || options.text); %>
+            <div class="field <%= locked ? 'control-staged' : '' %>"><label for="<%= inputId %>"><%= t(`control.fields.${field.id}`) %><% if (locked) { %><small><%= t("control.stagedField") %></small><% } %></label><select id="<%= inputId %>" name="<%= field.id %>" <%= locked ? "disabled" : "" %>>
+              <option value=""><%= t("common.notSelected") %></option>
+              <% list.forEach((entry) => { %><option value="<%= entry.id %>" <%= field.value === entry.id ? "selected" : "" %>><%= field.type === "role" ? "@" : (field.channelKind === "text" ? "#" : "") %><%= entry.name %></option><% }) %>
+            </select></div>
+          <% } else if (field.type === "roleList" || field.type === "channelList") { const list = field.type === "roleList" ? options.roles : (options[field.channelKind] || options.text); const selectedIds = new Set(field.value || []); %>
+            <div class="field field-wide <%= locked ? 'control-staged' : '' %>"><label for="<%= inputId %>"><%= t(`control.fields.${field.id}`) %><% if (locked) { %><small><%= t("control.stagedField") %></small><% } %></label><select class="multi-select" id="<%= inputId %>" name="<%= field.id %>" multiple size="<%= Math.min(6, Math.max(3, list.length)) %>" <%= locked ? "disabled" : "" %>>
+              <% list.forEach((entry) => { %><option value="<%= entry.id %>" <%= selectedIds.has(entry.id) ? "selected" : "" %>><%= field.type === "roleList" ? "@" : (field.channelKind === "text" ? "#" : "") %><%= entry.name %></option><% }) %>
+            </select><div class="hint"><%= t("control.multiHint") %></div></div>
+          <% } else if (field.multiline) { %>
+            <div class="field field-wide <%= locked ? 'control-staged' : '' %>"><label for="<%= inputId %>"><%= t(`control.fields.${field.id}`) %><% if (locked) { %><small><%= t("control.stagedField") %></small><% } %></label><textarea id="<%= inputId %>" name="<%= field.id %>" rows="4" maxlength="<%= field.maxLength %>" <%= locked ? "disabled" : "" %>><%= field.value || "" %></textarea></div>
+          <% } else { %>
+            <div class="field <%= locked ? 'control-staged' : '' %>"><label for="<%= inputId %>"><%= t(`control.fields.${field.id}`) %><% if (locked) { %><small><%= t("control.stagedField") %></small><% } %></label><input type="<%= field.type === 'number' ? 'number' : 'text' %>" id="<%= inputId %>" name="<%= field.id %>" value="<%= field.value ?? '' %>" <%= locked ? "disabled" : "" %> <% if (field.type === "number") { %>min="<%= field.min %>" max="<%= field.max %>" step="<%= field.step || 1 %>"<% } else { %>maxlength="<%= field.maxLength %>"<% } %> /></div>
+          <% } %>
+        <% }) %>
+      </div>
+    </details>
+  <% }) %>
+
+  <div class="panel sticky-save control-save"><div><strong><%= t("control.readyToSave") %></strong><span class="hint"><%= t("control.saveHint") %></span></div><button type="submit" class="btn"><%= t("common.save") %></button></div>
+</form>
+<%- include("../partials/foot") %>
