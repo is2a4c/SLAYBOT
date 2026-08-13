@@ -6,6 +6,7 @@ const { FeedError, fetchLatest } = require("./providers");
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_FAILURES_BEFORE_PAUSE = 10;
 const CONCURRENCY = 4;
+const MAX_EMBED_DESCRIPTION = 4096;
 
 const TYPE_STYLE = {
   TWITCH: { color: "#9146FF", label: "Twitch", verb: "is live" },
@@ -13,6 +14,31 @@ const TYPE_STYLE = {
   RSS: { color: "#FF9900", label: "RSS", verb: "published" },
   GITHUB: { color: "#24292F", label: "GitHub", verb: "shipped" },
 };
+
+/**
+ * Keep an announcement inside Discord's embed limit without ending halfway
+ * through a release-note line. Full notes remain one click away on GitHub.
+ *
+ * @param {string} value
+ * @param {string|null|undefined} link
+ */
+function fitDescription(value, link) {
+  const text = String(value || "").trim();
+  if (text.length <= MAX_EMBED_DESCRIPTION) return text;
+
+  const suffix = link ? `\n\n… [Read the full release notes on GitHub →](${link})` : "\n\n…";
+  // Reserve enough room to close a fenced code block if the chosen boundary is
+  // inside one. This keeps the link and the rest of the embed out of the block.
+  const budget = MAX_EMBED_DESCRIPTION - suffix.length - 4;
+  const preview = text.slice(0, budget).trimEnd();
+  const minimumUsefulBoundary = Math.floor(budget * 0.6);
+  const boundaries = [preview.lastIndexOf("\n\n"), preview.lastIndexOf("\n"), preview.lastIndexOf(" ")];
+  const boundary = boundaries.find((position) => position >= minimumUsefulBoundary);
+  const shortened = (boundary === undefined ? preview : preview.slice(0, boundary)).trimEnd();
+  const closesCodeBlock = (shortened.match(/```/g) || []).length % 2 === 1 ? "\n```" : "";
+
+  return `${shortened}${closesCodeBlock}${suffix}`;
+}
 
 /**
  * Is this item worth announcing?
@@ -55,7 +81,7 @@ function buildAnnouncement(feed, item) {
   if (item.extra?.kind) details.push(`**Type:** ${item.extra.kind}`);
   if (item.extra?.source) details.push(`**Source:** ${item.extra.source}`);
   if (item.extra?.body) details.push(item.extra.body);
-  if (details.length) embed.setDescription(details.join("\n").slice(0, 2000));
+  if (details.length) embed.setDescription(fitDescription(details.join("\n"), item.link));
 
   if (item.extra?.thumbnail) embed.setImage(item.extra.thumbnail);
 
@@ -200,4 +226,5 @@ module.exports = {
   TYPE_STYLE,
   buildAnnouncement,
   decideAnnouncement,
+  fitDescription,
 };

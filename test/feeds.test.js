@@ -141,3 +141,42 @@ test("a custom message replaces the default announcement text", () => {
   assert.equal(payload.content, "New upload, go watch it");
   assert.equal(payload.embeds[0].data.author.name, "YouTube · Creator");
 });
+
+test("github announcements keep release notes that fit in a Discord embed", () => {
+  const body = `## What is new\n\n${"A complete release note. ".repeat(100)}`;
+  const payload = buildAnnouncement(
+    { type: "GITHUB", target: "is2a4c/SLAYBOT", mention: null, message: null },
+    {
+      id: "release-1",
+      title: "SLAYBOT v3.1.0",
+      link: "https://github.com/is2a4c/SLAYBOT/releases/tag/v3.1.0",
+      publishedAt: null,
+      extra: { author: "is2a4c", kind: "release", body },
+    }
+  );
+
+  assert.match(payload.embeds[0].data.description, /A complete release note/);
+  assert.ok(payload.embeds[0].data.description.endsWith(body.trimEnd()));
+  assert.doesNotMatch(payload.embeds[0].data.description, /Read the full release notes/);
+});
+
+test("oversized github release notes end cleanly with a link to the full text", () => {
+  const body = Array.from({ length: 300 }, (_, index) => `- **Change ${index}:** a useful improvement`).join("\n");
+  const link = "https://github.com/is2a4c/SLAYBOT/releases/tag/v4.0.0";
+  const payload = buildAnnouncement(
+    { type: "GITHUB", target: "is2a4c/SLAYBOT", mention: null, message: null },
+    {
+      id: "release-2",
+      title: "SLAYBOT v4.0.0",
+      link,
+      publishedAt: null,
+      extra: { author: "is2a4c", kind: "release", body },
+    }
+  );
+
+  const description = payload.embeds[0].data.description;
+  const preview = description.split("\n\n…")[0];
+  assert.ok(description.length <= 4096);
+  assert.match(description, /\n\n… \[Read the full release notes on GitHub →\]\(.+\)$/);
+  assert.match(preview.split("\n").at(-1), /^- \*\*Change \d+:\*\* a useful improvement$/);
+});

@@ -270,7 +270,7 @@ async function fetchGitHub(repo) {
     title: release.name || release.tag_name || "New release",
     link: release.html_url,
     publishedAt: release.published_at ? new Date(release.published_at) : null,
-    extra: { author: release.author?.login, kind: "release", body: release.body?.slice(0, 500) },
+    extra: { author: release.author?.login, kind: "release", body: release.body },
   };
 }
 
