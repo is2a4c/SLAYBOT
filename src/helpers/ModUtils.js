@@ -4,6 +4,7 @@ const { MODERATION, EMBED_COLORS } = require("@root/config");
 // Utils
 const { containsLink } = require("@helpers/Utils");
 const { error } = require("@helpers/Logger");
+const { sendWarningDm } = require("@src/services/moderationNotifications");
 
 // Schemas
 const { getSettings } = require("@schemas/Guild");
@@ -318,14 +319,25 @@ module.exports = class ModUtils {
       const memberDb = await getMember(issuer.guild.id, target.id);
       memberDb.warnings += 1;
       const settings = await getSettings(issuer.guild);
+      const warningCount = memberDb.warnings;
+      const automaticAction = warningCount >= settings.max_warn.limit ? settings.max_warn.action : null;
 
       // check if max warnings are reached
-      if (memberDb.warnings >= settings.max_warn.limit) {
+      if (automaticAction) {
         await ModUtils.addModAction(issuer.guild.members.me, target, "Max warnings reached", settings.max_warn.action); // moderate
         memberDb.warnings = 0; // reset warnings
       }
 
       await memberDb.save();
+      await sendWarningDm({
+        target,
+        settings,
+        issuer,
+        reason,
+        warnings: warningCount,
+        maxWarnings: settings.max_warn.limit,
+        automaticAction,
+      });
       return true;
     } catch (ex) {
       error("warnTarget", ex);
