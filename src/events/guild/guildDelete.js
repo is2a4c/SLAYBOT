@@ -7,6 +7,7 @@ const { deleteGuildPolls } = require("@schemas/Poll");
 const { deleteGuildChallenges } = require("@schemas/VerificationAttempt");
 const { deleteGuildThreads } = require("@schemas/ModmailThread");
 const { deleteGuildFeeds } = require("@schemas/Feed");
+const { deleteGuildCustomCommands } = require("@schemas/CustomCommand");
 const { deleteGuildBackups } = require("@schemas/GuildBackup");
 const { deleteGuildEntries } = require("@schemas/StarboardEntry");
 const { deleteGuildStickies } = require("@schemas/StickyMessage");
@@ -47,6 +48,9 @@ module.exports = async (client, guild) => {
       client.logger.error(`Failed to clear modmail threads for ${guild.id}`, error)
     ),
     deleteGuildFeeds(guild.id).catch((error) => client.logger.error(`Failed to clear feeds for ${guild.id}`, error)),
+    deleteGuildCustomCommands(guild.id).catch((error) =>
+      client.logger.error(`Failed to clear custom commands for ${guild.id}`, error)
+    ),
     deleteGuildBackups(guild.id).catch((error) =>
       client.logger.error(`Failed to clear backups for ${guild.id}`, error)
     ),

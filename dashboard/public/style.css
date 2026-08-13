@@ -932,6 +932,26 @@ tbody tr:hover td {
   gap: 12px;
 }
 
+.custom-command-card {
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease;
+}
+
+.custom-command-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
+
+.custom-command-card > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .command-card-header {
   display: flex;
   justify-content: space-between;

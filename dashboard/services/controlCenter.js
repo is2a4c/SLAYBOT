@@ -7,7 +7,7 @@ const field = (id, path, type, extra = {}) => ({
   runtime: !path.startsWith("control_center."),
   ...extra,
 });
-const toggle = (id, path) => field(id, path, "toggle");
+const toggle = (id, path, extra = {}) => field(id, path, "toggle", extra);
 const text = (id, path, maxLength = 1000, extra = {}) => field(id, path, "text", { maxLength, ...extra });
 const number = (id, path, min, max, extra = {}) => field(id, path, "number", { min, max, ...extra });
 const choice = (id, path, choices) => field(id, path, "choice", { choices });
@@ -28,7 +28,7 @@ const CONTROL_MODULES = [
           choice("language", "language", ["ru", "en", "DISCORD"]),
           text("timezone", "control_center.common.timezone", 64),
           toggle("slashCommands", "control_center.common.slash_commands"),
-          toggle("textCommands", "control_center.common.text_commands"),
+          toggle("textCommands", "control_center.common.text_commands", { runtime: true }),
           roleList("adminRoles", "control_center.common.admin_roles"),
         ],
       },

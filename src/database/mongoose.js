@@ -56,6 +56,7 @@ module.exports = {
 
   schemas: {
     Birthday: require("./schemas/Birthday").model,
+    CustomCommand: require("./schemas/CustomCommand").model,
     Feed: require("./schemas/Feed").model,
     Giveaways: require("./schemas/Giveaways"),
     Guild: require("./schemas/Guild"),

@@ -78,3 +78,19 @@ test("control view isolates one module and preserves current values", () => {
   assert.equal(view.groups[0].fields.find((field) => field.id === "prefix").value, "?");
   assert.equal(view.groups[0].fields.find((field) => field.id === "timezone").value, "UTC");
 });
+
+test("the custom text-command switch is live while unimplemented switches stay staged", () => {
+  const common = findModule("common");
+  const fields = common.groups.flatMap((group) => group.fields);
+  assert.equal(fields.find((field) => field.id === "textCommands").runtime, true);
+  assert.equal(fields.find((field) => field.id === "slashCommands").runtime, false);
+
+  const patch = buildControlPatch(
+    mockGuild(),
+    { textCommands: "on", slashCommands: "on" },
+    { control_center: { common: { text_commands: false, slash_commands: false } } },
+    common
+  );
+  assert.equal(patch["control_center.common.text_commands"], true);
+  assert.equal(patch["control_center.common.slash_commands"], undefined);
+});

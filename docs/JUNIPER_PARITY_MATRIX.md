@@ -152,3 +152,7 @@ own information architecture and design language.
   XP/voice tracking alive if Discord rejects a role change.
 - Ranking member editor for level, residual XP, and cumulative voice minutes,
   with guild membership validation and immutable dashboard audit history.
+- Custom prefix-command builder with per-command access roles/channels,
+  cooldowns, invocation cleanup, ordered send-message and role-change actions,
+  safe template variables, scoped storage, and automatic guild cleanup. Arbitrary
+  JavaScript/template-code execution is intentionally not supported.

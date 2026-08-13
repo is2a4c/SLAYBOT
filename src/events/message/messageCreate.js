@@ -1,6 +1,7 @@
 const { commandHandler, automodHandler, statsHandler, stickyHandler, modmailHandler } = require("@src/handlers");
 const { PREFIX_COMMANDS } = require("@root/config");
 const { getSettings } = require("@schemas/Guild");
+const { tryCustomCommand } = require("@src/services/customCommands/CustomCommandRuntime");
 
 /**
  * @param {import('@src/structures').BotClient} client
@@ -39,6 +40,12 @@ module.exports = async (client, message) => {
       if (cmd) {
         isCommand = true;
         await commandHandler.handlePrefixCommand(message, cmd, settings);
+      } else {
+        const custom = await tryCustomCommand(message, settings).catch((ex) => {
+          client.logger.error("customCommand", ex);
+          return { handled: false };
+        });
+        isCommand = custom.handled;
       }
     }
   }
