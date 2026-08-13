@@ -159,6 +159,19 @@ const Schema = new mongoose.Schema({
     max_mentions: { type: Number, default: 5 },
     max_role_mentions: { type: Number, default: 3 },
   },
+  command_policy: {
+    disabled_categories: { type: [String], default: [] },
+    commands: [
+      {
+        _id: false,
+        name: { type: String, required: true, maxlength: 32 },
+        enabled: { type: Boolean, default: true },
+        cooldown_seconds: { type: Number, default: null, min: 0, max: 86400 },
+        allowed_roles: { type: [String], default: [] },
+        allowed_channels: { type: [String], default: [] },
+      },
+    ],
+  },
   invite: {
     tracking: Boolean,
     ranks: [

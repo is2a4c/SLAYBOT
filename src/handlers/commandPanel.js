@@ -4,6 +4,7 @@ const { applyBranding, resolveBranding } = require("@helpers/Branding");
 const { guildTranslator } = require("@src/i18n");
 const commandHandler = require("@src/handlers/command");
 const catalog = require("@src/services/commands/catalog");
+const { effectiveCooldown } = require("@src/services/commands/policy");
 const draft = require("@src/services/panels/draft");
 const { asCommandInteraction, buildOptions } = require("@src/services/commands/proxy");
 const { asMessage } = require("@src/services/commands/message");
@@ -117,7 +118,7 @@ function navigationRow(t, backId, before = []) {
  * @param {object} settings
  */
 function buildCatalog(t, interaction, settings) {
-  const categories = catalog.categoriesFor(interaction.client, interaction.member, t);
+  const categories = catalog.categoriesFor(interaction.client, interaction.member, t, settings);
   const total = categories.reduce((sum, category) => sum + category.count, 0);
 
   const embed = new EmbedBuilder()
@@ -180,8 +181,10 @@ function buildCatalog(t, interaction, settings) {
  * @param {string} category
  */
 function buildCategory(t, interaction, settings, category, page = 0) {
-  const commands = catalog.commandsIn(interaction.client, interaction.member, category);
-  const meta = catalog.categoriesFor(interaction.client, interaction.member, t).find((entry) => entry.id === category);
+  const commands = catalog.commandsIn(interaction.client, interaction.member, category, settings);
+  const meta = catalog
+    .categoriesFor(interaction.client, interaction.member, t, settings)
+    .find((entry) => entry.id === category);
 
   // A menu holds twenty-five rows, and a category can outgrow that.
   const pages = Math.max(1, Math.ceil(commands.length / catalog.PAGE));
@@ -382,7 +385,10 @@ async function run(interaction, { command, leaf }, t, settings) {
       user: interaction.user,
       member: interaction.member,
       guild: interaction.guild,
-    }) || commandHandler.cooldownProblem(command, interaction.user.id);
+      settings,
+      channel: interaction.channel,
+      source: "panel",
+    }) || commandHandler.cooldownProblem(command, interaction.user.id, settings);
 
   if (problem) return warn(interaction, problem);
 
@@ -438,7 +444,7 @@ async function run(interaction, { command, leaf }, t, settings) {
       success: succeeded,
       durationMs: Date.now() - startedAt,
     });
-    if (command.cooldown > 0) commandHandler.applyCooldown(interaction.user.id, command);
+    if (effectiveCooldown(settings, command) > 0) commandHandler.applyCooldown(interaction.user.id, command);
   }
 
   return true;
@@ -471,7 +477,7 @@ function openCommand(t, interaction, settings, path) {
   // The catalogue offers prefix-only commands too, so the screen behind one is
   // looked up the same way it was listed: by name, across both kinds.
   const command = catalog.allCommands(interaction.client).find((entry) => entry.name === name);
-  if (!command || !catalog.allowed(command, interaction.member)) return null;
+  if (!command || !catalog.allowed(command, interaction.member, settings)) return null;
 
   const leaves = catalog.leavesOf(command);
   const leaf = leaves.find((entry) => entry.path === path);
@@ -542,7 +548,7 @@ async function route(interaction, settings, t, parsed) {
   }
 
   if (parsed.action === "run") {
-    const target = catalog.resolve(interaction.client, interaction.member, parsed.ref);
+    const target = catalog.resolve(interaction.client, interaction.member, parsed.ref, settings);
     if (!target) {
       await redraw(buildCatalog(t, interaction, settings));
       return true;
@@ -554,7 +560,7 @@ async function route(interaction, settings, t, parsed) {
 
   if (parsed.action === "opt") {
     const [path, optionId] = parsed.ref.split("|");
-    const target = catalog.resolve(interaction.client, interaction.member, path);
+    const target = catalog.resolve(interaction.client, interaction.member, path, settings);
     const option = target?.leaf.options.find((entry) => entry.id === optionId);
 
     if (!option) {

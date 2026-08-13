@@ -3,6 +3,7 @@ const { OWNER_IDS, PREFIX_COMMANDS, EMBED_COLORS } = require("@root/config");
 const { parsePermissions } = require("@helpers/Utils");
 const { timeformat } = require("@helpers/Utils");
 const { getSettings } = require("@schemas/Guild");
+const { effectiveCooldown, policyProblem } = require("@src/services/commands/policy");
 
 const cooldownCache = new Map();
 
@@ -13,14 +14,20 @@ const cooldownCache = new Map();
  * rules about who may run what are decided once, so a button cannot become a way
  * around a permission a slash command enforces.
  *
+ * Discord's own permissions are checked first and the server's command policy
+ * after, so the policy can only ever narrow what somebody may run.
+ *
  * @param {import('@structures/Command')} cmd
  * @param {Object} who
  * @param {import('discord.js').User} who.user
  * @param {import('discord.js').GuildMember} [who.member]
  * @param {import('discord.js').Guild} [who.guild]
+ * @param {object} [who.settings] guild settings, when the caller has them
+ * @param {import('discord.js').GuildChannel} [who.channel] where it was invoked
+ * @param {"prefix"|"slash"|"panel"} [who.source]
  * @returns {string|null}
  */
-function accessProblem(cmd, { user, member, guild }) {
+function accessProblem(cmd, { user, member, guild, settings, channel, source }) {
   if (cmd.category === "OWNER" && !OWNER_IDS.includes(user?.id)) {
     return "This command is only accessible to bot owners";
   }
@@ -33,18 +40,29 @@ function accessProblem(cmd, { user, member, guild }) {
     return `I need ${parsePermissions(cmd.botPermissions)} for this command`;
   }
 
+  if (settings) {
+    return policyProblem(settings, cmd, {
+      member,
+      channelId: channel?.id,
+      parentId: channel?.parentId,
+      source,
+    });
+  }
+
   return null;
 }
 
 /**
  * @param {import('@structures/Command')} cmd
  * @param {string} userId
+ * @param {object} [settings] guild settings, for a server's own cooldown
  * @returns {string|null}
  */
-function cooldownProblem(cmd, userId) {
-  if (!(cmd.cooldown > 0)) return null;
+function cooldownProblem(cmd, userId, settings) {
+  const cooldown = effectiveCooldown(settings, cmd);
+  if (!(cooldown > 0)) return null;
 
-  const remaining = getRemainingCooldown(userId, cmd);
+  const remaining = getRemainingCooldown(userId, cmd, cooldown);
   if (remaining <= 0) return null;
 
   return `You are on cooldown. You can again use the command in \`${timeformat(remaining)}\``;
@@ -109,6 +127,15 @@ module.exports = {
       }
     }
 
+    // what this server allows of its own commands
+    const policy = policyProblem(settings, cmd, {
+      member: message.member,
+      channelId: message.channelId,
+      parentId: message.channel?.parentId,
+      source: "prefix",
+    });
+    if (policy) return message.safeReply(policy);
+
     // minArgs count
     if (cmd.command.minArgsCount > args.length) {
       const usageEmbed = this.getCommandUsage(cmd, prefix, invoke);
@@ -116,8 +143,9 @@ module.exports = {
     }
 
     // cooldown check
-    if (cmd.cooldown > 0) {
-      const remaining = getRemainingCooldown(message.author.id, cmd);
+    const cooldown = effectiveCooldown(settings, cmd);
+    if (cooldown > 0) {
+      const remaining = getRemainingCooldown(message.author.id, cmd, cooldown);
       if (remaining > 0) {
         return message.safeReply(`You are on cooldown. You can again use the command in \`${timeformat(remaining)}\``);
       }
@@ -138,7 +166,7 @@ module.exports = {
         success: succeeded,
         durationMs: Date.now() - startedAt,
       });
-      if (cmd.cooldown > 0) applyCooldown(message.author.id, cmd);
+      if (cooldown > 0) applyCooldown(message.author.id, cmd);
     }
   },
 
@@ -176,10 +204,20 @@ module.exports = {
       }
     }
 
+    // The settings are read before the checks rather than after: the server's
+    // command policy and its own cooldowns are part of who may run this.
+    const settings = interaction.guild ? await getSettings(interaction.guild) : null;
+
     // who may run this, and whether they have waited long enough
     const problem =
-      accessProblem(cmd, { user: interaction.user, member: interaction.member, guild: interaction.guild }) ||
-      cooldownProblem(cmd, interaction.user.id);
+      accessProblem(cmd, {
+        user: interaction.user,
+        member: interaction.member,
+        guild: interaction.guild,
+        settings,
+        channel: interaction.channel,
+        source: "slash",
+      }) || cooldownProblem(cmd, interaction.user.id, settings);
 
     if (problem) return interaction.reply({ content: problem, ephemeral: true });
 
@@ -189,7 +227,6 @@ module.exports = {
       if (cmd.slashCommand.defer !== false && !interaction.deferred && !interaction.replied) {
         await interaction.deferReply({ ephemeral: cmd.slashCommand.ephemeral });
       }
-      const settings = await getSettings(interaction.guild);
       await cmd.interactionRun(interaction, { settings });
       succeeded = true;
     } catch (ex) {
@@ -204,7 +241,7 @@ module.exports = {
         success: succeeded,
         durationMs: Date.now() - startedAt,
       });
-      if (cmd.cooldown > 0) applyCooldown(interaction.user.id, cmd);
+      if (effectiveCooldown(settings, cmd) > 0) applyCooldown(interaction.user.id, cmd);
     }
   },
 
@@ -286,16 +323,17 @@ function applyCooldown(memberId, cmd) {
 /**
  * @param {string} memberId
  * @param {object} cmd
+ * @param {number} [cooldown] seconds, when a server set its own
  */
-function getRemainingCooldown(memberId, cmd) {
+function getRemainingCooldown(memberId, cmd, cooldown = Number(cmd.cooldown || 0)) {
   const key = cmd.name + "|" + memberId;
   if (cooldownCache.has(key)) {
-    const remaining = (Date.now() - cooldownCache.get(key)) * 0.001;
-    if (remaining > cmd.cooldown) {
+    const elapsed = (Date.now() - cooldownCache.get(key)) * 0.001;
+    if (elapsed > cooldown) {
       cooldownCache.delete(key);
       return 0;
     }
-    return cmd.cooldown - remaining;
+    return cooldown - elapsed;
   }
   return 0;
 }

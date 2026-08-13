@@ -1,4 +1,5 @@
 const { ApplicationCommandOptionType } = require("discord.js");
+const { categoryDisabled, commandPolicy, effectiveCooldown } = require("@src/services/commands/policy");
 
 const CATEGORY_ORDER = [
   "ADMIN",
@@ -72,7 +73,17 @@ function categoryRank(category) {
   return index === -1 ? CATEGORY_ORDER.length : index;
 }
 
-function buildCommandCatalog({ client, guild, member, isOwner, prefix = "!" }) {
+/**
+ * Every command of the bot, with what this server did to it.
+ *
+ * `ready` stays what it always was — whether Discord's permissions let it run —
+ * and the server's own policy is reported next to it rather than folded into it,
+ * so the page can say which of the two is standing in the way.
+ *
+ * @param {Object} input
+ * @param {object} [input.settings] guild settings, for the command policy
+ */
+function buildCommandCatalog({ client, guild, member, isOwner, prefix = "!", settings = null }) {
   const botMember = guild.members.me;
   const commands = uniqueCommands(client)
     .filter((command) => isOwner || command.category !== "OWNER")
@@ -82,6 +93,8 @@ function buildCommandCatalog({ client, guild, member, isOwner, prefix = "!" }) {
       const userReady = holderHasPermissions(member, userPermissions);
       const botReady = holderHasPermissions(botMember, botPermissions);
       const memberPresent = Boolean(member);
+      const policy = commandPolicy(settings, command.name);
+      const groupOff = categoryDisabled(settings, command.category || "OTHER");
 
       return {
         name: command.name,
@@ -96,6 +109,17 @@ function buildCommandCatalog({ client, guild, member, isOwner, prefix = "!" }) {
         userReady: memberPresent && userReady,
         botReady,
         ready: memberPresent && userReady && botReady,
+        policy: {
+          enabled: policy?.enabled !== false,
+          groupDisabled: groupOff,
+          cooldownSeconds: policy?.cooldown_seconds ?? null,
+          effectiveCooldown: effectiveCooldown(settings, command),
+          allowedRoles: [...(policy?.allowed_roles || [])],
+          allowedChannels: [...(policy?.allowed_channels || [])],
+          restricted: Boolean(
+            groupOff || policy?.enabled === false || policy?.allowed_roles?.length || policy?.allowed_channels?.length
+          ),
+        },
       };
     })
     .sort(
@@ -103,7 +127,12 @@ function buildCommandCatalog({ client, guild, member, isOwner, prefix = "!" }) {
         categoryRank(left.category) - categoryRank(right.category) || left.name.localeCompare(right.name, "en")
     );
 
-  const categories = [...new Set(commands.map((command) => command.category))];
+  const categories = [...new Set(commands.map((command) => command.category))].map((id) => ({
+    id,
+    disabled: categoryDisabled(settings, id),
+    count: commands.filter((command) => command.category === id).length,
+  }));
+
   return {
     commands,
     categories,
@@ -112,6 +141,7 @@ function buildCommandCatalog({ client, guild, member, isOwner, prefix = "!" }) {
       ready: commands.filter((command) => command.ready).length,
       userBlocked: commands.filter((command) => command.memberPresent && !command.userReady).length,
       botBlocked: commands.filter((command) => !command.botReady).length,
+      restricted: commands.filter((command) => command.policy.restricted).length,
     },
   };
 }

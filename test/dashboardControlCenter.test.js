@@ -79,20 +79,20 @@ test("control view isolates one module and preserves current values", () => {
   assert.equal(view.groups[0].fields.find((field) => field.id === "timezone").value, "UTC");
 });
 
-test("the custom text-command switch is live while unimplemented switches stay staged", () => {
+test("both command switches are live now that the command policy enforces them", () => {
   const common = findModule("common");
   const fields = common.groups.flatMap((group) => group.fields);
   assert.equal(fields.find((field) => field.id === "textCommands").runtime, true);
-  assert.equal(fields.find((field) => field.id === "slashCommands").runtime, false);
+  assert.equal(fields.find((field) => field.id === "slashCommands").runtime, true);
 
   const patch = buildControlPatch(
     mockGuild(),
-    { textCommands: "on", slashCommands: "on" },
-    { control_center: { common: { text_commands: false, slash_commands: false } } },
+    { textCommands: "on" },
+    { control_center: { common: { text_commands: false, slash_commands: true } } },
     common
   );
   assert.equal(patch["control_center.common.text_commands"], true);
-  assert.equal(patch["control_center.common.slash_commands"], undefined);
+  assert.equal(patch["control_center.common.slash_commands"], false, "an unchecked switch is stored as off");
 });
 
 test("notification controls backed by event handlers are live", () => {

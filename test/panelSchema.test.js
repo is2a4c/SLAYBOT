@@ -87,6 +87,8 @@ test("every editable guild setting is reachable from the control panel", () => {
     "stats.rewards.level",
     "stats.rewards.voice",
     "automod.escalation_rules",
+    "command_policy.disabled_categories",
+    "command_policy.commands",
   ]);
 
   for (const path of Object.keys(schema.paths)) {

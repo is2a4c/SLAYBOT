@@ -17,7 +17,28 @@
   <div class="metric-card"><span class="metric-icon success"><%- include("../partials/icon", { name: "check" }) %></span><div><div class="label"><%= t("commands.ready") %></div><div class="value"><%= summary.ready %></div></div></div>
   <div class="metric-card"><span class="metric-icon warning"><%- include("../partials/icon", { name: "users" }) %></span><div><div class="label"><%= t("commands.userBlocked") %></div><div class="value"><%= summary.userBlocked %></div></div></div>
   <div class="metric-card"><span class="metric-icon danger"><%- include("../partials/icon", { name: "alert" }) %></span><div><div class="label"><%= t("commands.botBlocked") %></div><div class="value"><%= summary.botBlocked %></div></div></div>
+  <div class="metric-card"><span class="metric-icon warning"><%- include("../partials/icon", { name: "shield" }) %></span><div><div class="label"><%= t("commands.restricted") %></div><div class="value"><%= summary.restricted %></div></div></div>
 </div>
+
+<% if (canEditPolicy) { %>
+  <details class="panel settings-section" id="command-groups">
+    <summary><span><%= t("commands.groupPolicyTitle") %></span><small><%= t("commands.groupPolicyHint") %></small></summary>
+    <div class="settings-section-body">
+      <form method="post" action="<%= basePath %>/g/<%= guild.id %>/commands/categories">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+        <div class="form-grid">
+          <% categories.forEach((category) => { const groupId = `group_${category.id}`; %>
+            <div class="checkbox-field field">
+              <input type="checkbox" id="<%= groupId %>" name="disabled" value="<%= category.id %>" <%= category.disabled ? "checked" : "" %> />
+              <label for="<%= groupId %>"><span><%= category.id %></span><small><%= t("commands.groupCommandCount", { count: category.count }) %></small></label>
+            </div>
+          <% }) %>
+        </div>
+        <div class="form-actions"><button type="submit" class="btn"><%= t("commands.saveGroups") %></button></div>
+      </form>
+    </div>
+  </details>
+<% } %>
 
 <div class="command-toolbar panel">
   <label class="field command-search">
@@ -28,7 +49,7 @@
     <span><%= t("commands.category") %></span>
     <select data-command-category>
       <option value=""><%= t("common.all") %></option>
-      <% categories.forEach((category) => { %><option value="<%= category.toLowerCase() %>"><%= category %></option><% }) %>
+      <% categories.forEach((category) => { %><option value="<%= category.id.toLowerCase() %>"><%= category.id %></option><% }) %>
     </select>
   </label>
   <label class="field">
@@ -43,11 +64,18 @@
 
 <div class="command-grid" data-command-grid>
   <% commands.forEach((command) => { %>
-    <article class="command-card" data-command-card data-category="<%= command.category.toLowerCase() %>" data-readiness="<%= command.ready ? "ready" : "blocked" %>" data-search-value="<%= `${command.name} ${command.description} ${command.category} ${command.userPermissions.join(" ")} ${command.botPermissions.join(" ")}`.toLowerCase() %>">
+    <article class="command-card" id="command-<%= command.name %>" data-command-card data-category="<%= command.category.toLowerCase() %>" data-readiness="<%= command.ready ? "ready" : "blocked" %>" data-search-value="<%= `${command.name} ${command.description} ${command.category} ${command.userPermissions.join(" ")} ${command.botPermissions.join(" ")}`.toLowerCase() %>">
       <div class="command-card-header">
         <div><span class="command-category"><%= command.category %></span><h2>/<%= command.name %></h2></div>
         <span class="badge <%= command.ready ? "pass" : "warn" %>"><%= command.ready ? t("commands.ready") : t("commands.blocked") %></span>
       </div>
+      <% if (command.policy.groupDisabled) { %>
+        <p class="hint policy-state"><%= t("commands.stateGroupDisabled") %></p>
+      <% } else if (!command.policy.enabled) { %>
+        <p class="hint policy-state"><%= t("commands.stateDisabled") %></p>
+      <% } else if (command.policy.restricted) { %>
+        <p class="hint policy-state"><%= t("commands.stateRestricted") %></p>
+      <% } %>
       <p><%= command.description || t("commands.noDescription") %></p>
 
       <div class="command-usages">
@@ -60,6 +88,45 @@
         <div><dt><%= t("commands.yourPermissions") %></dt><dd class="<%= command.userReady ? "permission-ok" : "permission-missing" %>"><%= command.memberPresent ? (command.userPermissions.join(", ") || t("commands.noneRequired")) : t("commands.notOnServer") %></dd></div>
         <div><dt><%= t("commands.botPermissions") %></dt><dd class="<%= command.botReady ? "permission-ok" : "permission-missing" %>"><%= command.botPermissions.join(", ") || t("commands.noneRequired") %></dd></div>
       </dl>
+
+      <% if (canEditPolicy) { const allowedRoles = new Set(command.policy.allowedRoles); const allowedChannels = new Set(command.policy.allowedChannels); %>
+        <details class="command-policy">
+          <summary><%= t("commands.policyTitle") %></summary>
+          <form method="post" action="<%= basePath %>/g/<%= guild.id %>/commands/policy" class="form-grid">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+            <input type="hidden" name="name" value="<%= command.name %>" />
+
+            <div class="checkbox-field field">
+              <input type="checkbox" id="enabled_<%= command.name %>" name="enabled" <%= command.policy.enabled ? "checked" : "" %> />
+              <label for="enabled_<%= command.name %>"><span><%= t("commands.policyEnabled") %></span></label>
+            </div>
+
+            <div class="field">
+              <label for="cooldown_<%= command.name %>"><%= t("commands.policyCooldown") %></label>
+              <input type="number" id="cooldown_<%= command.name %>" name="cooldown" min="0" max="86400" step="1" value="<%= command.policy.cooldownSeconds ?? "" %>" placeholder="<%= command.cooldown %>" />
+              <div class="hint"><%= t("commands.policyCooldownHint", { seconds: command.policy.effectiveCooldown }) %></div>
+            </div>
+
+            <div class="field field-wide">
+              <label for="roles_<%= command.name %>"><%= t("commands.policyRoles") %></label>
+              <select class="multi-select" id="roles_<%= command.name %>" name="roles" multiple size="<%= Math.min(6, Math.max(3, roles.length)) %>">
+                <% roles.forEach((role) => { %><option value="<%= role.id %>" <%= allowedRoles.has(role.id) ? "selected" : "" %>>@<%= role.name %></option><% }) %>
+              </select>
+              <div class="hint"><%= t("commands.policyRolesHint") %></div>
+            </div>
+
+            <div class="field field-wide">
+              <label for="channels_<%= command.name %>"><%= t("commands.policyChannels") %></label>
+              <select class="multi-select" id="channels_<%= command.name %>" name="channels" multiple size="<%= Math.min(6, Math.max(3, policyChannels.length)) %>">
+                <% policyChannels.forEach((channel) => { %><option value="<%= channel.id %>" <%= allowedChannels.has(channel.id) ? "selected" : "" %>><%= channel.type === 4 ? "▸ " : "#" %><%= channel.name %></option><% }) %>
+              </select>
+              <div class="hint"><%= t("commands.policyChannelsHint") %></div>
+            </div>
+
+            <div class="form-actions field-wide"><button type="submit" class="btn"><%= t("common.save") %></button></div>
+          </form>
+        </details>
+      <% } %>
     </article>
   <% }) %>
 </div>

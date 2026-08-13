@@ -4,6 +4,7 @@ const { OWNER_IDS } = require("@root/config");
 // pulls in the whole client, and this only needs the names and icons.
 const CommandCategory = require("@src/structures/CommandCategory");
 const { ICONS } = require("@src/services/panels/fieldEditor");
+const { categoryDisabled, commandPolicy } = require("@src/services/commands/policy");
 
 /**
  * The bot's commands, read as a tree the panel can walk.
@@ -185,15 +186,24 @@ function leavesOf(command) {
  * The panel only offers what the person opening it could run anyway — a member
  * without Ban Members never sees a ban button to be refused by.
  *
+ * A command the server switched off is left out rather than shown and then
+ * refused; the refusal still stands at the moment it would run, so hiding it is
+ * only about not offering a button that cannot work.
+ *
  * @param {object} command
  * @param {import('discord.js').GuildMember} member
+ * @param {object} [settings] guild settings, for this server's command policy
  * @returns {boolean}
  */
-function allowed(command, member) {
+function allowed(command, member, settings) {
   // The panel is how somebody got here; offering it inside itself is noise.
   if (command.name === "panel") return false;
   if (!command.slashCommand?.enabled && !command.command?.enabled) return false;
   if (command.category === "OWNER") return OWNER_IDS.includes(member?.id);
+  if (settings) {
+    if (categoryDisabled(settings, command.category)) return false;
+    if (commandPolicy(settings, command.name)?.enabled === false) return false;
+  }
   if (!command.userPermissions?.length) return true;
   return Boolean(member?.permissions?.has(command.userPermissions));
 }
@@ -214,11 +224,12 @@ function allCommands(client) {
 /**
  * @param {import('discord.js').Client} client
  * @param {import('discord.js').GuildMember} member
+ * @param {object} [settings] guild settings, for this server's command policy
  * @returns {object[]} commands this member may run, in name order
  */
-function commandsFor(client, member) {
+function commandsFor(client, member, settings) {
   return allCommands(client)
-    .filter((command) => allowed(command, member))
+    .filter((command) => allowed(command, member, settings))
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
@@ -231,9 +242,9 @@ function commandsFor(client, member) {
  *   server's language; without it they keep the English ones
  * @returns {{id: string, name: string, emoji: string, count: number}[]}
  */
-function categoriesFor(client, member, t) {
+function categoriesFor(client, member, t, settings) {
   const counted = new Map();
-  for (const command of commandsFor(client, member)) {
+  for (const command of commandsFor(client, member, settings)) {
     counted.set(command.category, (counted.get(command.category) || 0) + 1);
   }
 
@@ -254,8 +265,8 @@ function categoriesFor(client, member, t) {
  * @param {string} category
  * @returns {object[]}
  */
-function commandsIn(client, member, category) {
-  return commandsFor(client, member).filter((command) => command.category === category);
+function commandsIn(client, member, category, settings) {
+  return commandsFor(client, member, settings).filter((command) => command.category === category);
 }
 
 /**
@@ -266,10 +277,10 @@ function commandsIn(client, member, category) {
  * @param {string} path e.g. "ticket add" or "ban"
  * @returns {{command: object, leaf: object}|null}
  */
-function resolve(client, member, path) {
+function resolve(client, member, path, settings) {
   const [name] = String(path).split(" ");
   const command = allCommands(client).find((entry) => entry.name === name);
-  if (!command || !allowed(command, member)) return null;
+  if (!command || !allowed(command, member, settings)) return null;
 
   const leaf = leavesOf(command).find((entry) => entry.path === path);
   return leaf ? { command, leaf } : null;

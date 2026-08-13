@@ -27,7 +27,7 @@ const CONTROL_MODULES = [
           text("prefix", "prefix", 5),
           choice("language", "language", ["ru", "en", "DISCORD"]),
           text("timezone", "control_center.common.timezone", 64),
-          toggle("slashCommands", "control_center.common.slash_commands"),
+          toggle("slashCommands", "control_center.common.slash_commands", { runtime: true }),
           toggle("textCommands", "control_center.common.text_commands", { runtime: true }),
           roleList("adminRoles", "control_center.common.admin_roles"),
         ],
