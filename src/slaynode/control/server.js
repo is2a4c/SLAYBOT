@@ -119,9 +119,16 @@ function createControlPlane(options = {}) {
       if (!node || !verify(decrypt(node.credentialEncrypted), req))
         return res.status(401).json({ error: "invalid node signature" });
       const nonce = req.headers["x-slay-nonce"];
-      if (node.lastNonces.includes(nonce)) return res.status(409).json({ error: "replayed nonce" });
-      node.lastNonces = [...node.lastNonces.slice(-99), nonce];
-      await node.save();
+      const claimed = await models.Node.updateOne(
+        {
+          _id: node._id,
+          status: { $ne: "REVOKED" },
+          credentialVersion: node.credentialVersion,
+          lastNonces: { $ne: nonce },
+        },
+        { $push: { lastNonces: { $each: [nonce], $slice: -100 } } }
+      );
+      if (!claimed.modifiedCount) return res.status(409).json({ error: "replayed nonce" });
       req.slayNode = node;
       next();
     } catch (error) {
