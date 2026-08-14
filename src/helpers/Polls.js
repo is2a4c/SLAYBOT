@@ -7,10 +7,18 @@ const {
   time,
 } = require("discord.js");
 const { EMBED_COLORS } = require("@root/config");
-const { MAX_OPTIONS, MAX_OPTION_LABEL, MAX_QUESTION } = require("@schemas/Poll");
+const { MAX_OPTIONS, MAX_OPTION_LABEL, MAX_QUESTION, createPoll } = require("@schemas/Poll");
+const { scheduleTask } = require("@schemas/ScheduledTask");
 
 const VOTE_PREFIX = "POLL_VOTE";
 const CLOSE_PREFIX = "POLL_CLOSE";
+// The scheduled-task type a poll's auto-close is filed under. Defined here
+// rather than imported from the handler that registers it, since that handler
+// requires this module for the embed/component builders - importing it back
+// would be a cycle for the sake of one string both sides already agree on.
+const POLL_CLOSE_TASK_TYPE = "POLL_CLOSE";
+const MIN_DURATION_MS = 60_000;
+const MAX_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const BAR_LENGTH = 12;
 const DEFAULT_EMOJIS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
 
@@ -207,9 +215,98 @@ function buildResultSummary(poll) {
     : `Tie between ${winners.map((label) => `**${label}**`).join(", ")} with ${best} vote${best === 1 ? "" : "s"} each.`;
 }
 
+/**
+ * Post a poll and hand back the message that carries it — the one poll engine
+ * behind both `/poll create` and a rich message's own poll option, so a vote
+ * cast on either looks and behaves identically.
+ *
+ * @param {Object} input
+ * @param {import('discord.js').Guild} input.guild
+ * @param {import('discord.js').GuildTextBasedChannel} input.channel
+ * @param {string} input.authorId
+ * @param {string} input.question
+ * @param {string} input.optionsInput options separated by `|`
+ * @param {boolean} [input.multi]
+ * @param {boolean} [input.anonymous]
+ * @param {boolean} [input.allowChange]
+ * @param {number|null} [input.durationMs]
+ * @returns {Promise<{poll: object, message: import('discord.js').Message}>}
+ */
+async function startPoll({
+  guild,
+  channel,
+  authorId,
+  question,
+  optionsInput,
+  multi = false,
+  anonymous = true,
+  allowChange = true,
+  durationMs = null,
+}) {
+  const text = assertQuestion(question);
+  const options = parseOptions(optionsInput);
+
+  if (!channel.isTextBased()) throw new PollError("Polls only work in text channels.");
+  if (!channel.permissionsFor(guild.members.me)?.has(["ViewChannel", "SendMessages", "EmbedLinks"])) {
+    throw new PollError(`I need to view, send messages and embed links in ${channel}.`);
+  }
+
+  if (durationMs !== null) {
+    if (!Number.isFinite(durationMs)) throw new PollError("Provide a duration such as `2h` or `3d`.");
+    if (durationMs < MIN_DURATION_MS) throw new PollError("A poll must run for at least a minute.");
+    if (durationMs > MAX_DURATION_MS) throw new PollError("A poll cannot run longer than 30 days.");
+  }
+
+  const endsAt = durationMs ? new Date(Date.now() + durationMs) : null;
+
+  // Post first, then store: the message id is the poll's identity.
+  const draft = {
+    message_id: "pending",
+    question: text,
+    options,
+    votes: new Map(),
+    multi,
+    anonymous,
+    allow_change: allowChange,
+    ends_at: endsAt,
+    closed: false,
+  };
+
+  const message = await channel.send({ embeds: [buildPollEmbed(draft)] });
+
+  const poll = await createPoll({
+    guild_id: guild.id,
+    channel_id: channel.id,
+    message_id: message.id,
+    author_id: authorId,
+    question: text,
+    options,
+    multi,
+    anonymous,
+    allow_change: allowChange,
+    ends_at: endsAt,
+  });
+
+  await message.edit({ embeds: [buildPollEmbed(poll)], components: buildPollComponents(poll) });
+
+  if (endsAt) {
+    await scheduleTask({
+      type: POLL_CLOSE_TASK_TYPE,
+      guildId: guild.id,
+      runAt: endsAt,
+      payload: { channelId: channel.id, messageId: message.id },
+    });
+  }
+
+  return { poll, message };
+}
+
 module.exports = {
   CLOSE_PREFIX,
   DEFAULT_EMOJIS,
+  MAX_DURATION_MS,
+  MIN_DURATION_MS,
+  POLL_CLOSE_TASK_TYPE,
   PollError,
   VOTE_PREFIX,
   applyVote,
@@ -219,5 +316,6 @@ module.exports = {
   buildPollEmbed,
   buildResultSummary,
   parseOptions,
+  startPoll,
   tally,
 };

@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const { getSettings } = require("@schemas/Guild");
+const { buildFields, buildLinkButtons } = require("@src/services/richMessage/RichMessage");
 
 /**
  * @param {string} content
@@ -82,6 +83,9 @@ const buildGreeting = async (member, type, config, inviterData) => {
   }
   if (config.embed.timestamp) embed.setTimestamp();
 
+  const fields = await buildFields(config.fields, (value) => parse(value, member, inviterData));
+  if (fields.length) embed.addFields(fields);
+
   // set default message
   const hasEmbed = ["title", "author", "description", "color", "thumbnail", "footer", "image", "timestamp"].some(
     (key) => {
@@ -89,15 +93,17 @@ const buildGreeting = async (member, type, config, inviterData) => {
       return value !== null && value !== undefined && value !== false && value !== "";
     }
   );
-  if (!config.content && !hasEmbed) {
+  const components = await buildLinkButtons(config.buttons, (value) => parse(value, member, inviterData));
+
+  if (!config.content && !hasEmbed && !fields.length) {
     content =
       type === "WELCOME"
         ? `Welcome to the server, ${member.displayName} 🎉`
         : `${member.user.username} has left the server 👋`;
-    return { content };
+    return { content, components };
   }
 
-  return { content, embeds: [embed] };
+  return { content, embeds: [embed], components };
 };
 
 /**

@@ -98,14 +98,14 @@ test("custom command names and action inputs are bounded", async () => {
   assert.equal(created.name, "hello");
 });
 
-test("templates expose only documented invocation values and suppress broad mentions", () => {
+test("templates expose only documented invocation values and suppress broad mentions", async () => {
   const msg = message();
   const context = { guild: msg.guild, channel: msg.channel, member: msg.member, arguments: ["one", "two"] };
   assert.equal(renderTemplate("{server}|{member:name}|{arguments}", context), "Test Server|Tester|one two");
-  const payload = messagePayload({ content: "Hi {member:mention} @everyone" }, context);
+  const payload = await messagePayload({ content: "Hi {member:mention} @everyone" }, context);
   assert.equal(payload.content, "Hi <@100000000000000003> @everyone");
   assert.deepEqual(payload.allowedMentions, { users: ["100000000000000003"], roles: [], parse: [] });
-  const controlled = messagePayload({ content: "<@&role>", mention_roles: [ROLE_ID], tts: true }, context);
+  const controlled = await messagePayload({ content: "<@&role>", mention_roles: [ROLE_ID], tts: true }, context);
   assert.deepEqual(controlled.allowedMentions.roles, [ROLE_ID]);
   assert.equal(controlled.tts, true);
 });

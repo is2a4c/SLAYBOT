@@ -20,6 +20,12 @@ const {
   syncGuildCommands,
   unpublishCommand,
 } = require("@src/services/customCommands/applicationCommands");
+const {
+  RichMessageError,
+  sanitizeButtons,
+  sanitizeFields,
+  sanitizePoll,
+} = require("@src/services/richMessage/RichMessage");
 const { resolveComponentEmoji } = require("@helpers/SelfRoles");
 
 class CustomCommandError extends Error {
@@ -269,21 +275,53 @@ function actionFromInput(guild, input, command = { actions: [], triggers: {} }) 
     }
   }
 
-  const content =
-    String(input.content || "")
+  const trimmed = (value, max) =>
+    String(value || "")
       .trim()
-      .slice(0, 2000) || null;
-  const embedTitle =
-    String(input.embedTitle || "")
-      .trim()
-      .slice(0, 256) || null;
-  const embedDescription =
-    String(input.embedDescription || "")
-      .trim()
-      .slice(0, 4096) || null;
-  if (!content && !embedTitle && !embedDescription) throw new CustomCommandError("Add message text or embed content.");
+      .slice(0, max) || null;
+  const httpsOrNull = (value) => {
+    const value_ = String(value || "").trim();
+    return /^https:\/\//i.test(value_) ? value_.slice(0, 300) : null;
+  };
+
+  const content = trimmed(input.content, 2000);
+  const embedTitle = trimmed(input.embedTitle, 256);
+  const embedDescription = trimmed(input.embedDescription, 4096);
+  const embedAuthor = trimmed(input.embedAuthor, 256);
+  const embedFooter = trimmed(input.embedFooter, 2048);
+  const embedThumbnail = httpsOrNull(input.embedThumbnail);
+  const embedImage = httpsOrNull(input.embedImage);
   const color = /^#[0-9a-f]{6}$/i.test(String(input.embedColor || "")) ? input.embedColor : null;
   const channelId = ids(guild, input.channelId, "channel")[0] || null;
+
+  let poll = null;
+  try {
+    poll = type === "SEND_MESSAGE" ? sanitizePoll(input) : null;
+  } catch (error) {
+    if (error instanceof RichMessageError) throw new CustomCommandError(error.message);
+    throw error;
+  }
+
+  let fields = [];
+  let buttons = [];
+  try {
+    fields = sanitizeFields(input.fields);
+    buttons = sanitizeButtons(input.buttons);
+  } catch (error) {
+    if (error instanceof RichMessageError) throw new CustomCommandError(error.message);
+    throw error;
+  }
+
+  // A poll is the whole message on its own; the rest of the rich-message
+  // fields would never be looked at once it is running, so a form that filled
+  // them in too is told rather than having them quietly ignored.
+  if (poll && (content || embedTitle || embedDescription || fields.length || buttons.length)) {
+    throw new CustomCommandError("A poll replaces the message - remove the text and embed fields, or the poll.");
+  }
+  if (!poll && !content && !embedTitle && !embedDescription) {
+    throw new CustomCommandError("Add message text, embed content, or a poll.");
+  }
+
   return {
     id: crypto.randomUUID(),
     name,
@@ -292,6 +330,14 @@ function actionFromInput(guild, input, command = { actions: [], triggers: {} }) 
     embed_title: embedTitle,
     embed_description: embedDescription,
     embed_color: color,
+    embed_author: embedAuthor,
+    embed_footer: embedFooter,
+    embed_thumbnail: embedThumbnail,
+    embed_image: embedImage,
+    embed_timestamp: input.embedTimestamp === "on",
+    fields,
+    buttons,
+    poll,
     channel_id: type === "SEND_MESSAGE" ? channelId : null,
     tts: input.tts === "on",
     delete_after_seconds: Math.min(86400, Math.max(0, Number.parseInt(input.deleteAfterSeconds, 10) || 0)),

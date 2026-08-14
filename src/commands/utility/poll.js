@@ -1,13 +1,9 @@
 const { ApplicationCommandOptionType, ChannelType, EmbedBuilder } = require("discord.js");
 const ems = require("enhanced-ms");
 const { EMBED_COLORS } = require("@root/config");
-const { MAX_OPTIONS, createPoll, listOpenPolls, getPoll } = require("@schemas/Poll");
-const { PollError, assertQuestion, buildPollComponents, buildPollEmbed, parseOptions } = require("@helpers/Polls");
+const { MAX_OPTIONS, listOpenPolls, getPoll } = require("@schemas/Poll");
+const { PollError, startPoll } = require("@helpers/Polls");
 const { pollHandler } = require("@src/handlers");
-const { scheduleTask } = require("@schemas/ScheduledTask");
-
-const MIN_DURATION_MS = 60_000;
-const MAX_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * @type {import("@structures/Command")}
@@ -168,75 +164,13 @@ module.exports = {
   },
 };
 
-async function start({
-  guild,
-  channel,
-  authorId,
-  question,
-  optionsInput,
-  multi = false,
-  anonymous = true,
-  allowChange = true,
-  durationMs = null,
-}) {
-  const text = assertQuestion(question);
-  const options = parseOptions(optionsInput);
-
-  if (!channel.isTextBased()) throw new PollError("Polls only work in text channels.");
-  if (!channel.permissionsFor(guild.members.me)?.has(["ViewChannel", "SendMessages", "EmbedLinks"])) {
-    throw new PollError(`I need to view, send messages and embed links in ${channel}.`);
-  }
-
-  if (durationMs !== null) {
-    if (!Number.isFinite(durationMs)) throw new PollError("Provide a duration such as `2h` or `3d`.");
-    if (durationMs < MIN_DURATION_MS) throw new PollError("A poll must run for at least a minute.");
-    if (durationMs > MAX_DURATION_MS) throw new PollError("A poll cannot run longer than 30 days.");
-  }
-
-  const endsAt = durationMs ? new Date(Date.now() + durationMs) : null;
-
-  // Post first, then store: the message id is the poll's identity.
-  const draft = {
-    message_id: "pending",
-    question: text,
-    options,
-    votes: new Map(),
-    multi,
-    anonymous,
-    allow_change: allowChange,
-    ends_at: endsAt,
-    closed: false,
-  };
-
-  const message = await channel.send({ embeds: [buildPollEmbed(draft)] });
-
-  const poll = await createPoll({
-    guild_id: guild.id,
-    channel_id: channel.id,
-    message_id: message.id,
-    author_id: authorId,
-    question: text,
-    options,
-    multi,
-    anonymous,
-    allow_change: allowChange,
-    ends_at: endsAt,
-  });
-
-  await message.edit({ embeds: [buildPollEmbed(poll)], components: buildPollComponents(poll) });
-
-  if (endsAt) {
-    await scheduleTask({
-      type: pollHandler.TASK_TYPE,
-      guildId: guild.id,
-      runAt: endsAt,
-      payload: { channelId: channel.id, messageId: message.id },
-    });
-  }
-
+async function start(input) {
+  const { poll, message } = await startPoll(input);
+  const endsAt = poll.ends_at;
   return {
     poll,
-    reply: `Poll started in ${channel}${endsAt ? `, closing <t:${Math.floor(endsAt.getTime() / 1000)}:R>` : ""}.`,
+    reply: `Poll started in ${input.channel}${endsAt ? `, closing <t:${Math.floor(new Date(endsAt).getTime() / 1000)}:R>` : ""}.`,
+    message,
   };
 }
 

@@ -3,6 +3,7 @@ const { CACHE_SIZE, PREFIX_COMMANDS, STATS } = require("@root/config.js");
 const FixedSizeMap = require("fixedsize-map");
 const { getUser } = require("./User");
 const { PermissionFlagsBits } = require("discord.js");
+const { buttonsPath, fieldsPath } = require("./RichMessage");
 
 const cache = new FixedSizeMap(CACHE_SIZE.GUILDS);
 const MAX_WARN_ACTIONS = ["TIMEOUT", "KICK", "BAN"];
@@ -217,6 +218,8 @@ const Schema = new mongoose.Schema({
       image: String,
       timestamp: { type: Boolean, default: false },
     },
+    fields: fieldsPath(),
+    buttons: buttonsPath(),
   },
   farewell: {
     enabled: Boolean,
@@ -233,6 +236,8 @@ const Schema = new mongoose.Schema({
       image: String,
       timestamp: { type: Boolean, default: false },
     },
+    fields: fieldsPath(),
+    buttons: buttonsPath(),
   },
   autorole: {
     type: [String],

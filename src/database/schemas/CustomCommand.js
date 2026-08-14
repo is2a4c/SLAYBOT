@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { PollSchema, buttonsPath, fieldsPath } = require("./RichMessage");
 
 const ACTION_TYPES = ["SEND_MESSAGE", "SEND_DM", "CHANGE_ROLES", "ADD_REACTION", "SHOW_MODAL"];
 const MAX_CUSTOM_COMMANDS = 50;
@@ -106,6 +107,17 @@ const ActionSchema = new mongoose.Schema(
     embed_title: { type: String, default: null, maxlength: 256 },
     embed_description: { type: String, default: null, maxlength: 4096 },
     embed_color: { type: String, default: null, maxlength: 7 },
+    // SEND_MESSAGE / SEND_DM only: the rest of what a rich message can carry.
+    embed_author: { type: String, default: null, maxlength: 256 },
+    embed_footer: { type: String, default: null, maxlength: 2048 },
+    embed_thumbnail: { type: String, default: null, maxlength: 300 },
+    embed_image: { type: String, default: null, maxlength: 300 },
+    embed_timestamp: { type: Boolean, default: false },
+    fields: fieldsPath(),
+    buttons: buttonsPath(),
+    // Set only when this action starts a poll instead of sending a message;
+    // SEND_DM never carries one, since a poll's vote is scoped to a guild.
+    poll: { type: PollSchema, default: null },
     channel_id: { type: String, default: null },
     tts: { type: Boolean, default: false },
     delete_after_seconds: { type: Number, default: 0, min: 0, max: 86400 },

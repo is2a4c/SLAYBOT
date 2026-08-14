@@ -22,6 +22,8 @@
             <div class="field"><label for="<%= inputId %>"><%= t(`advanced.fields.${field.id}`) %></label><select id="<%= inputId %>" name="<%= field.id %>"><option value=""><%= t("common.notSelected") %></option><% options.roles.forEach((entry) => { %><option value="<%= entry.id %>" <%= field.value === entry.id ? "selected" : "" %>>@<%= entry.name %></option><% }) %></select></div>
           <% } else if (field.type === "roleList" || field.type === "channelList") { %>
             <div class="field"><label for="<%= inputId %>"><%= t(`advanced.fields.${field.id}`) %></label><input type="text" id="<%= inputId %>" name="<%= field.id %>" value="<%= (field.value || []).join(', ') %>" /><div class="hint"><%= t("advanced.idListHint") %></div></div>
+          <% } else if (field.type === "richFields" || field.type === "richButtons") { %>
+            <div class="field field-wide"><label for="<%= inputId %>"><%= t(`advanced.fields.${field.id}`) %></label><textarea id="<%= inputId %>" name="<%= field.id %>" rows="3"><%= field.value || "" %></textarea><div class="hint"><%= t(`advanced.fields.${field.id}Hint`) %></div></div>
           <% } else if (field.multiline) { %>
             <div class="field field-wide"><label for="<%= inputId %>"><%= t(`advanced.fields.${field.id}`) %></label><textarea id="<%= inputId %>" name="<%= field.id %>" rows="4" maxlength="<%= field.maxLength %>"><%= field.value || "" %></textarea></div>
           <% } else { %>

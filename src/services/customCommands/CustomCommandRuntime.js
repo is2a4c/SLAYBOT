@@ -1,9 +1,9 @@
-const { EmbedBuilder } = require("discord.js");
 const { model } = require("@schemas/CustomCommand");
 const { contextLabel } = require("./applicationCommands");
 const { asMessage } = require("@src/services/commands/message");
 const { buildModal, parseModalCustomId } = require("./modalBuilder");
 const modalSessions = require("./modalSessions");
+const { buildPayload, scheduleDeletion, startPollFromConfig } = require("@src/services/richMessage/RichMessage");
 
 const cooldowns = new Map();
 
@@ -93,37 +93,68 @@ function markCooldown(command, subject) {
   );
 }
 
-function messagePayload(action, context) {
-  const content = renderTemplate(action.content, context).slice(0, 2000) || null;
-  const title = renderTemplate(action.embed_title, context).slice(0, 256) || null;
-  const description = renderTemplate(action.embed_description, context).slice(0, 4096) || null;
-  const embeds = [];
-  if (title || description) {
-    const embed = new EmbedBuilder();
-    if (title) embed.setTitle(title);
-    if (description) embed.setDescription(description);
-    if (/^#[0-9a-f]{6}$/i.test(action.embed_color || "")) embed.setColor(action.embed_color);
-    embeds.push(embed);
-  }
-  if (!content && !embeds.length) return null;
+/**
+ * The stored action, in the shape the shared rich-message builder takes.
+ *
+ * @param {object} action
+ * @returns {object}
+ */
+function richMessageConfig(action) {
   return {
-    content,
-    embeds,
-    tts: Boolean(action.tts),
-    allowedMentions: { users: [context.member.id], roles: action.mention_roles || [], parse: [] },
+    content: action.content,
+    title: action.embed_title,
+    description: action.embed_description,
+    color: action.embed_color,
+    author: action.embed_author,
+    footer: action.embed_footer,
+    thumbnail: action.embed_thumbnail,
+    image: action.embed_image,
+    timestamp: action.embed_timestamp,
+    fields: action.fields,
+    buttons: action.buttons,
+    tts: action.tts,
   };
 }
 
-function scheduleDeletion(sent, seconds) {
-  const delay = Math.min(86400, Math.max(0, Number(seconds) || 0));
-  if (!sent?.delete || !delay) return;
-  setTimeout(() => sent.delete().catch(() => {}), delay * 1000).unref?.();
+/**
+ * @param {object} action
+ * @param {object} context
+ * @returns {Promise<object|null>} a sendable payload, or null for an empty message
+ */
+async function messagePayload(action, context) {
+  return buildPayload(richMessageConfig(action), (value) => renderTemplate(value, context), {
+    selfMention: context.member.id,
+    roleMentions: action.mention_roles || [],
+  });
+}
+
+/**
+ * Where a channel-bound action actually goes: the channel it names, unless
+ * that channel is gone or not one the bot can post in - the command still
+ * answers, in the channel it was run from, rather than doing nothing.
+ *
+ * @param {object} action
+ * @param {object} message
+ * @returns {import('discord.js').GuildTextBasedChannel|null}
+ */
+function targetChannel(action, message) {
+  const named = action.channel_id ? message.guild.channels.cache.get(action.channel_id) : null;
+  if (action.channel_id && named?.isTextBased?.()) return named;
+  return message.channel?.isTextBased?.() ? message.channel : null;
 }
 
 async function executeSendMessage(action, message, context) {
-  const channel = action.channel_id ? message.guild.channels.cache.get(action.channel_id) : message.channel;
-  if (!channel?.isTextBased?.()) return;
-  const payload = messagePayload(action, context);
+  const channel = targetChannel(action, message);
+  if (!channel) return;
+
+  if (action.poll?.question) {
+    await startPollFromConfig({ guild: message.guild, channel, authorId: message.author.id, poll: action.poll }).catch(
+      () => {}
+    );
+    return;
+  }
+
+  const payload = await messagePayload(action, context);
   if (payload) {
     const sent = await channel.send(payload);
     scheduleDeletion(sent, action.delete_after_seconds);
@@ -131,7 +162,7 @@ async function executeSendMessage(action, message, context) {
 }
 
 async function executeSendDm(action, message, context) {
-  const payload = messagePayload(action, context);
+  const payload = await messagePayload(action, context);
   if (!payload) return;
   const sent = await message.member.send(payload).catch(() => null);
   scheduleDeletion(sent, action.delete_after_seconds);

@@ -1,6 +1,20 @@
+const {
+  RichMessageError,
+  sanitizeButtons,
+  sanitizeFields,
+  stringifyButtons,
+  stringifyFields,
+} = require("@src/services/richMessage/RichMessage");
+
 const SNOWFLAKE = /^\d{17,20}$/;
 
 const text = (id, path, maxLength = 1000, extra = {}) => ({ id, path, type: "text", maxLength, ...extra });
+// A compact list of {name, value, inline} or {label, url, emoji} rows, typed as
+// one plain-text line each - the same shape and the same limits a custom
+// command's message action uses, so "shared" means the same code, not a
+// second implementation that quietly drifts from the first.
+const richFields = (id, path, max) => ({ id, path, type: "richFields", max });
+const richButtons = (id, path, max) => ({ id, path, type: "richButtons", max });
 const number = (id, path, min, max) => ({ id, path, type: "number", min, max });
 const toggle = (id, path) => ({ id, path, type: "toggle" });
 const choice = (id, path, choices, extra = {}) => ({ id, path, type: "choice", choices, ...extra });
@@ -60,6 +74,8 @@ const ADVANCED_SECTIONS = [
       text("welcomeFooter", "welcome.embed.footer", 200, { nullable: true }),
       text("welcomeImage", "welcome.embed.image", 300, { nullable: true, format: "https" }),
       toggle("welcomeTimestamp", "welcome.embed.timestamp"),
+      richFields("welcomeFields", "welcome.fields"),
+      richButtons("welcomeButtons", "welcome.buttons"),
       toggle("farewellEnabled", "farewell.enabled"),
       channel("farewellChannel", "farewell.channel"),
       text("farewellContent", "farewell.content", 1000, { multiline: true, nullable: true }),
@@ -72,6 +88,8 @@ const ADVANCED_SECTIONS = [
       text("farewellFooter", "farewell.embed.footer", 200, { nullable: true }),
       text("farewellImage", "farewell.embed.image", 300, { nullable: true, format: "https" }),
       toggle("farewellTimestamp", "farewell.embed.timestamp"),
+      richFields("farewellFields", "farewell.fields"),
+      richButtons("farewellButtons", "farewell.buttons"),
     ],
   },
   {
@@ -247,6 +265,24 @@ function parseList(raw) {
 function parseField(guild, body, field, current) {
   const raw = body[field.id];
   if (field.type === "toggle") return raw === "on";
+  if (field.type === "richFields") {
+    // Malformed input reverts to what was already stored, the same way every
+    // other field here degrades - not a rejected form, just an ignored line.
+    try {
+      return sanitizeFields(raw, field.max);
+    } catch (error) {
+      if (error instanceof RichMessageError) return current;
+      throw error;
+    }
+  }
+  if (field.type === "richButtons") {
+    try {
+      return sanitizeButtons(raw, field.max);
+    } catch (error) {
+      if (error instanceof RichMessageError) return current;
+      throw error;
+    }
+  }
   if (field.type === "number") {
     const parsed = Number.parseInt(raw, 10);
     if (!Number.isFinite(parsed)) return current;
@@ -300,10 +336,17 @@ function buildAdvancedPatch(guild, body, settings) {
   );
 }
 
+function viewValue(field, settings) {
+  const stored = getPath(settings, field.path);
+  if (field.type === "richFields") return stringifyFields(stored);
+  if (field.type === "richButtons") return stringifyButtons(stored);
+  return stored;
+}
+
 function fieldsForView(settings) {
   return ADVANCED_SECTIONS.map((section) => ({
     ...section,
-    fields: section.fields.map((field) => ({ ...field, value: getPath(settings, field.path) })),
+    fields: section.fields.map((field) => ({ ...field, value: viewValue(field, settings) })),
   }));
 }
 
@@ -333,5 +376,6 @@ module.exports = {
   buildAdvancedPatch,
   fieldsForView,
   getPath,
+  parseField,
   shouldRepublishTicketPanel,
 };

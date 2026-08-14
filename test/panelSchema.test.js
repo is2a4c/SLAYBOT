@@ -89,6 +89,10 @@ test("every editable guild setting is reachable from the control panel", () => {
     "automod.escalation_rules",
     "command_policy.disabled_categories",
     "command_policy.commands",
+    "welcome.fields",
+    "welcome.buttons",
+    "farewell.fields",
+    "farewell.buttons",
   ]);
 
   for (const path of Object.keys(schema.paths)) {
