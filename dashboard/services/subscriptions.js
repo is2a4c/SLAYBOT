@@ -73,7 +73,7 @@ async function createSubscription(guild, input, actorId, dependencies = {}) {
   let target;
   let latest;
   try {
-    target = normalizeTarget(type, input.target);
+    target = await normalizeTarget(type, input.target);
     latest = await (dependencies.fetchLatest || fetchLatest)(type, target, filters);
   } catch (error) {
     if (error instanceof FeedError) throw new SubscriptionError("TARGET", error.message);

@@ -84,7 +84,7 @@ module.exports = {
     live: "Powered by FeedWatcher",
     create: "New subscription",
     target: "Channel or source",
-    targetHint: "Twitch/Trovo name, YouTube ID, VK community, RSS URL, or owner/repo",
+    targetHint: "Twitch/Trovo name, YouTube channel (id, URL or @handle), VK community, RSS URL, or owner/repo",
     mentionRole: "Role to mention",
     message: "Message before publication",
     messageHint:

@@ -417,10 +417,11 @@ module.exports = {
 
     feeds: {
       title: "Feeds",
-      description: "Announce Twitch streams, YouTube uploads, RSS items and GitHub releases.",
+      description: "Announce Twitch, YouTube, Trovo, VK, RSS and GitHub updates.",
       empty: "Nothing is being watched yet.",
       hint: "Add a source — it is checked right away and watched from then on.",
-      targetHint: "twitch: channel name · youtube: channel id (UC…) · rss: url · github: owner/repo",
+      targetHint:
+        "twitch/trovo: channel name · youtube: channel id, URL or @handle · vk: community name or url · rss: url · github: owner/repo",
       lastError: "last error: {error}",
       limit: "A server can watch at most {max} sources.",
       exists: "`{target}` is already watched in that channel.",

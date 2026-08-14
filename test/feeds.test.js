@@ -6,11 +6,13 @@ const { FEED_TYPES } = require("@schemas/Feed");
 const {
   FeedError,
   PROVIDERS,
+  extractChannelIdFromHtml,
   matchesVkFilters,
   normalizeTarget,
   parseFeed,
   redactedUrl,
   request,
+  youtubeHandlePath,
 } = require("../src/services/feeds/providers");
 const {
   TYPE_STYLE,
@@ -21,39 +23,69 @@ const {
 const { SUPPORTED_TYPES, vkFilters } = require("../dashboard/services/subscriptions");
 
 /* ------------------------------------------------------------------- targets */
+// normalizeTarget is async because YOUTUBE's handle/URL form has to look the
+// id up; every other type still resolves without ever awaiting anything.
 
-test("twitch targets accept a url or a bare login", () => {
-  assert.equal(normalizeTarget("TWITCH", "https://twitch.tv/Ninja"), "ninja");
-  assert.equal(normalizeTarget("TWITCH", "Ninja"), "ninja");
-  assert.throws(() => normalizeTarget("TWITCH", "a b"), FeedError);
+test("twitch targets accept a url or a bare login", async () => {
+  assert.equal(await normalizeTarget("TWITCH", "https://twitch.tv/Ninja"), "ninja");
+  assert.equal(await normalizeTarget("TWITCH", "Ninja"), "ninja");
+  await assert.rejects(() => normalizeTarget("TWITCH", "a b"), FeedError);
 });
 
-test("youtube targets require the channel id", () => {
+test("a youtube channel id is recognised on sight, with no lookup needed", async () => {
   assert.equal(
-    normalizeTarget("YOUTUBE", "https://youtube.com/channel/UC_x5XG1OV2P6uZZ5FSM9Ttw"),
+    await normalizeTarget("YOUTUBE", "https://youtube.com/channel/UC_x5XG1OV2P6uZZ5FSM9Ttw"),
     "UC_x5XG1OV2P6uZZ5FSM9Ttw"
   );
-  assert.throws(() => normalizeTarget("YOUTUBE", "@handle"), /channel id/);
+  assert.equal(await normalizeTarget("YOUTUBE", "UC_x5XG1OV2P6uZZ5FSM9Ttw"), "UC_x5XG1OV2P6uZZ5FSM9Ttw");
+  // Neither an id nor a recognisable handle/URL shape - rejected before any
+  // network lookup would even be attempted.
+  await assert.rejects(() => normalizeTarget("YOUTUBE", "just some text"), /channel id.*URL.*handle/s);
 });
 
-test("github targets normalise to owner/repo", () => {
-  assert.equal(normalizeTarget("GITHUB", "https://github.com/discordjs/discord.js"), "discordjs/discord.js");
-  assert.equal(normalizeTarget("GITHUB", "discordjs/discord.js.git"), "discordjs/discord.js");
-  assert.throws(() => normalizeTarget("GITHUB", "discordjs"), /owner\/repo/);
+test("a youtube handle or custom URL is recognised as needing a lookup, not rejected on sight", () => {
+  assert.equal(youtubeHandlePath("@MrBeast"), "@MrBeast");
+  assert.equal(youtubeHandlePath("https://youtube.com/@MrBeast"), "@MrBeast");
+  assert.equal(youtubeHandlePath("youtube.com/c/OldStyleName"), "c/OldStyleName");
+  assert.equal(youtubeHandlePath("https://www.youtube.com/user/EvenOlder"), "user/EvenOlder");
+  assert.equal(youtubeHandlePath("not a handle at all"), null);
+  assert.equal(youtubeHandlePath("UC_x5XG1OV2P6uZZ5FSM9Ttw"), null, "a bare id is not a handle path");
 });
 
-test("rss targets must be http urls", () => {
-  assert.equal(normalizeTarget("RSS", "https://example.com/feed.xml"), "https://example.com/feed.xml");
-  assert.throws(() => normalizeTarget("RSS", "ftp://example.com/feed"), /http and https/);
-  assert.throws(() => normalizeTarget("RSS", "not a url"), /valid feed URL/);
-  assert.throws(() => normalizeTarget("RSS", ""), /Provide what should be watched/);
+test("the channel id is pulled from wherever the channel page put it", () => {
+  assert.equal(
+    extractChannelIdFromHtml('{"channelId":"UC_x5XG1OV2P6uZZ5FSM9Ttw","other":"stuff"}'),
+    "UC_x5XG1OV2P6uZZ5FSM9Ttw"
+  );
+  assert.equal(
+    extractChannelIdFromHtml('<link rel="canonical" href="https://www.youtube.com/channel/UC_x5XG1OV2P6uZZ5FSM9Ttw">'),
+    "UC_x5XG1OV2P6uZZ5FSM9Ttw"
+  );
+  assert.equal(
+    extractChannelIdFromHtml('<meta itemprop="channelId" content="UC_x5XG1OV2P6uZZ5FSM9Ttw">'),
+    "UC_x5XG1OV2P6uZZ5FSM9Ttw"
+  );
+  assert.equal(extractChannelIdFromHtml("<html>no channel id anywhere in here</html>"), null);
 });
 
-test("trovo targets accept a url or a bare channel name", () => {
-  assert.equal(normalizeTarget("TROVO", "https://trovo.live/SomeStreamer"), "somestreamer");
-  assert.equal(normalizeTarget("TROVO", "trovo.live/s/SomeStreamer?from=search"), "somestreamer");
-  assert.equal(normalizeTarget("TROVO", "SomeStreamer"), "somestreamer");
-  assert.throws(() => normalizeTarget("TROVO", "no"), FeedError, "below Trovo's own minimum username length");
+test("github targets normalise to owner/repo", async () => {
+  assert.equal(await normalizeTarget("GITHUB", "https://github.com/discordjs/discord.js"), "discordjs/discord.js");
+  assert.equal(await normalizeTarget("GITHUB", "discordjs/discord.js.git"), "discordjs/discord.js");
+  await assert.rejects(() => normalizeTarget("GITHUB", "discordjs"), /owner\/repo/);
+});
+
+test("rss targets must be http urls", async () => {
+  assert.equal(await normalizeTarget("RSS", "https://example.com/feed.xml"), "https://example.com/feed.xml");
+  await assert.rejects(() => normalizeTarget("RSS", "ftp://example.com/feed"), /http and https/);
+  await assert.rejects(() => normalizeTarget("RSS", "not a url"), /valid feed URL/);
+  await assert.rejects(() => normalizeTarget("RSS", ""), /Provide what should be watched/);
+});
+
+test("trovo targets accept a url or a bare channel name", async () => {
+  assert.equal(await normalizeTarget("TROVO", "https://trovo.live/SomeStreamer"), "somestreamer");
+  assert.equal(await normalizeTarget("TROVO", "trovo.live/s/SomeStreamer?from=search"), "somestreamer");
+  assert.equal(await normalizeTarget("TROVO", "SomeStreamer"), "somestreamer");
+  await assert.rejects(() => normalizeTarget("TROVO", "no"), FeedError, "below Trovo's own minimum username length");
 });
 
 test("every registered feed type has a provider, a style and dashboard support", () => {
@@ -64,15 +96,15 @@ test("every registered feed type has a provider, a style and dashboard support",
   }
 });
 
-test("vk targets accept a url, a bare name, or a numeric community id", () => {
-  assert.equal(normalizeTarget("VK", "https://vk.com/durov"), "durov");
-  assert.equal(normalizeTarget("VK", "vk.com/club1"), "-1");
-  assert.equal(normalizeTarget("VK", "public228"), "-228");
-  assert.equal(normalizeTarget("VK", "123456"), "-123456");
-  assert.equal(normalizeTarget("VK", "-123456"), "-123456");
-  assert.equal(normalizeTarget("VK", "some_community.name"), "some_community.name");
-  assert.throws(() => normalizeTarget("VK", "0"), FeedError);
-  assert.throws(() => normalizeTarget("VK", "!"), /valid VK community/);
+test("vk targets accept a url, a bare name, or a numeric community id", async () => {
+  assert.equal(await normalizeTarget("VK", "https://vk.com/durov"), "durov");
+  assert.equal(await normalizeTarget("VK", "vk.com/club1"), "-1");
+  assert.equal(await normalizeTarget("VK", "public228"), "-228");
+  assert.equal(await normalizeTarget("VK", "123456"), "-123456");
+  assert.equal(await normalizeTarget("VK", "-123456"), "-123456");
+  assert.equal(await normalizeTarget("VK", "some_community.name"), "some_community.name");
+  await assert.rejects(() => normalizeTarget("VK", "0"), FeedError);
+  await assert.rejects(() => normalizeTarget("VK", "!"), /valid VK community/);
 });
 
 test("a VK keyword filter is case-insensitive and matches the post text", () => {

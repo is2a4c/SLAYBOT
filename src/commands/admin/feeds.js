@@ -7,13 +7,17 @@ const { decideAnnouncement } = require("@src/services/feeds/FeedWatcher");
 const TYPE_CHOICES = [
   { name: "Twitch stream", value: "TWITCH" },
   { name: "YouTube uploads", value: "YOUTUBE" },
+  { name: "Trovo stream", value: "TROVO" },
+  { name: "VK wall post", value: "VK" },
   { name: "RSS / Atom feed", value: "RSS" },
   { name: "GitHub releases", value: "GITHUB" },
 ];
 
 const TARGET_HINT = {
   TWITCH: "channel name, e.g. `ninja`",
-  YOUTUBE: "channel id starting with `UC`",
+  YOUTUBE: "channel id, URL or @handle",
+  TROVO: "channel name, e.g. `somestreamer`",
+  VK: "community name or url, e.g. `durov`",
   RSS: "feed url",
   GITHUB: "`owner/repo`",
 };
@@ -23,7 +27,7 @@ const TARGET_HINT = {
  */
 module.exports = {
   name: "feeds",
-  description: "announce Twitch streams, YouTube uploads, RSS items and GitHub releases",
+  description: "announce Twitch, YouTube, Trovo, VK, RSS and GitHub updates",
   category: "ADMIN",
   userPermissions: ["ManageGuild"],
   botPermissions: ["EmbedLinks"],
@@ -33,10 +37,13 @@ module.exports = {
     usage: "<add|remove|list|test> ...",
     minArgsCount: 1,
     subcommands: [
-      { trigger: "add <twitch|youtube|rss|github> <target> <#channel>", description: "watch a source" },
-      { trigger: "remove <twitch|youtube|rss|github> <target>", description: "stop watching a source" },
+      { trigger: "add <twitch|youtube|trovo|vk|rss|github> <target> <#channel>", description: "watch a source" },
+      { trigger: "remove <twitch|youtube|trovo|vk|rss|github> <target>", description: "stop watching a source" },
       { trigger: "list", description: "list the configured feeds" },
-      { trigger: "test <twitch|youtube|rss|github> <target>", description: "fetch a source without saving it" },
+      {
+        trigger: "test <twitch|youtube|trovo|vk|rss|github> <target>",
+        description: "fetch a source without saving it",
+      },
     ],
   },
   slashCommand: {
@@ -208,7 +215,7 @@ module.exports = {
 };
 
 async function add(guild, { type, target, channel, mention, message, authorId }) {
-  const normalized = normalizeTarget(type, target);
+  const normalized = await normalizeTarget(type, target);
 
   if (!channel.isTextBased()) return "Announcements need a text channel.";
   if (!channel.permissionsFor(guild.members.me)?.has(["ViewChannel", "SendMessages", "EmbedLinks"])) {
@@ -247,7 +254,7 @@ async function add(guild, { type, target, channel, mention, message, authorId })
 }
 
 async function remove(guild, { type, target, channel }) {
-  const normalized = normalizeTarget(type, target);
+  const normalized = await normalizeTarget(type, target);
   const result = await deleteFeed({
     guildId: guild.id,
     type,
@@ -287,7 +294,7 @@ async function renderList(guild) {
 }
 
 async function testSource(type, target) {
-  const normalized = normalizeTarget(type, target);
+  const normalized = await normalizeTarget(type, target);
   const latest = await fetchLatest(type, normalized);
 
   if (!latest) {

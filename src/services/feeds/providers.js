@@ -112,7 +112,7 @@ function parseFeed(xml) {
  * @param {string} type
  * @param {string} input
  */
-function normalizeTarget(type, input) {
+async function normalizeTarget(type, input) {
   const value = String(input || "").trim();
   if (!value) throw new FeedError("Provide what should be watched.");
 
@@ -126,9 +126,18 @@ function normalizeTarget(type, input) {
   if (type === "YOUTUBE") {
     const idMatch = value.match(/(UC[\w-]{22})/);
     if (idMatch) return idMatch[1];
-    throw new FeedError(
-      "Provide the YouTube channel id (starts with `UC`). Open the channel, then About → Share → Copy channel ID."
-    );
+
+    // A handle or a custom URL carries no channel id as text at all - it only
+    // exists on the channel's own page, so this is the one target that needs
+    // a lookup rather than a pattern match.
+    const handlePath = youtubeHandlePath(value);
+    if (handlePath) {
+      const resolved = await resolveYoutubeChannelId(handlePath);
+      if (resolved) return resolved;
+      throw new FeedError("Could not find a YouTube channel at that handle or URL.");
+    }
+
+    throw new FeedError("Provide the YouTube channel id (starts with `UC`), a channel URL, or an @handle.");
   }
 
   if (type === "GITHUB") {
@@ -240,6 +249,49 @@ async function fetchTwitch(login) {
       thumbnail: stream.thumbnail_url?.replace("{width}", "1280").replace("{height}", "720"),
     },
   };
+}
+
+/**
+ * The path segment on youtube.com that names a channel by handle or by a
+ * custom URL, or null when the input is neither.
+ *
+ * @param {string} value
+ * @returns {string|null} e.g. `@name`, `c/OldName`, `user/EvenOlder`
+ */
+function youtubeHandlePath(value) {
+  if (/^@[\w.-]{2,30}$/.test(value)) return value;
+
+  const match = value.match(/^(?:https?:\/\/)?(?:www\.|m\.)?youtube\.com\/(@[\w.-]+|c\/[\w.-]+|user\/[\w.-]+)\/?/i);
+  return match?.[1] || null;
+}
+
+/**
+ * A channel id, wherever it is sitting in the page's own markup. YouTube
+ * repeats it in more than one place; the first one found wins.
+ *
+ * @param {string} html
+ * @returns {string|null}
+ */
+function extractChannelIdFromHtml(html) {
+  const match =
+    html.match(/"channelId":"(UC[\w-]{22})"/) ||
+    html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/channel\/(UC[\w-]{22})"/) ||
+    html.match(/<meta itemprop="channelId" content="(UC[\w-]{22})"/);
+  return match?.[1] || null;
+}
+
+/**
+ * Resolve a handle or custom URL to the channel id everything else here
+ * actually needs - the page itself is the only place that mapping exists,
+ * since neither carries the id as text.
+ *
+ * @param {string} handlePath e.g. `@name`
+ * @returns {Promise<string|null>}
+ */
+async function resolveYoutubeChannelId(handlePath) {
+  const response = await request(`https://www.youtube.com/${handlePath}`);
+  if (!response.ok) return null;
+  return extractChannelIdFromHtml(await response.text());
 }
 
 /**
@@ -492,6 +544,7 @@ module.exports = {
   FeedError,
   PROVIDERS,
   REQUEST_TIMEOUT_MS,
+  extractChannelIdFromHtml,
   fetchGitHub,
   fetchLatest,
   fetchRss,
@@ -504,4 +557,5 @@ module.exports = {
   parseFeed,
   redactedUrl,
   request,
+  youtubeHandlePath,
 };

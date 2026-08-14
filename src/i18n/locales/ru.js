@@ -421,10 +421,11 @@ module.exports = {
 
     feeds: {
       title: "Ленты",
-      description: "Анонсы стримов Twitch, роликов YouTube, записей RSS и релизов GitHub.",
+      description: "Анонсы Twitch, YouTube, Trovo, VK, RSS и GitHub.",
       empty: "Пока ничего не отслеживается.",
       hint: "Добавь источник — бот проверит его сразу и начнёт следить.",
-      targetHint: "twitch: имя канала · youtube: id канала (UC…) · rss: ссылка · github: owner/repo",
+      targetHint:
+        "twitch/trovo: имя канала · youtube: id, URL или @handle · vk: имя сообщества или ссылка · rss: ссылка · github: owner/repo",
       lastError: "последняя ошибка: {error}",
       limit: "Больше {max} источников на сервер не бывает.",
       exists: "`{target}` уже отслеживается в этом канале.",

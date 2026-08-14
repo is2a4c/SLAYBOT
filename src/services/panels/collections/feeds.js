@@ -12,8 +12,8 @@ const { HOME_ID } = require("../ids");
  * channel name is worth finding here rather than in a watcher log nobody reads.
  */
 
-const TYPES = ["TWITCH", "YOUTUBE", "RSS", "GITHUB"];
-const TYPE_ICONS = { TWITCH: "🟣", YOUTUBE: "🔴", RSS: "📰", GITHUB: "🐙" };
+const TYPES = ["TWITCH", "YOUTUBE", "TROVO", "VK", "RSS", "GITHUB"];
+const TYPE_ICONS = { TWITCH: "🟣", YOUTUBE: "🔴", TROVO: "🟢", VK: "🔵", RSS: "📰", GITHUB: "🐙" };
 const TEXT_CHANNELS = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 const SEND = ["ViewChannel", "SendMessages", "EmbedLinks"];
 
@@ -83,7 +83,7 @@ async function check(guild, values, t) {
 
   let target;
   try {
-    target = normalizeTarget(values.type, values.target);
+    target = await normalizeTarget(values.type, values.target);
     const latest = await fetchLatest(values.type, target);
     // Adopt what is published now, so setup does not announce a backlog.
     const { store } = decideAnnouncement({ lastItemId: null, item: latest, firstRun: true });
