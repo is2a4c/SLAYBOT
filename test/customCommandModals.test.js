@@ -155,8 +155,24 @@ function modalCommand(overrides = {}) {
         type: "SHOW_MODAL",
         modal_title: "Say hi",
         modal_inputs: [
-          { id: "name", label: "Your name", style: "SHORT", required: true, min_length: null, max_length: null, placeholder: null },
-          { id: "color", label: "Favourite colour", style: "SHORT", required: false, min_length: null, max_length: null, placeholder: null },
+          {
+            id: "name",
+            label: "Your name",
+            style: "SHORT",
+            required: true,
+            min_length: null,
+            max_length: null,
+            placeholder: null,
+          },
+          {
+            id: "color",
+            label: "Favourite colour",
+            style: "SHORT",
+            required: false,
+            min_length: null,
+            max_length: null,
+            placeholder: null,
+          },
         ],
         confirm_action_id: "confirm-1",
       },
@@ -166,7 +182,11 @@ function modalCommand(overrides = {}) {
 }
 
 function fakeModel(commands) {
-  return { findOne: async (query) => commands.find((c) => c._id === query._id && c.guild_id === query.guild_id && (!query.enabled || c.enabled)) || null };
+  return {
+    findOne: async (query) =>
+      commands.find((c) => c._id === query._id && c.guild_id === query.guild_id && (!query.enabled || c.enabled)) ||
+      null,
+  };
 }
 
 /* ------------------------------------------------------------- modalBuilder */
@@ -196,7 +216,12 @@ test("buildModal turns the stored fields into Discord's own components", () => {
 test("more than five fields never reaches Discord, even from a hand-built action", () => {
   const tooMany = {
     modal_title: "x",
-    modal_inputs: Array.from({ length: 8 }, (_, i) => ({ id: `f${i}`, label: `f${i}`, style: "SHORT", required: true })),
+    modal_inputs: Array.from({ length: 8 }, (_, i) => ({
+      id: `f${i}`,
+      label: `f${i}`,
+      style: "SHORT",
+      required: true,
+    })),
   };
   const modal = buildModal(tooMany, "token-2").toJSON();
   assert.equal(modal.components.length, MAX_MODAL_INPUTS);
@@ -205,7 +230,14 @@ test("more than five fields never reaches Discord, even from a hand-built action
 /* ------------------------------------------------------------- modalSessions */
 
 test("a session is answered once: the second read finds nothing", () => {
-  const token = modalSessions.create({ guildId: GUILD_ID, commandId: "cmd-1", userId: USER_ID, args: [], options: {}, target: null });
+  const token = modalSessions.create({
+    guildId: GUILD_ID,
+    commandId: "cmd-1",
+    userId: USER_ID,
+    args: [],
+    options: {},
+    target: null,
+  });
   assert.equal(modalSessions.size(), 1);
 
   const first = modalSessions.consume(token, USER_ID);
@@ -217,13 +249,27 @@ test("a session is answered once: the second read finds nothing", () => {
 });
 
 test("a session opened for somebody else refuses, and still burns the token", () => {
-  const token = modalSessions.create({ guildId: GUILD_ID, commandId: "cmd-1", userId: USER_ID, args: [], options: {}, target: null });
+  const token = modalSessions.create({
+    guildId: GUILD_ID,
+    commandId: "cmd-1",
+    userId: USER_ID,
+    args: [],
+    options: {},
+    target: null,
+  });
   assert.equal(modalSessions.consume(token, "someone-else"), null);
   assert.equal(modalSessions.consume(token, USER_ID), null, "already consumed by the ownership check above");
 });
 
 test("a session past its TTL is treated as gone", () => {
-  const token = modalSessions.create({ guildId: GUILD_ID, commandId: "cmd-1", userId: USER_ID, args: [], options: {}, target: null });
+  const token = modalSessions.create({
+    guildId: GUILD_ID,
+    commandId: "cmd-1",
+    userId: USER_ID,
+    args: [],
+    options: {},
+    target: null,
+  });
 
   const realNow = Date.now;
   try {
@@ -235,7 +281,14 @@ test("a session past its TTL is treated as gone", () => {
 });
 
 test("discard burns a token that was never actually shown to anybody", () => {
-  const token = modalSessions.create({ guildId: GUILD_ID, commandId: "cmd-1", userId: USER_ID, args: [], options: {}, target: null });
+  const token = modalSessions.create({
+    guildId: GUILD_ID,
+    commandId: "cmd-1",
+    userId: USER_ID,
+    args: [],
+    options: {},
+    target: null,
+  });
   modalSessions.discard(token);
   assert.equal(modalSessions.consume(token, USER_ID), null);
 });
@@ -398,10 +451,28 @@ test("{modal:*} substitutes what was typed and nothing more", () => {
 /* --------------------------------------------------------- dashboard: input */
 
 test("parseModalInputs reads the compact line format", () => {
-  const inputs = parseModalInputs("name | Your name | short | required\ncolor | Favourite colour | paragraph | optional | 2 | 20 | e.g. blue");
+  const inputs = parseModalInputs(
+    "name | Your name | short | required\ncolor | Favourite colour | paragraph | optional | 2 | 20 | e.g. blue"
+  );
   assert.deepEqual(inputs, [
-    { id: "name", label: "Your name", style: "SHORT", required: true, min_length: null, max_length: null, placeholder: null },
-    { id: "color", label: "Favourite colour", style: "PARAGRAPH", required: false, min_length: 2, max_length: 20, placeholder: "e.g. blue" },
+    {
+      id: "name",
+      label: "Your name",
+      style: "SHORT",
+      required: true,
+      min_length: null,
+      max_length: null,
+      placeholder: null,
+    },
+    {
+      id: "color",
+      label: "Favourite colour",
+      style: "PARAGRAPH",
+      required: false,
+      min_length: 2,
+      max_length: 20,
+      placeholder: "e.g. blue",
+    },
   ]);
 });
 
@@ -417,7 +488,10 @@ test("parseModalInputs rejects what Discord could never accept", () => {
 
 test("actionFromInput refuses a form on a command with no way to open one", () => {
   const guild = testGuild();
-  const prefixOnly = { actions: [], triggers: { prefix: true, slash: false, message_context: false, member_context: false } };
+  const prefixOnly = {
+    actions: [],
+    triggers: { prefix: true, slash: false, message_context: false, member_context: false },
+  };
 
   assert.throws(
     () => actionFromInput(guild, { type: "SHOW_MODAL", modalTitle: "x", modalInputs: "a | a" }, prefixOnly),
@@ -441,7 +515,13 @@ test("actionFromInput wires the chosen action up as the confirmation step", () =
 
   const action = actionFromInput(
     guild,
-    { type: "SHOW_MODAL", actionName: "form", modalTitle: "Say hi", modalInputs: "name | Your name", confirmAction: "existing-1" },
+    {
+      type: "SHOW_MODAL",
+      actionName: "form",
+      modalTitle: "Say hi",
+      modalInputs: "name | Your name",
+      confirmAction: "existing-1",
+    },
     command
   );
 

@@ -64,7 +64,11 @@ async function buildFields(fields, renderText) {
     // Discord rejects the whole embed when one field has an empty name or
     // value; dropping just that field keeps the rest of the message alive.
     if (!name || !value) continue;
-    built.push({ name: name.slice(0, MAX_FIELD_NAME), value: value.slice(0, MAX_FIELD_VALUE), inline: Boolean(field.inline) });
+    built.push({
+      name: name.slice(0, MAX_FIELD_NAME),
+      value: value.slice(0, MAX_FIELD_VALUE),
+      inline: Boolean(field.inline),
+    });
     if (built.length >= MAX_FIELDS) break;
   }
   return built;
@@ -86,7 +90,8 @@ async function buildEmbed(config, renderText) {
   const image = await renderMaybe(config.image, renderText);
   const fields = await buildFields(config.fields, renderText);
 
-  const hasContent = title || description || author || footer || thumbnail || image || fields.length || config.timestamp;
+  const hasContent =
+    title || description || author || footer || thumbnail || image || fields.length || config.timestamp;
   if (!hasContent) return null;
 
   const embed = new EmbedBuilder();
@@ -241,7 +246,9 @@ function sanitizeButtons(raw, max = MAX_BUTTONS) {
     const label = String(rawLabel || "").slice(0, MAX_BUTTON_LABEL);
     const url = String(rawUrl || "");
     if (!label || !HTTPS.test(url)) {
-      throw new RichMessageError('Each button needs a label and an https link, e.g. "Support | https://discord.gg/...".');
+      throw new RichMessageError(
+        'Each button needs a label and an https link, e.g. "Support | https://discord.gg/...".'
+      );
     }
     return { label, url: url.slice(0, 512), emoji: rawEmoji ? String(rawEmoji).slice(0, 100) : null };
   });
@@ -254,7 +261,9 @@ function sanitizeButtons(raw, max = MAX_BUTTONS) {
  * @returns {{question: string, options: string[], multi: boolean, duration_minutes: number|null}|null}
  */
 function sanitizePoll(input) {
-  const question = String(input?.pollQuestion || "").trim().slice(0, MAX_POLL_QUESTION);
+  const question = String(input?.pollQuestion || "")
+    .trim()
+    .slice(0, MAX_POLL_QUESTION);
   const options = String(input?.pollOptions || "")
     .split("\n")
     .map((line) => line.trim())
@@ -293,7 +302,9 @@ function stringifyFields(fields) {
  * @returns {string}
  */
 function stringifyButtons(buttons) {
-  return (buttons || []).map((button) => `${button.label} | ${button.url}${button.emoji ? ` | ${button.emoji}` : ""}`).join("\n");
+  return (buttons || [])
+    .map((button) => `${button.label} | ${button.url}${button.emoji ? ` | ${button.emoji}` : ""}`)
+    .join("\n");
 }
 
 module.exports = {
