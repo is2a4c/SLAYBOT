@@ -61,10 +61,36 @@ function decideAnnouncement({ lastItemId, item, firstRun = false }) {
 }
 
 /**
+ * The variables a publication template may use. Every one of them is a name
+ * substituted for a value - there is no expression, no lookup chain and no
+ * code, so a server administrator writing a template cannot make the bot do
+ * anything beyond arranging plain text.
+ *
+ * A variable a provider has nothing for (`{game}` on a GitHub release) becomes
+ * an empty string rather than being left as literal `{game}` text.
+ *
+ * @param {string} value
+ * @param {{feed: object, item: object, author: string, guildName?: string}} context
+ * @returns {string}
+ */
+function renderAnnouncementText(value, { feed, item, author, guildName }) {
+  return String(value || "")
+    .replaceAll("{title}", item.title || "")
+    .replaceAll("{url}", item.link || "")
+    .replaceAll("{author}", author || "")
+    .replaceAll("{channel}", feed.target || "")
+    .replaceAll("{server}", guildName || "")
+    .replaceAll("{mention}", feed.mention || "")
+    .replaceAll("{game}", item.extra?.game || "")
+    .replaceAll("{viewers}", typeof item.extra?.viewers === "number" ? String(item.extra.viewers) : "");
+}
+
+/**
  * @param {object} feed
  * @param {object} item
+ * @param {{guildName?: string}} [context]
  */
-function buildAnnouncement(feed, item) {
+function buildAnnouncement(feed, item, { guildName } = {}) {
   const style = TYPE_STYLE[feed.type] || { color: EMBED_COLORS.BOT_EMBED, label: feed.type, verb: "posted" };
   const author = item.extra?.author || feed.target;
 
@@ -85,10 +111,15 @@ function buildAnnouncement(feed, item) {
 
   if (item.extra?.thumbnail) embed.setImage(item.extra.thumbnail);
 
-  const content = [feed.mention, feed.message || `${author} ${style.verb}: ${item.link || ""}`.trim()]
-    .filter(Boolean)
-    .join(" ")
-    .slice(0, 2000);
+  const templateContext = { feed, item, author, guildName };
+  const text = feed.message
+    ? renderAnnouncementText(feed.message, templateContext)
+    : `${author} ${style.verb}: ${item.link || ""}`.trim();
+
+  // A template that already placed {mention} itself is not mentioned again -
+  // only a template that never mentioned it gets the automatic prepend.
+  const mentionPlaced = feed.message && String(feed.message).includes("{mention}");
+  const content = [mentionPlaced ? null : feed.mention, text].filter(Boolean).join(" ").slice(0, 2000);
 
   return { content, embeds: [embed] };
 }
@@ -154,7 +185,7 @@ class FeedWatcher {
       return { announced: false };
     }
 
-    await channel.send(buildAnnouncement(feed, item)).catch((error) => {
+    await channel.send(buildAnnouncement(feed, item, { guildName: guild.name })).catch((error) => {
       this.client.logger?.error(`Feed announcement failed for ${feed.type} ${feed.target}`, error);
     });
 
@@ -227,4 +258,5 @@ module.exports = {
   buildAnnouncement,
   decideAnnouncement,
   fitDescription,
+  renderAnnouncementText,
 };

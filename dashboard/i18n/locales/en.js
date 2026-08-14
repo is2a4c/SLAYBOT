@@ -87,7 +87,8 @@ module.exports = {
     targetHint: "Twitch name, YouTube ID, RSS URL, or owner/repo",
     mentionRole: "Role to mention",
     message: "Message before publication",
-    messageHint: "Optional text shown before the publication card",
+    messageHint:
+      "Optional template shown before the publication card. Variables: {title}, {url}, {author}, {channel}, {server}, {mention}, {game}, {viewers} (the last two only fill in for Twitch).",
     currentEyebrow: "Live configuration",
     current: "Connected sources",
     empty: "No subscriptions yet.",

@@ -87,7 +87,8 @@ module.exports = {
     targetHint: "Имя Twitch, ID YouTube, RSS URL или owner/repo",
     mentionRole: "Упоминаемая роль",
     message: "Текст перед публикацией",
-    messageHint: "Необязательный текст до карточки публикации",
+    messageHint:
+      "Необязательный шаблон перед карточкой публикации. Переменные: {title}, {url}, {author}, {channel}, {server}, {mention}, {game}, {viewers} (последние два — только для Twitch).",
     currentEyebrow: "Активная конфигурация",
     current: "Подключённые источники",
     empty: "Подписок пока нет.",

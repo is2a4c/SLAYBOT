@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 require("module-alias/register");
 
 const { FeedError, normalizeTarget, parseFeed } = require("../src/services/feeds/providers");
-const { buildAnnouncement, decideAnnouncement } = require("../src/services/feeds/FeedWatcher");
+const { buildAnnouncement, decideAnnouncement, renderAnnouncementText } = require("../src/services/feeds/FeedWatcher");
 
 /* ------------------------------------------------------------------- targets */
 
@@ -179,4 +179,72 @@ test("oversized github release notes end cleanly with a link to the full text", 
   assert.ok(description.length <= 4096);
   assert.match(description, /\n\n… \[Read the full release notes on GitHub →\]\(.+\)$/);
   assert.match(preview.split("\n").at(-1), /^- \*\*Change \d+:\*\* a useful improvement$/);
+});
+
+/* ------------------------------------------------------------- templates */
+
+test("a template variable is substituted with the matching value", () => {
+  const feed = { target: "ninja", mention: "<@&1>" };
+  const item = {
+    title: "Ranked grind",
+    link: "https://twitch.tv/ninja",
+    extra: { author: "Ninja", game: "Fortnite", viewers: 42 },
+  };
+
+  const text = renderAnnouncementText("{author} is live on {channel}: {title} ({url}) - {viewers} watching {game}", {
+    feed,
+    item,
+    author: item.extra.author,
+    guildName: "My Server",
+  });
+
+  assert.equal(text, "Ninja is live on ninja: Ranked grind (https://twitch.tv/ninja) - 42 watching Fortnite");
+});
+
+test("a variable a provider has nothing for renders as nothing, not literal text", () => {
+  const text = renderAnnouncementText("{title} · {game} · {viewers} · {server}", {
+    feed: { target: "repo" },
+    item: { title: "Release", extra: {} },
+    author: "author",
+  });
+
+  assert.equal(text, "Release ·  ·  · ");
+});
+
+test("{server} fills in from the guild the feed announces into", () => {
+  const text = renderAnnouncementText("posted in {server}", {
+    feed: {},
+    item: { title: "x", extra: {} },
+    author: "a",
+    guildName: "Slay HQ",
+  });
+  assert.equal(text, "posted in Slay HQ");
+});
+
+test("a template replaces the default text but keeps the automatic mention", () => {
+  const payload = buildAnnouncement(
+    { type: "GITHUB", target: "is2a4c/SLAYBOT", mention: "<@&9>", message: "Shipped {title} → {url}" },
+    { id: "r1", title: "v2.0", link: "https://x/v2", publishedAt: null, extra: { author: "is2a4c", kind: "release" } }
+  );
+
+  assert.equal(payload.content, "<@&9> Shipped v2.0 → https://x/v2");
+});
+
+test("a template that places {mention} itself is not mentioned a second time", () => {
+  const payload = buildAnnouncement(
+    { type: "GITHUB", target: "is2a4c/SLAYBOT", mention: "<@&9>", message: "Hey {mention}, {title} is out" },
+    { id: "r1", title: "v2.0", link: "https://x/v2", publishedAt: null, extra: { author: "is2a4c", kind: "release" } }
+  );
+
+  assert.equal(payload.content, "Hey <@&9>, v2.0 is out");
+});
+
+test("{server} reaches the built announcement through the guild name FeedWatcher passes in", () => {
+  const payload = buildAnnouncement(
+    { type: "RSS", target: "https://example.com/feed", mention: null, message: "New post in {server}: {title}" },
+    { id: "p1", title: "Hello", link: "https://example.com/p1", publishedAt: null, extra: {} },
+    { guildName: "Community" }
+  );
+
+  assert.equal(payload.content, "New post in Community: Hello");
 });
