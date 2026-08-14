@@ -3,14 +3,22 @@ const assert = require("node:assert/strict");
 require("module-alias/register");
 
 const { FEED_TYPES } = require("@schemas/Feed");
-const { FeedError, PROVIDERS, normalizeTarget, parseFeed } = require("../src/services/feeds/providers");
+const {
+  FeedError,
+  PROVIDERS,
+  matchesVkFilters,
+  normalizeTarget,
+  parseFeed,
+  redactedUrl,
+  request,
+} = require("../src/services/feeds/providers");
 const {
   TYPE_STYLE,
   buildAnnouncement,
   decideAnnouncement,
   renderAnnouncementText,
 } = require("../src/services/feeds/FeedWatcher");
-const { SUPPORTED_TYPES } = require("../dashboard/services/subscriptions");
+const { SUPPORTED_TYPES, vkFilters } = require("../dashboard/services/subscriptions");
 
 /* ------------------------------------------------------------------- targets */
 
@@ -54,6 +62,97 @@ test("every registered feed type has a provider, a style and dashboard support",
     assert.ok(TYPE_STYLE[type], `${type} has no announcement style`);
     assert.ok(SUPPORTED_TYPES.includes(type), `${type} is not offered on the dashboard`);
   }
+});
+
+test("vk targets accept a url, a bare name, or a numeric community id", () => {
+  assert.equal(normalizeTarget("VK", "https://vk.com/durov"), "durov");
+  assert.equal(normalizeTarget("VK", "vk.com/club1"), "-1");
+  assert.equal(normalizeTarget("VK", "public228"), "-228");
+  assert.equal(normalizeTarget("VK", "123456"), "-123456");
+  assert.equal(normalizeTarget("VK", "-123456"), "-123456");
+  assert.equal(normalizeTarget("VK", "some_community.name"), "some_community.name");
+  assert.throws(() => normalizeTarget("VK", "0"), FeedError);
+  assert.throws(() => normalizeTarget("VK", "!"), /valid VK community/);
+});
+
+test("a VK keyword filter is case-insensitive and matches the post text", () => {
+  const post = { text: "We just SHIPPED a new update", attachments: [] };
+  assert.equal(matchesVkFilters(post, { keyword: "shipped" }), true);
+  assert.equal(matchesVkFilters(post, { keyword: "cancelled" }), false);
+  assert.equal(matchesVkFilters(post, {}), true, "no filter means every post matches");
+});
+
+test("a VK attachment filter only passes a post carrying that attachment type", () => {
+  const withPhoto = { text: "", attachments: [{ type: "photo" }] };
+  const withVideo = { text: "", attachments: [{ type: "video" }] };
+  const withNone = { text: "", attachments: [] };
+
+  assert.equal(matchesVkFilters(withPhoto, { attachmentType: "PHOTO" }), true);
+  assert.equal(matchesVkFilters(withVideo, { attachmentType: "PHOTO" }), false);
+  assert.equal(matchesVkFilters(withNone, { attachmentType: "PHOTO" }), false);
+});
+
+test("both VK filters must pass for a post to match", () => {
+  const post = { text: "release notes", attachments: [{ type: "photo" }] };
+  assert.equal(matchesVkFilters(post, { keyword: "release", attachmentType: "PHOTO" }), true);
+  assert.equal(matchesVkFilters(post, { keyword: "release", attachmentType: "VIDEO" }), false);
+  assert.equal(matchesVkFilters(post, { keyword: "nope", attachmentType: "PHOTO" }), false);
+});
+
+test("a VK announcement carries the community's own post link", () => {
+  const payload = buildAnnouncement(
+    { type: "VK", target: "durov", mention: null, message: null },
+    {
+      id: "555",
+      title: "New post",
+      link: "https://vk.com/wall-1_555",
+      publishedAt: new Date("2026-07-30T12:00:00.000Z"),
+      extra: { author: "Pavel Durov's channel" },
+    }
+  );
+
+  assert.match(payload.content, /posted/);
+  assert.equal(payload.embeds[0].data.author.name, "VK · Pavel Durov's channel");
+});
+
+test("dashboard VK filters are only ever stored for a VK subscription", () => {
+  assert.deepEqual(vkFilters("VK", { keyword: " new release ", attachmentType: "photo" }), {
+    keyword: "new release",
+    attachmentType: "PHOTO",
+  });
+  assert.deepEqual(vkFilters("VK", {}), { keyword: null, attachmentType: null });
+  assert.deepEqual(vkFilters("VK", { attachmentType: "not-a-real-type" }), { keyword: null, attachmentType: null });
+  assert.deepEqual(vkFilters("TWITCH", { keyword: "ignored", attachmentType: "PHOTO" }), {
+    keyword: null,
+    attachmentType: null,
+  });
+});
+
+/* ---------------------------------------------------------- credential safety */
+
+test("a request error never carries a query string a token could be sitting in", () => {
+  assert.equal(
+    redactedUrl("https://api.vk.com/method/wall.get?access_token=SECRET&v=5.199"),
+    "https://api.vk.com/method/wall.get"
+  );
+  assert.equal(
+    redactedUrl("https://id.twitch.tv/oauth2/token?client_secret=SECRET"),
+    "https://id.twitch.tv/oauth2/token"
+  );
+  assert.equal(redactedUrl("not a url"), "the feed provider");
+});
+
+test("a connection failure surfaces as a FeedError with the credential-bearing query string stripped", async () => {
+  const secretToken = "super-secret-token-do-not-leak";
+  await assert.rejects(
+    () => request(`http://127.0.0.1:1/?access_token=${secretToken}`),
+    (error) => {
+      assert.ok(error instanceof FeedError, "network failures are reported as FeedError, not a raw fetch error");
+      assert.doesNotMatch(error.message, new RegExp(secretToken), "the token must never appear in a stored error");
+      assert.match(error.message, /http:\/\/127\.0\.0\.1:1\//);
+      return true;
+    }
+  );
 });
 
 test("a Trovo stream announces with its game and viewer count, like Twitch", () => {

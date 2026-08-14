@@ -14,6 +14,7 @@ const TYPE_STYLE = {
   RSS: { color: "#FF9900", label: "RSS", verb: "published" },
   GITHUB: { color: "#24292F", label: "GitHub", verb: "shipped" },
   TROVO: { color: "#1CE7C0", label: "Trovo", verb: "is live" },
+  VK: { color: "#0077FF", label: "VK", verb: "posted" },
 };
 
 /**
@@ -152,7 +153,10 @@ class FeedWatcher {
 
     let item = null;
     try {
-      item = await fetchLatest(feed.type, feed.target);
+      item = await fetchLatest(feed.type, feed.target, {
+        keyword: feed.keyword_filter,
+        attachmentType: feed.attachment_filter,
+      });
       feed.last_error = null;
       feed.consecutive_failures = 0;
     } catch (error) {

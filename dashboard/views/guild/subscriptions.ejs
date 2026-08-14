@@ -22,6 +22,10 @@
       <% options.roles.forEach((role) => { %><option value="<%= role.id %>">@<%= role.name %></option><% }) %>
     </select></div>
     <div class="field field-wide"><label for="subscription-message"><%= t("subscriptions.message") %></label><textarea id="subscription-message" name="message" maxlength="1000" rows="3" placeholder="<%= t('subscriptions.messageHint') %>"></textarea></div>
+    <div class="field"><label for="subscription-keyword"><%= t("subscriptions.keywordFilter") %></label><input id="subscription-keyword" name="keyword" maxlength="200" placeholder="<%= t('subscriptions.keywordFilterHint') %>" /></div>
+    <div class="field"><label for="subscription-attachment"><%= t("subscriptions.attachmentFilter") %></label><select id="subscription-attachment" name="attachmentType"><option value=""><%= t("subscriptions.attachmentFilterAny") %></option>
+      <% attachmentFilters.forEach((entry) => { %><option value="<%= entry %>"><%= entry %></option><% }) %>
+    </select></div>
     <div class="field field-wide"><button class="btn" type="submit"><%= t("common.create") %></button></div>
   </form>
 </section>
@@ -31,7 +35,7 @@
   <% if (!subscriptions.length) { %><div class="empty"><%= t("subscriptions.empty") %></div><% } else { %>
     <div class="table-shell"><table><thead><tr><th><%= t("common.type") %></th><th><%= t("common.target") %></th><th><%= t("common.channel") %></th><th><%= t("common.status") %></th><th></th></tr></thead><tbody>
       <% subscriptions.forEach((feed) => { %><tr>
-        <td><strong><%= feed.type %></strong></td><td><code><%= feed.target %></code><% if (feed.last_error) { %><small class="table-note danger-text"><%= feed.last_error %></small><% } %></td>
+        <td><strong><%= feed.type %></strong></td><td><code><%= feed.target %></code><% if (feed.keyword_filter || feed.attachment_filter) { %><small class="table-note"><%= [feed.keyword_filter ? `"${feed.keyword_filter}"` : null, feed.attachment_filter].filter(Boolean).join(" · ") %></small><% } %><% if (feed.last_error) { %><small class="table-note danger-text"><%= feed.last_error %></small><% } %></td>
         <td>#<%= (guild.channels.cache.get(feed.channel_id) || {}).name || feed.channel_id %></td><td><span class="badge <%= feed.enabled ? 'pass' : 'neutral' %>"><%= feed.enabled ? t("subscriptions.enabled") : t("subscriptions.paused") %></span></td>
         <td class="btn-row"><form method="post" action="<%= basePath %>/g/<%= guild.id %>/subscriptions/<%= feed._id %>/toggle"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><input type="hidden" name="enabled" value="<%= feed.enabled ? 'false' : 'true' %>" /><button class="btn secondary" type="submit"><%= feed.enabled ? t("subscriptions.pause") : t("subscriptions.resume") %></button></form>
         <form method="post" action="<%= basePath %>/g/<%= guild.id %>/subscriptions/<%= feed._id %>/delete" data-confirm="<%= t('common.dangerousAction') %>"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><button class="btn danger" type="submit"><%= t("common.delete") %></button></form></td>

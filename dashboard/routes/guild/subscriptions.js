@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { logAudit } = require("@src/services/dashboard/auditLog");
 const { requireCsrf } = require("../../auth/csrf");
+const { ATTACHMENT_FILTERS } = require("@schemas/Feed");
 const {
   SUPPORTED_TYPES,
   SubscriptionError,
@@ -28,6 +29,7 @@ router.get("/", async (req, res) => {
     guild: req.guild,
     subscriptions,
     providers: SUPPORTED_TYPES,
+    attachmentFilters: ATTACHMENT_FILTERS,
     options: options(req.guild),
     error: typeof req.query.error === "string" ? req.query.error : null,
   });
@@ -44,7 +46,13 @@ router.post("/", requireCsrf, async (req, res) => {
       guildId: req.guild.id,
       targetType: "feed",
       targetId: String(feed._id),
-      after: { type: feed.type, target: feed.target, channelId: feed.channel_id },
+      after: {
+        type: feed.type,
+        target: feed.target,
+        channelId: feed.channel_id,
+        keywordFilter: feed.keyword_filter,
+        attachmentFilter: feed.attachment_filter,
+      },
     });
     return res.redirect(`${redirect}?notice=created`);
   } catch (error) {

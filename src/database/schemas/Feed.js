@@ -1,18 +1,24 @@
 const mongoose = require("mongoose");
 
-const FEED_TYPES = ["TWITCH", "YOUTUBE", "RSS", "GITHUB", "TROVO"];
+const FEED_TYPES = ["TWITCH", "YOUTUBE", "RSS", "GITHUB", "TROVO", "VK"];
+const ATTACHMENT_FILTERS = ["PHOTO", "VIDEO", "LINK", "DOC", "AUDIO"];
 const MAX_FEEDS_PER_GUILD = 25;
 
 const Schema = new mongoose.Schema(
   {
     guild_id: { type: String, required: true },
     type: { type: String, enum: FEED_TYPES, required: true },
-    // Twitch login, YouTube channel id, owner/repo, or an RSS url.
+    // Twitch/Trovo login, YouTube channel id, owner/repo, an RSS url, or a VK
+    // community's screen name (or `-<numeric id>` for one given as a number).
     target: { type: String, required: true },
     channel_id: { type: String, required: true },
     // Optional role or text prepended to the announcement.
     mention: { type: String, default: null },
     message: { type: String, default: null, maxlength: 1000 },
+    // VK only: skip a wall post unless it matches. Both are ignored by every
+    // other provider, which never sets them.
+    keyword_filter: { type: String, default: null, maxlength: 200 },
+    attachment_filter: { type: String, enum: [null, ...ATTACHMENT_FILTERS], default: null },
     enabled: { type: Boolean, default: true },
     // Identifier of the last item announced, so a restart never re-posts.
     last_item_id: { type: String, default: null },
@@ -33,6 +39,7 @@ const Model = mongoose.models["feed"] ? mongoose.model("feed") : mongoose.model(
 
 module.exports = {
   model: Model,
+  ATTACHMENT_FILTERS,
   FEED_TYPES,
   MAX_FEEDS_PER_GUILD,
 

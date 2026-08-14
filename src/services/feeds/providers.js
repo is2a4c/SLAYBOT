@@ -11,6 +11,28 @@ class FeedError extends Error {
 }
 
 /**
+ * The origin and path of a request URL, with its query string dropped.
+ *
+ * Several providers carry a credential in the query string (VK's
+ * `access_token`, Twitch's `client_secret`) because that is the only way
+ * their API accepts one. `node-fetch` puts the *entire* request URL into a
+ * network-level error's own message, and that message is what ends up stored
+ * in `feed.last_error` and shown on the dashboard - so a request that merely
+ * failed to connect must never surface as the credential that was in it.
+ *
+ * @param {string} url
+ * @returns {string}
+ */
+function redactedUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return "the feed provider";
+  }
+}
+
+/**
  * @param {string} url
  * @param {object} [options]
  */
@@ -25,6 +47,10 @@ async function request(url, options = {}) {
       headers: { "user-agent": USER_AGENT, ...(options.headers || {}) },
     });
     return response;
+  } catch (error) {
+    // A DNS failure, refused connection or abort - not an HTTP status the
+    // provider sent back, so `response.ok` was never reached to check.
+    throw new FeedError(`Could not reach ${redactedUrl(url)}: ${error?.code || error?.name || "request failed"}.`);
   } finally {
     clearTimeout(timer);
   }
@@ -127,6 +153,25 @@ function normalizeTarget(type, input) {
     const username = (match?.[1] || value).toLowerCase();
     if (!/^[a-z0-9_]{4,24}$/.test(username)) throw new FeedError("That is not a valid Trovo channel name.");
     return username;
+  }
+
+  if (type === "VK") {
+    const match = value.match(/^(?:https?:\/\/)?(?:www\.|m\.)?vk\.com\/([\w.]+)\/?(?:[?#].*)?$/i);
+    const raw = (match?.[1] || value).toLowerCase();
+
+    // A community given as a bare number, or as VK's own `club<id>`/`public<id>`
+    // form, is stored as `-<id>` - the negative owner id `wall.get` itself takes,
+    // so the fetch needs no separate resolution step for it.
+    const clubMatch = raw.match(/^(?:club|public)(\d+)$/);
+    const numeric = clubMatch ? clubMatch[1] : /^-?\d+$/.test(raw) ? raw.replace(/^-/, "") : null;
+    if (numeric !== null) {
+      const id = Number.parseInt(numeric, 10);
+      if (!Number.isFinite(id) || id <= 0) throw new FeedError("That is not a valid VK community id.");
+      return `-${id}`;
+    }
+
+    if (!/^[a-z][a-z0-9._]{1,49}$/.test(raw)) throw new FeedError("That is not a valid VK community name.");
+    return raw;
   }
 
   throw new FeedError(`Unknown feed type ${type}.`);
@@ -342,22 +387,105 @@ async function fetchTrovo(username) {
   };
 }
 
+const VK_API_VERSION = "5.199";
+const VK_ATTACHMENT_TYPE_MAP = { PHOTO: "photo", VIDEO: "video", LINK: "link", DOC: "doc", AUDIO: "audio" };
+
+/**
+ * Whether a VK wall post is one this subscription actually wants - both
+ * filters are optional, and a post satisfies an unset filter automatically.
+ *
+ * @param {object} post raw VK wall.get item
+ * @param {{keyword?: string, attachmentType?: string}} filters
+ * @returns {boolean}
+ */
+function matchesVkFilters(post, { keyword, attachmentType } = {}) {
+  if (
+    keyword &&
+    !String(post.text || "")
+      .toLowerCase()
+      .includes(String(keyword).toLowerCase())
+  )
+    return false;
+
+  if (attachmentType) {
+    const wanted = VK_ATTACHMENT_TYPE_MAP[attachmentType];
+    const has = (post.attachments || []).some((attachment) => attachment.type === wanted);
+    if (!has) return false;
+  }
+
+  return true;
+}
+
+/**
+ * VK's own API takes a community either as `owner_id` (negative for a
+ * community) or as `domain` (its screen name) - whichever `normalizeTarget`
+ * settled on for this subscription.
+ *
+ * @param {string} target `-<id>` or a screen name
+ * @param {{keyword?: string, attachmentType?: string}} [filters] VK-only:
+ *   skip a post that does not match, so an unrelated post never interrupts a
+ *   community's own themed announcement channel
+ * @returns {Promise<{id: string, title: string, link: string, publishedAt: Date|null, extra: object}|null>}
+ */
+async function fetchVk(target, filters = {}) {
+  const token = process.env.VK_ACCESS_TOKEN;
+  if (!token) throw new FeedError("VK alerts need VK_ACCESS_TOKEN in the environment.");
+
+  const isId = /^-\d+$/.test(target);
+  const params = new URLSearchParams({
+    access_token: token,
+    v: VK_API_VERSION,
+    count: "20",
+    filter: "owner",
+    [isId ? "owner_id" : "domain"]: target,
+  });
+
+  const response = await request(`https://api.vk.com/method/wall.get?${params.toString()}`);
+  if (!response.ok) throw new FeedError(`VK API returned ${response.status}.`);
+
+  const body = await response.json();
+  if (body.error) throw new FeedError(`VK rejected the request: ${body.error.error_msg || body.error.error_code}.`);
+
+  const posts = body.response?.items || [];
+  const post = posts.find((entry) => matchesVkFilters(entry, filters));
+  if (!post) return null;
+
+  const ownerId = post.owner_id ?? (isId ? target : null);
+  const author = body.response?.groups?.[0]?.name || target;
+  const thumbnail = post.attachments?.find((attachment) => attachment.type === "photo")?.photo?.sizes?.at(-1)?.url;
+
+  return {
+    id: String(post.id),
+    title: (post.text || "New post").slice(0, 250) || "New post",
+    link: ownerId ? `https://vk.com/wall${ownerId}_${post.id}` : `https://vk.com/${target}`,
+    publishedAt: post.date ? new Date(post.date * 1000) : null,
+    extra: { author, thumbnail },
+  };
+}
+
 const PROVIDERS = {
   TWITCH: fetchTwitch,
   YOUTUBE: fetchYouTube,
   RSS: fetchRss,
   GITHUB: fetchGitHub,
   TROVO: fetchTrovo,
+  VK: fetchVk,
 };
 
 /**
  * @param {string} type
  * @param {string} target
  */
-function fetchLatest(type, target) {
+/**
+ * @param {string} type
+ * @param {string} target
+ * @param {{keyword?: string, attachmentType?: string}} [filters] VK only;
+ *   every other provider takes and ignores the extra argument
+ */
+function fetchLatest(type, target, filters) {
   const provider = PROVIDERS[type];
   if (!provider) throw new FeedError(`Unknown feed type ${type}.`);
-  return provider(target);
+  return provider(target, filters);
 }
 
 module.exports = {
@@ -369,7 +497,11 @@ module.exports = {
   fetchRss,
   fetchTrovo,
   fetchTwitch,
+  fetchVk,
   fetchYouTube,
+  matchesVkFilters,
   normalizeTarget,
   parseFeed,
+  redactedUrl,
+  request,
 };

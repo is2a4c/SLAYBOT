@@ -1,4 +1,12 @@
-const { FEED_TYPES, MAX_FEEDS_PER_GUILD, countFeeds, createFeed, listFeeds, model } = require("@schemas/Feed");
+const {
+  ATTACHMENT_FILTERS,
+  FEED_TYPES,
+  MAX_FEEDS_PER_GUILD,
+  countFeeds,
+  createFeed,
+  listFeeds,
+  model,
+} = require("@schemas/Feed");
 const { FeedError, fetchLatest, normalizeTarget } = require("@src/services/feeds/providers");
 const { decideAnnouncement } = require("@src/services/feeds/FeedWatcher");
 
@@ -35,16 +43,38 @@ function roleMention(guild, roleId) {
   return `<@&${role.id}>`;
 }
 
+/**
+ * VK-only filters, from the same flat form every provider shares. Anything
+ * that isn't VK stores neither field, whatever was typed into these boxes.
+ *
+ * @param {string} type
+ * @param {object} input
+ * @returns {{keyword: string|null, attachmentType: string|null}}
+ */
+function vkFilters(type, input) {
+  if (type !== "VK") return { keyword: null, attachmentType: null };
+
+  const keyword =
+    String(input.keyword || "")
+      .trim()
+      .slice(0, 200) || null;
+  const attachmentTypeRaw = String(input.attachmentType || "").toUpperCase();
+  const attachmentType = ATTACHMENT_FILTERS.includes(attachmentTypeRaw) ? attachmentTypeRaw : null;
+  return { keyword, attachmentType };
+}
+
 async function createSubscription(guild, input, actorId, dependencies = {}) {
   const type = String(input.type || "").toUpperCase();
   if (!SUPPORTED_TYPES.includes(type)) throw new SubscriptionError("TYPE", "Choose a supported provider.");
   assertTextChannel(guild, input.channelId);
 
+  const filters = vkFilters(type, input);
+
   let target;
   let latest;
   try {
     target = normalizeTarget(type, input.target);
-    latest = await (dependencies.fetchLatest || fetchLatest)(type, target);
+    latest = await (dependencies.fetchLatest || fetchLatest)(type, target, filters);
   } catch (error) {
     if (error instanceof FeedError) throw new SubscriptionError("TARGET", error.message);
     throw error;
@@ -74,6 +104,8 @@ async function createSubscription(guild, input, actorId, dependencies = {}) {
       String(input.message || "")
         .trim()
         .slice(0, 1000) || null,
+    keyword_filter: filters.keyword,
+    attachment_filter: filters.attachmentType,
     enabled: true,
     last_item_id: store,
     last_checked_at: new Date(),
@@ -105,4 +137,5 @@ module.exports = {
   deleteSubscription,
   listSubscriptions: listFeeds,
   setSubscriptionEnabled,
+  vkFilters,
 };
