@@ -80,11 +80,11 @@ module.exports = {
   subscriptions: {
     title: "Подписки и публикации",
     eyebrow: "Автоматические публикации",
-    subtitle: "Следите за Twitch, YouTube, RSS и GitHub и публикуйте обновления прямо в Discord.",
+    subtitle: "Следите за Twitch, YouTube, Trovo, RSS и GitHub и публикуйте обновления прямо в Discord.",
     live: "Работает через FeedWatcher",
     create: "Новая подписка",
     target: "Канал или источник",
-    targetHint: "Имя Twitch, ID YouTube, RSS URL или owner/repo",
+    targetHint: "Имя Twitch или Trovo, ID YouTube, RSS URL или owner/repo",
     mentionRole: "Упоминаемая роль",
     message: "Текст перед публикацией",
     messageHint:

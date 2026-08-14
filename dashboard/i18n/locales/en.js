@@ -80,11 +80,11 @@ module.exports = {
   subscriptions: {
     title: "Subscriptions & publishing",
     eyebrow: "Automated publishing",
-    subtitle: "Watch Twitch, YouTube, RSS, and GitHub and publish updates directly to Discord.",
+    subtitle: "Watch Twitch, YouTube, Trovo, RSS, and GitHub and publish updates directly to Discord.",
     live: "Powered by FeedWatcher",
     create: "New subscription",
     target: "Channel or source",
-    targetHint: "Twitch name, YouTube ID, RSS URL, or owner/repo",
+    targetHint: "Twitch or Trovo name, YouTube ID, RSS URL, or owner/repo",
     mentionRole: "Role to mention",
     message: "Message before publication",
     messageHint:

@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const FEED_TYPES = ["TWITCH", "YOUTUBE", "RSS", "GITHUB"];
+const FEED_TYPES = ["TWITCH", "YOUTUBE", "RSS", "GITHUB", "TROVO"];
 const MAX_FEEDS_PER_GUILD = 25;
 
 const Schema = new mongoose.Schema(

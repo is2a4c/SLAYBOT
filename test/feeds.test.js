@@ -2,8 +2,15 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 require("module-alias/register");
 
-const { FeedError, normalizeTarget, parseFeed } = require("../src/services/feeds/providers");
-const { buildAnnouncement, decideAnnouncement, renderAnnouncementText } = require("../src/services/feeds/FeedWatcher");
+const { FEED_TYPES } = require("@schemas/Feed");
+const { FeedError, PROVIDERS, normalizeTarget, parseFeed } = require("../src/services/feeds/providers");
+const {
+  TYPE_STYLE,
+  buildAnnouncement,
+  decideAnnouncement,
+  renderAnnouncementText,
+} = require("../src/services/feeds/FeedWatcher");
+const { SUPPORTED_TYPES } = require("../dashboard/services/subscriptions");
 
 /* ------------------------------------------------------------------- targets */
 
@@ -32,6 +39,40 @@ test("rss targets must be http urls", () => {
   assert.throws(() => normalizeTarget("RSS", "ftp://example.com/feed"), /http and https/);
   assert.throws(() => normalizeTarget("RSS", "not a url"), /valid feed URL/);
   assert.throws(() => normalizeTarget("RSS", ""), /Provide what should be watched/);
+});
+
+test("trovo targets accept a url or a bare channel name", () => {
+  assert.equal(normalizeTarget("TROVO", "https://trovo.live/SomeStreamer"), "somestreamer");
+  assert.equal(normalizeTarget("TROVO", "trovo.live/s/SomeStreamer?from=search"), "somestreamer");
+  assert.equal(normalizeTarget("TROVO", "SomeStreamer"), "somestreamer");
+  assert.throws(() => normalizeTarget("TROVO", "no"), FeedError, "below Trovo's own minimum username length");
+});
+
+test("every registered feed type has a provider, a style and dashboard support", () => {
+  for (const type of FEED_TYPES) {
+    assert.ok(PROVIDERS[type], `${type} has no fetch provider`);
+    assert.ok(TYPE_STYLE[type], `${type} has no announcement style`);
+    assert.ok(SUPPORTED_TYPES.includes(type), `${type} is not offered on the dashboard`);
+  }
+});
+
+test("a Trovo stream announces with its game and viewer count, like Twitch", () => {
+  const payload = buildAnnouncement(
+    { type: "TROVO", target: "somestreamer", mention: null, message: null },
+    {
+      id: "streamer-id:12345",
+      title: "Late night raid",
+      link: "https://trovo.live/somestreamer",
+      publishedAt: new Date("2026-07-30T12:00:00.000Z"),
+      extra: { author: "SomeStreamer", game: "Valorant", viewers: 88 },
+    }
+  );
+
+  assert.match(payload.content, /SomeStreamer is live/);
+  const embed = payload.embeds[0].data;
+  assert.equal(embed.author.name, "Trovo · SomeStreamer");
+  assert.match(embed.description, /Valorant/);
+  assert.match(embed.description, /88/);
 });
 
 /* --------------------------------------------------------------------- parser */

@@ -1,8 +1,10 @@
-const { MAX_FEEDS_PER_GUILD, countFeeds, createFeed, listFeeds, model } = require("@schemas/Feed");
+const { FEED_TYPES, MAX_FEEDS_PER_GUILD, countFeeds, createFeed, listFeeds, model } = require("@schemas/Feed");
 const { FeedError, fetchLatest, normalizeTarget } = require("@src/services/feeds/providers");
 const { decideAnnouncement } = require("@src/services/feeds/FeedWatcher");
 
-const SUPPORTED_TYPES = ["TWITCH", "YOUTUBE", "RSS", "GITHUB"];
+// The schema is the source of truth for what a provider can be; this only
+// ever mirrors it, so a new provider never has to be listed twice.
+const SUPPORTED_TYPES = FEED_TYPES;
 const SEND_PERMISSIONS = ["ViewChannel", "SendMessages", "EmbedLinks"];
 
 class SubscriptionError extends Error {

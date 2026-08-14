@@ -122,6 +122,13 @@ function normalizeTarget(type, input) {
     return url.toString();
   }
 
+  if (type === "TROVO") {
+    const match = value.match(/^(?:https?:\/\/)?(?:www\.)?trovo\.live\/(?:s\/)?([a-zA-Z0-9_]{4,24})\/?(?:[?#].*)?$/);
+    const username = (match?.[1] || value).toLowerCase();
+    if (!/^[a-z0-9_]{4,24}$/.test(username)) throw new FeedError("That is not a valid Trovo channel name.");
+    return username;
+  }
+
   throw new FeedError(`Unknown feed type ${type}.`);
 }
 
@@ -274,11 +281,73 @@ async function fetchGitHub(repo) {
   };
 }
 
+/**
+ * Trovo's Open API needs a `Client-ID` on every call and has no per-user OAuth
+ * step for public channel data - one free developer app registration covers
+ * every server this bot watches, the same shape as Twitch's app credential.
+ *
+ * A username is resolved to Trovo's internal numeric user id first, since the
+ * channel-status endpoint only takes that id, not the name a person types.
+ *
+ * @param {string} username
+ * @param {string} clientId
+ * @returns {Promise<string>}
+ */
+async function resolveTrovoUserId(username, clientId) {
+  const response = await request("https://open-api.trovo.live/openplatform/getusers", {
+    method: "POST",
+    headers: { "client-id": clientId, "content-type": "application/json" },
+    body: JSON.stringify({ user: [username] }),
+  });
+  if (!response.ok) throw new FeedError(`Trovo API returned ${response.status}.`);
+
+  const body = await response.json();
+  const user = body.users?.[0];
+  if (!user?.user_id) throw new FeedError(`Trovo channel "${username}" was not found.`);
+  return user.user_id;
+}
+
+/**
+ * @param {string} username
+ * @returns {Promise<{id: string, title: string, link: string, publishedAt: Date|null, extra: object}|null>}
+ */
+async function fetchTrovo(username) {
+  const clientId = process.env.TROVO_CLIENT_ID;
+  if (!clientId) throw new FeedError("Trovo alerts need TROVO_CLIENT_ID in the environment.");
+
+  const userId = await resolveTrovoUserId(username, clientId);
+  const response = await request(
+    `https://open-api.trovo.live/openplatform/channels/id?user_id=${encodeURIComponent(userId)}`,
+    { headers: { "client-id": clientId } }
+  );
+  if (!response.ok) throw new FeedError(`Trovo API returned ${response.status}.`);
+
+  const body = await response.json();
+  if (!body.is_live) return null; // offline
+
+  // Trovo hands back the current broadcast, not a stable id for it; the start
+  // time is what actually changes between one stream and the next.
+  const startedAt = body.started_at ? new Date(Number(body.started_at) * 1000) : null;
+  return {
+    id: `${userId}:${startedAt ? startedAt.getTime() : body.stream_title}`,
+    title: body.stream_title || `${body.username || username} is live`,
+    link: body.channel_url || `https://trovo.live/${username}`,
+    publishedAt: startedAt,
+    extra: {
+      author: body.username || username,
+      game: body.category_name,
+      viewers: typeof body.current_viewers === "number" ? body.current_viewers : undefined,
+      thumbnail: body.thumbnail,
+    },
+  };
+}
+
 const PROVIDERS = {
   TWITCH: fetchTwitch,
   YOUTUBE: fetchYouTube,
   RSS: fetchRss,
   GITHUB: fetchGitHub,
+  TROVO: fetchTrovo,
 };
 
 /**
@@ -298,6 +367,7 @@ module.exports = {
   fetchGitHub,
   fetchLatest,
   fetchRss,
+  fetchTrovo,
   fetchTwitch,
   fetchYouTube,
   normalizeTarget,

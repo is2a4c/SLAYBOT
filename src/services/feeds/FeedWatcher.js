@@ -13,6 +13,7 @@ const TYPE_STYLE = {
   YOUTUBE: { color: "#FF0000", label: "YouTube", verb: "posted a video" },
   RSS: { color: "#FF9900", label: "RSS", verb: "published" },
   GITHUB: { color: "#24292F", label: "GitHub", verb: "shipped" },
+  TROVO: { color: "#1CE7C0", label: "Trovo", verb: "is live" },
 };
 
 /**
