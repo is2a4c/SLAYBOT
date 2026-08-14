@@ -51,7 +51,7 @@ function buildWarningDm({ guild, issuer, reason, warnings, maxWarnings, automati
         .setThumbnail(guild.iconURL?.() || null)
         .setDescription(`Вам выдано предупреждение на сервере **${truncate(guild.name, 200)}**.`)
         .addFields(fields)
-        .setFooter({ text: `Сервер: ${guild.id}` })
+        .setFooter({ text: `Сервер: ${truncate(guild.name, 200)}` })
         .setTimestamp(),
     ],
   };
@@ -92,7 +92,7 @@ function buildModerationDm({ guild, issuer, target, reason, action }) {
           { name: "Модератор", value: `${issuer.displayName} (${issuer.id})` },
           { name: "Пользователь", value: `${target.globalName || target.username || target.id} (${target.id})` }
         )
-        .setFooter({ text: `Сервер: ${guild.id}` })
+        .setFooter({ text: `Сервер: ${truncate(guild.name, 200)}` })
         .setTimestamp(),
     ],
   };
