@@ -18,7 +18,12 @@ const {
 } = require("@src/handlers");
 const { InteractionType } = require("discord.js");
 const { ackIfSlow, expired } = require("@src/services/panels/reply");
-const { tryCustomContextCommand, tryCustomSlashCommand } = require("@src/services/customCommands/CustomCommandRuntime");
+const {
+  handleModalSubmit: handleCustomCommandModal,
+  matchesModal: matchesCustomCommandModal,
+  tryCustomContextCommand,
+  tryCustomSlashCommand,
+} = require("@src/services/customCommands/CustomCommandRuntime");
 
 // Discord gives three seconds to answer a click before it gives up on us, so
 // anything approaching that is worth having in the log with its custom id.
@@ -216,6 +221,11 @@ async function route(client, interaction) {
 
   // Modals
   else if (interaction.type === InteractionType.ModalSubmit) {
+    // a custom command's own form: CCMODAL:<sessionToken>
+    if (matchesCustomCommandModal(interaction.customId)) {
+      return handleCustomCommandModal(interaction);
+    }
+
     // form modals carry the form id: FORM_MODAL:<formId>
     if (interaction.customId.startsWith(`${formHandler.MODAL_PREFIX}:`)) {
       return formHandler.handleFormModal(interaction);

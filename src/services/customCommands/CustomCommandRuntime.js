@@ -2,6 +2,8 @@ const { EmbedBuilder } = require("discord.js");
 const { model } = require("@schemas/CustomCommand");
 const { contextLabel } = require("./applicationCommands");
 const { asMessage } = require("@src/services/commands/message");
+const { buildModal, parseModalCustomId } = require("./modalBuilder");
+const modalSessions = require("./modalSessions");
 
 const cooldowns = new Map();
 
@@ -37,23 +39,58 @@ function renderTemplate(value, context) {
     text = text.replaceAll(`{option:${name}}`, String(given ?? ""));
   }
 
+  // What somebody typed into a form, by the field id the dashboard gave it.
+  for (const [id, given] of Object.entries(context.modal || {})) {
+    text = text.replaceAll(`{modal:${id}}`, String(given ?? ""));
+  }
+
   return text;
 }
 
-function accessProblem(command, message) {
-  if (command.allowed_channels?.length && !command.allowed_channels.includes(message.channelId)) {
+/**
+ * The id a plain `Message` and an `Interaction` each carry the invoking user
+ * under a different name.
+ *
+ * @param {object} subject
+ * @returns {string|undefined}
+ */
+function subjectUserId(subject) {
+  return subject.author?.id || subject.user?.id;
+}
+
+/**
+ * @param {object} command
+ * @param {object} subject anything with `.channelId`, `.guildId` and either
+ *   `.member` or the fields a `Message`/`Interaction` already carries
+ */
+function accessProblem(command, subject) {
+  if (command.allowed_channels?.length && !command.allowed_channels.includes(subject.channelId)) {
     return "This custom command is not available in this channel.";
   }
   if (
     command.allowed_roles?.length &&
-    !command.allowed_roles.some((roleId) => message.member.roles.cache.has(roleId))
+    !command.allowed_roles.some((roleId) => subject.member?.roles?.cache?.has(roleId))
   ) {
     return "You do not have a role allowed to use this custom command.";
   }
-  const key = `${message.guildId}:${command._id}:${message.author.id}`;
+  const key = `${subject.guildId}:${command._id}:${subjectUserId(subject)}`;
   const remaining = (cooldowns.get(key) || 0) - Date.now();
   if (remaining > 0) return `This custom command is on cooldown for ${Math.ceil(remaining / 1000)} seconds.`;
   return null;
+}
+
+/**
+ * Start this command's cooldown counting from now, for whoever just used it.
+ *
+ * @param {object} command
+ * @param {object} subject
+ */
+function markCooldown(command, subject) {
+  if (!(command.cooldown_seconds > 0)) return;
+  cooldowns.set(
+    `${subject.guildId}:${command._id}:${subjectUserId(subject)}`,
+    Date.now() + command.cooldown_seconds * 1000
+  );
 }
 
 function messagePayload(action, context) {
@@ -120,6 +157,22 @@ async function executeChangeRoles(action, message) {
   if (add.length) await message.member.roles.add(add, "SLAYBOT custom command");
 }
 
+/**
+ * One action, whichever kind it is. SHOW_MODAL is never run through here: it is
+ * handled at invocation time, before there is a channel message or a deferred
+ * interaction to run the rest of the actions against.
+ *
+ * @param {object} action
+ * @param {object} message
+ * @param {object} context
+ */
+async function runAction(action, message, context) {
+  if (action.type === "SEND_MESSAGE") await executeSendMessage(action, message, context);
+  else if (action.type === "SEND_DM") await executeSendDm(action, message, context);
+  else if (action.type === "CHANGE_ROLES") await executeChangeRoles(action, message);
+  else if (action.type === "ADD_REACTION") await executeAddReaction(action, message);
+}
+
 async function executeCommand(command, message, args, extra = {}) {
   const problem = accessProblem(command, message);
   if (problem) {
@@ -136,19 +189,14 @@ async function executeCommand(command, message, args, extra = {}) {
     options: extra.options || {},
   };
   for (const action of command.actions || []) {
-    if (action.type === "SEND_MESSAGE") await executeSendMessage(action, message, context);
-    if (action.type === "SEND_DM") await executeSendDm(action, message, context);
-    if (action.type === "CHANGE_ROLES") await executeChangeRoles(action, message);
-    if (action.type === "ADD_REACTION") await executeAddReaction(action, message);
+    // A command with a form shows it instead of running straight through; the
+    // action after it runs only once the form comes back, from handleModalSubmit.
+    if (action.type === "SHOW_MODAL") continue;
+    await runAction(action, message, context);
   }
 
   if (command.delete_invocation && message.deletable) await message.delete().catch(() => {});
-  if (command.cooldown_seconds > 0) {
-    cooldowns.set(
-      `${message.guildId}:${command._id}:${message.author.id}`,
-      Date.now() + command.cooldown_seconds * 1000
-    );
-  }
+  markCooldown(command, message);
   return { handled: true, executed: true };
 }
 
@@ -205,23 +253,15 @@ async function settle(interaction, answered) {
 }
 
 /**
- * Run a custom command from an interaction rather than a typed message.
- *
- * The command itself is untouched: it is handed the same stand-in message the
- * command panel uses, so one implementation serves all four triggers.
+ * The stand-in message a command's actions run against, counting whether any
+ * of them actually answered the interaction.
  *
  * @param {import('discord.js').Interaction} interaction
  * @param {object} command
- * @param {{args?: string[], options?: object, target?: object}} [input]
+ * @param {string[]} args
  */
-async function runFromInteraction(interaction, command, input = {}) {
-  const args = input.args || [];
+function trackedMessage(interaction, command, args) {
   const answered = { count: 0 };
-
-  if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply({ ephemeral: true }).catch(() => {});
-  }
-
   const message = asMessage(interaction, { command, args, prefix: "/" });
   const reply = message.safeReply;
   const counted = async (payload) => {
@@ -231,10 +271,142 @@ async function runFromInteraction(interaction, command, input = {}) {
   message.safeReply = counted;
   message.reply = counted;
   message.followUp = counted;
+  return { message, answered };
+}
 
+/**
+ * Run a custom command from an interaction rather than a typed message.
+ *
+ * The command itself is untouched: it is handed the same stand-in message the
+ * command panel uses, so one implementation serves all four triggers. A command
+ * built around a form is the one exception: showing it has to be the very first
+ * answer to the interaction, before anything else touches it, so that branches
+ * off before the usual deferred-reply flow starts.
+ *
+ * @param {import('discord.js').Interaction} interaction
+ * @param {object} command
+ * @param {{args?: string[], options?: object, target?: object}} [input]
+ */
+async function runFromInteraction(interaction, command, input = {}) {
+  const modalAction = (command.actions || []).find((action) => action.type === "SHOW_MODAL");
+  if (modalAction) return presentModal(interaction, command, modalAction, input);
+
+  const args = input.args || [];
+
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply({ ephemeral: true }).catch(() => {});
+  }
+
+  const { message, answered } = trackedMessage(interaction, command, args);
   const result = await executeCommand(command, message, args, { options: input.options, target: input.target });
   await settle(interaction, answered);
   return result;
+}
+
+/**
+ * Open a command's form. This has to be the interaction's first and only
+ * immediate answer — Discord refuses a modal shown after a deferral or a
+ * reply — so access and cooldown are checked here rather than left to
+ * `executeCommand`, and nothing else runs until the form comes back.
+ *
+ * @param {import('discord.js').Interaction} interaction
+ * @param {object} command
+ * @param {object} modalAction
+ * @param {{args?: string[], options?: object, target?: object}} [extra]
+ */
+async function presentModal(interaction, command, modalAction, extra = {}) {
+  const problem = accessProblem(command, interaction);
+  if (problem) {
+    await interaction.reply({ content: problem, ephemeral: true }).catch(() => {});
+    return { handled: true, executed: false };
+  }
+
+  const token = modalSessions.create({
+    guildId: interaction.guildId,
+    commandId: String(command._id),
+    userId: interaction.user.id,
+    args: extra.args || [],
+    options: extra.options || {},
+    target: extra.target || null,
+  });
+
+  try {
+    await interaction.showModal(buildModal(modalAction, token));
+  } catch (error) {
+    modalSessions.discard(token);
+    interaction.client?.logger?.error?.("customCommand: could not open form", error);
+    return { handled: true, executed: false };
+  }
+
+  markCooldown(command, interaction);
+  return { handled: true, executed: false, presentedModal: true };
+}
+
+/**
+ * @param {import('discord.js').ModalSubmitInteraction} interaction
+ */
+function matchesModal(customId) {
+  return parseModalCustomId(customId) !== null;
+}
+
+/**
+ * A form came back. Its session says which command it belongs to and which of
+ * that command's other actions is the one to run now, with what was typed
+ * available as `{modal:<fieldId>}`.
+ *
+ * The session is consumed on the very first read, whether or not it turns out
+ * to be usable — an expired form and a resubmitted one look identical from
+ * here, and both get the same "nothing to run" answer instead of running
+ * anything twice.
+ *
+ * @param {import('discord.js').ModalSubmitInteraction} interaction
+ * @param {object} [dependencies]
+ */
+async function handleModalSubmit(interaction, dependencies = {}) {
+  const token = parseModalCustomId(interaction.customId);
+  const session = token ? modalSessions.consume(token, interaction.user.id) : null;
+
+  if (!session) {
+    return interaction
+      .reply({ content: "This form has expired or was already submitted.", ephemeral: true })
+      .catch(() => {});
+  }
+
+  const command = await (dependencies.model || model)
+    .findOne({ _id: session.commandId, guild_id: session.guildId, enabled: true })
+    .catch(() => null);
+  const modalAction = command?.actions?.find((action) => action.type === "SHOW_MODAL");
+
+  if (!command || !modalAction) {
+    return interaction.reply({ content: "This command is no longer available.", ephemeral: true }).catch(() => {});
+  }
+
+  const modalValues = {};
+  for (const input of modalAction.modal_inputs || []) {
+    modalValues[input.id] = interaction.fields.getTextInputValue(input.id) || "";
+  }
+
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply({ ephemeral: true }).catch(() => {});
+  }
+
+  const confirmAction = command.actions.find((action) => action.id === modalAction.confirm_action_id);
+  const { message, answered } = trackedMessage(interaction, command, session.args || []);
+
+  if (confirmAction) {
+    await runAction(confirmAction, message, {
+      guild: interaction.guild,
+      channel: interaction.channel,
+      member: interaction.member,
+      arguments: session.args || [],
+      target: session.target || null,
+      options: session.options || {},
+      modal: modalValues,
+    });
+  }
+
+  await settle(interaction, answered);
+  return { handled: true, executed: Boolean(confirmAction) };
 }
 
 /**
@@ -297,10 +469,16 @@ module.exports = {
   executeCommand,
   executeAddReaction,
   executeSendDm,
+  handleModalSubmit,
   manageableRoles,
+  markCooldown,
+  matchesModal,
   messagePayload,
+  presentModal,
   readSlashOptions,
   renderTemplate,
+  resetCooldowns: () => cooldowns.clear(),
+  runAction,
   runFromInteraction,
   scheduleDeletion,
   tryCustomCommand,

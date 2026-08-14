@@ -170,6 +170,16 @@ module.exports = {
     sendDm: "Отправить автору в ЛС",
     changeRoles: "Изменить роли автора",
     addReaction: "Добавить реакцию на вызов",
+    showModal: "Показать форму",
+    modalHint:
+      "Поля ниже относятся только к действию-форме. Она должна быть первым ответом на взаимодействие, поэтому нужен slash или контекстный триггер.",
+    modalTitle: "Заголовок формы",
+    modalConfirmAction: "Выполняется после отправки формы",
+    modalNoConfirm: "Ничего (просто подтвердить)",
+    modalFields: "Поля формы",
+    modalFieldsHint:
+      "По одному в строке: id | подпись | short или paragraph | required или optional | мин. длина | макс. длина | подсказка. До {count} полей.",
+    modalFieldCount: "Полей: {count}",
     reactionEmoji: "Emoji реакции",
     deleteAfter: "Удалить отправленное через, секунд (0 — оставить)",
     tts: "Отправить как TTS",
@@ -180,7 +190,8 @@ module.exports = {
     content: "Обычный текст",
     embedTitle: "Заголовок карточки",
     embedDescription: "Описание карточки",
-    variables: "Переменные: {server}, {member:id}, {member:name}, {member:mention}, {channel}, {arguments}.",
+    variables:
+      "Переменные: {server}, {member:id}, {member:name}, {member:mention}, {channel}, {arguments}, {target:id}, {target:name}, {target:mention}, {target:content}, {option:<имя>}, {modal:<id поля>}.",
     deleteCommand: "Удалить команду",
     triggers: "Способы запуска",
     triggerPrefix: "После префикса",

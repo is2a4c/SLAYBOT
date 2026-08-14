@@ -17,7 +17,7 @@ const {
   publishCommands,
   updateCommand,
 } = require("../../services/customCommands");
-const { OPTION_TYPES } = require("@schemas/CustomCommand");
+const { MAX_MODAL_INPUTS, OPTION_TYPES } = require("@schemas/CustomCommand");
 
 const root = (res, guildId) => `${res.locals.basePath}/g/${guildId}/custom-commands`;
 const options = (guild) => ({
@@ -104,6 +104,7 @@ router.get("/:id", async (req, res) => {
       guild: req.guild,
       command,
       optionTypes: OPTION_TYPES,
+      maxModalInputs: MAX_MODAL_INPUTS,
       options: options(req.guild),
       error: typeof req.query.error === "string" ? req.query.error : null,
     });

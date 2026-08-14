@@ -1,8 +1,13 @@
 const mongoose = require("mongoose");
 
-const ACTION_TYPES = ["SEND_MESSAGE", "SEND_DM", "CHANGE_ROLES", "ADD_REACTION"];
+const ACTION_TYPES = ["SEND_MESSAGE", "SEND_DM", "CHANGE_ROLES", "ADD_REACTION", "SHOW_MODAL"];
 const MAX_CUSTOM_COMMANDS = 50;
 const MAX_ACTIONS = 10;
+
+// Discord's own modal limits: five text inputs, a 45-character title.
+const MAX_MODAL_INPUTS = 5;
+const MAX_MODAL_TITLE = 45;
+const MODAL_INPUT_STYLES = ["SHORT", "PARAGRAPH"];
 
 // Discord's own option types, by the name the dashboard shows for each. Only the
 // ones a custom command can be handed something useful from are here: a
@@ -79,6 +84,19 @@ const RegistrationSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const ModalInputSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true, maxlength: 100 },
+    label: { type: String, required: true, maxlength: 45 },
+    style: { type: String, enum: MODAL_INPUT_STYLES, default: "SHORT" },
+    required: { type: Boolean, default: true },
+    min_length: { type: Number, default: null, min: 0, max: 4000 },
+    max_length: { type: Number, default: null, min: 1, max: 4000 },
+    placeholder: { type: String, default: null, maxlength: 100 },
+  },
+  { _id: false }
+);
+
 const ActionSchema = new mongoose.Schema(
   {
     id: { type: String, required: true },
@@ -95,6 +113,15 @@ const ActionSchema = new mongoose.Schema(
     emoji: { type: String, default: null, maxlength: 100 },
     add_roles: { type: [String], default: [] },
     remove_roles: { type: [String], default: [] },
+    // SHOW_MODAL only: the form itself, and which of the command's other
+    // actions runs once it is submitted.
+    modal_title: { type: String, default: null, maxlength: MAX_MODAL_TITLE },
+    modal_inputs: {
+      type: [ModalInputSchema],
+      default: [],
+      validate: [(value) => value.length <= MAX_MODAL_INPUTS, `A form can have at most ${MAX_MODAL_INPUTS} fields.`],
+    },
+    confirm_action_id: { type: String, default: null },
   },
   { _id: false }
 );
@@ -155,8 +182,11 @@ module.exports = {
   MAX_ACTIONS,
   MAX_CHOICES,
   MAX_CUSTOM_COMMANDS,
+  MAX_MODAL_INPUTS,
+  MAX_MODAL_TITLE,
   MAX_OPTIONS,
   MAX_SUBCOMMANDS,
+  MODAL_INPUT_STYLES,
   NAME_PATTERN,
   OPTION_TYPES,
   model,

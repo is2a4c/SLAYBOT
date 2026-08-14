@@ -170,6 +170,16 @@ module.exports = {
     sendDm: "Send the author a DM",
     changeRoles: "Change author roles",
     addReaction: "React to the invocation",
+    showModal: "Show a form",
+    modalHint:
+      "The fields below apply only to a form action. It has to be the interaction's first answer, so it needs a slash or context menu trigger.",
+    modalTitle: "Form title",
+    modalConfirmAction: "Runs after the form is submitted",
+    modalNoConfirm: "Nothing (just acknowledge)",
+    modalFields: "Form fields",
+    modalFieldsHint:
+      "One per line: id | label | short or paragraph | required or optional | min length | max length | placeholder. Up to {count} fields.",
+    modalFieldCount: "{count} fields",
     reactionEmoji: "Reaction emoji",
     deleteAfter: "Delete the sent message after seconds (0 keeps it)",
     tts: "Send as TTS",
@@ -180,7 +190,8 @@ module.exports = {
     content: "Plain text",
     embedTitle: "Card title",
     embedDescription: "Card description",
-    variables: "Variables: {server}, {member:id}, {member:name}, {member:mention}, {channel}, {arguments}.",
+    variables:
+      "Variables: {server}, {member:id}, {member:name}, {member:mention}, {channel}, {arguments}, {target:id}, {target:name}, {target:mention}, {target:content}, {option:<name>}, {modal:<field id>}.",
     deleteCommand: "Delete command",
     triggers: "How it can be run",
     triggerPrefix: "After the prefix",

@@ -1,10 +1,13 @@
 const crypto = require("node:crypto");
 const { ApplicationCommandType } = require("discord.js");
 const {
+  ACTION_TYPES,
   CHOICE_TYPES,
   MAX_ACTIONS,
   MAX_CHOICES,
   MAX_CUSTOM_COMMANDS,
+  MAX_MODAL_INPUTS,
+  MAX_MODAL_TITLE,
   MAX_OPTIONS,
   MAX_SUBCOMMANDS,
   NAME_PATTERN,
@@ -105,6 +108,17 @@ async function updateCommand(guild, id, input, client, commandModel = model) {
   // A command with every trigger switched off can never run and would be
   // invisible everywhere but this page; the prefix is what it falls back to.
   if (!Object.values(triggers).some(Boolean)) triggers.prefix = true;
+
+  // A form can only ever be shown as the first answer to an interaction, so a
+  // command that has one is only reachable through the triggers that give it
+  // one - a typed command runs against a plain message, with nothing to open a
+  // modal on.
+  if (command.actions.some((entry) => entry.type === "SHOW_MODAL")) {
+    triggers.prefix = false;
+    if (!triggers.slash && !triggers.message_context && !triggers.member_context) {
+      throw new CustomCommandError("This command has a form, so it needs a slash or context menu trigger.");
+    }
+  }
   command.triggers = triggers;
 
   command.context_label =
@@ -132,14 +146,112 @@ async function updateCommand(guild, id, input, client, commandModel = model) {
   return command;
 }
 
-function actionFromInput(guild, input) {
-  const type = ["SEND_MESSAGE", "SEND_DM", "CHANGE_ROLES", "ADD_REACTION"].includes(input.type)
-    ? input.type
-    : "SEND_MESSAGE";
+/**
+ * One line of a form's field list: `id | label | style | required | min | max | placeholder`.
+ * Only the id and the label are required; everything after them is optional and
+ * may be left off the line entirely.
+ *
+ * @param {string} raw
+ * @returns {object[]}
+ */
+function parseModalInputs(raw) {
+  const lines = String(raw || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length > MAX_MODAL_INPUTS) {
+    throw new CustomCommandError(`A form can have at most ${MAX_MODAL_INPUTS} fields.`);
+  }
+
+  const seen = new Set();
+  return lines.map((line) => {
+    const [rawId, rawLabel, rawStyle, rawRequired, rawMin, rawMax, ...rest] = line
+      .split("|")
+      .map((part) => part.trim());
+    const id = String(rawId || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "")
+      .slice(0, 100);
+    const label = String(rawLabel || "").slice(0, 45);
+    if (!id || !label) {
+      throw new CustomCommandError('Each field needs an id and a label, e.g. "color | Favourite colour | short".');
+    }
+    if (seen.has(id)) throw new CustomCommandError(`Field id "${id}" is used twice.`);
+    seen.add(id);
+
+    const style = String(rawStyle || "")
+      .trim()
+      .toLowerCase()
+      .startsWith("p")
+      ? "PARAGRAPH"
+      : "SHORT";
+    const required =
+      String(rawRequired || "required")
+        .trim()
+        .toLowerCase() !== "optional";
+
+    const min = rawMin ? Number.parseInt(rawMin, 10) : null;
+    const max = rawMax ? Number.parseInt(rawMax, 10) : null;
+    if (rawMin && !Number.isFinite(min)) throw new CustomCommandError(`"${rawMin}" is not a valid minimum length.`);
+    if (rawMax && !Number.isFinite(max)) throw new CustomCommandError(`"${rawMax}" is not a valid maximum length.`);
+    if (min !== null && max !== null && min > max) {
+      throw new CustomCommandError(`Field "${id}": the minimum length cannot exceed the maximum.`);
+    }
+
+    return {
+      id,
+      label,
+      style,
+      required,
+      min_length: min !== null ? Math.min(4000, Math.max(0, min)) : null,
+      max_length: max !== null ? Math.min(4000, Math.max(1, max)) : null,
+      placeholder: rest.join("|").trim().slice(0, 100) || null,
+    };
+  });
+}
+
+/**
+ * @param {import('discord.js').Guild} guild
+ * @param {object} input
+ * @param {object} [command] the command this action is joining, so a form can
+ *   be refused when nothing could ever show it and can offer the command's
+ *   other actions as its confirmation step
+ */
+function actionFromInput(guild, input, command = { actions: [], triggers: {} }) {
+  const type = ACTION_TYPES.includes(input.type) ? input.type : "SEND_MESSAGE";
   const name =
     String(input.actionName || "")
       .trim()
       .slice(0, 80) || type.toLowerCase().replaceAll("_", " ");
+
+  if (type === "SHOW_MODAL") {
+    if ((command.actions || []).some((entry) => entry.type === "SHOW_MODAL")) {
+      throw new CustomCommandError("A command can only have one form.");
+    }
+    if (!command.triggers?.slash && !command.triggers?.message_context && !command.triggers?.member_context) {
+      throw new CustomCommandError(
+        "Enable a slash or context menu trigger before adding a form - Discord cannot open a form from a typed command."
+      );
+    }
+    const modalTitle = String(input.modalTitle || "")
+      .trim()
+      .slice(0, MAX_MODAL_TITLE);
+    if (!modalTitle) throw new CustomCommandError("A form needs a title.");
+    const modalInputs = parseModalInputs(input.modalInputs);
+    if (!modalInputs.length) throw new CustomCommandError("A form needs at least one field.");
+    const confirmActionId = (command.actions || []).find((entry) => entry.id === input.confirmAction)?.id || null;
+
+    return {
+      id: crypto.randomUUID(),
+      name,
+      type,
+      modal_title: modalTitle,
+      modal_inputs: modalInputs,
+      confirm_action_id: confirmActionId,
+    };
+  }
+
   if (type === "CHANGE_ROLES") {
     const addRoles = ids(guild, input.addRoles, "role");
     const removeRoles = ids(guild, input.removeRoles, "role").filter((id) => !addRoles.includes(id));
@@ -191,7 +303,7 @@ async function addAction(guild, commandId, input, commandModel = model) {
   const command = await findCommand(guild.id, commandId, commandModel);
   if (command.actions.length >= MAX_ACTIONS)
     throw new CustomCommandError(`A command can have at most ${MAX_ACTIONS} actions.`);
-  command.actions.push(actionFromInput(guild, input));
+  command.actions.push(actionFromInput(guild, input, command));
   await command.save();
   return command;
 }
@@ -406,6 +518,7 @@ module.exports = {
   optionFromInput,
   optionHost,
   parseChoices,
+  parseModalInputs,
   publishCommands,
   updateCommand,
 };
