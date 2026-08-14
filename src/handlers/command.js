@@ -4,6 +4,7 @@ const { parsePermissions } = require("@helpers/Utils");
 const { timeformat } = require("@helpers/Utils");
 const { getSettings } = require("@schemas/Guild");
 const { effectiveCooldown, policyProblem } = require("@src/services/commands/policy");
+const { musicProblem } = require("@src/services/music/policy");
 
 const cooldownCache = new Map();
 
@@ -41,12 +42,14 @@ function accessProblem(cmd, { user, member, guild, settings, channel, source }) 
   }
 
   if (settings) {
-    return policyProblem(settings, cmd, {
-      member,
-      channelId: channel?.id,
-      parentId: channel?.parentId,
-      source,
-    });
+    return (
+      policyProblem(settings, cmd, {
+        member,
+        channelId: channel?.id,
+        parentId: channel?.parentId,
+        source,
+      }) || musicProblem(settings, cmd, { member, channelId: channel?.id })
+    );
   }
 
   return null;
@@ -128,12 +131,13 @@ module.exports = {
     }
 
     // what this server allows of its own commands
-    const policy = policyProblem(settings, cmd, {
-      member: message.member,
-      channelId: message.channelId,
-      parentId: message.channel?.parentId,
-      source: "prefix",
-    });
+    const policy =
+      policyProblem(settings, cmd, {
+        member: message.member,
+        channelId: message.channelId,
+        parentId: message.channel?.parentId,
+        source: "prefix",
+      }) || musicProblem(settings, cmd, { member: message.member, channelId: message.channelId });
     if (policy) return message.safeReply(policy);
 
     // minArgs count

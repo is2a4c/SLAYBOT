@@ -1,5 +1,6 @@
 const { musicValidations } = require("@helpers/BotUtils");
 const { skipCurrentTrack } = require("@helpers/MusicPlayer");
+const { noticeSeconds } = require("@src/services/music/policy");
 
 /**
  * @type {import("@structures/Command")}
@@ -17,14 +18,14 @@ module.exports = {
     enabled: true,
   },
 
-  async messageRun(message, args) {
+  async messageRun(message, args, data) {
     const response = await skip(message);
-    await message.safeReply(response);
+    await message.safeReply(response, typeof response === "object" ? noticeSeconds(data?.settings) : undefined);
   },
 
-  async interactionRun(interaction) {
+  async interactionRun(interaction, { settings } = {}) {
     const response = await skip(interaction);
-    await interaction.safeFollowUp(response);
+    await interaction.safeFollowUp(response, typeof response === "object" ? noticeSeconds(settings) : undefined);
   },
 };
 
@@ -39,5 +40,5 @@ async function skip({ client, guildId }) {
 
   const { title } = player.queue.current;
   await skipCurrentTrack(player);
-  return `⏯️ ${title} was skipped.`;
+  return { content: `⏯️ ${title} was skipped.` };
 }

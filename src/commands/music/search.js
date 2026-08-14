@@ -7,14 +7,9 @@ const {
 } = require("discord.js");
 const prettyMs = require("pretty-ms");
 const { EMBED_COLORS, MUSIC } = require("@root/config");
-const { loadTracks, normalizeLoadResult, toError, toQueueTrack } = require("@helpers/LavalinkUtils");
+const { hasAvailableNode, loadTracks, normalizeLoadResult, toError, toQueueTrack } = require("@helpers/LavalinkUtils");
 const { connectMusicPlayer, getMissingVoicePermissions } = require("@helpers/MusicPlayer");
-
-const search_prefix = {
-  YT: "ytsearch",
-  YTM: "ytmsearch",
-  SC: "scsearch",
-};
+const { applyQueueLimits, noticeSeconds, searchIdentifier } = require("@src/services/music/policy");
 
 /**
  * @type {import("@structures/Command")}
@@ -41,16 +36,18 @@ module.exports = {
     ],
   },
 
-  async messageRun(message, args) {
+  async messageRun(message, args, data) {
     const query = args.join(" ");
-    const response = await search(message, query);
-    if (response) await message.safeReply(response);
+    const response = await search(message, query, data?.settings);
+    if (response)
+      await message.safeReply(response, typeof response === "object" ? noticeSeconds(data?.settings) : undefined);
   },
 
-  async interactionRun(interaction) {
+  async interactionRun(interaction, { settings } = {}) {
     const query = interaction.options.getString("query");
-    const response = await search(interaction, query);
-    if (response) await interaction.safeFollowUp(response);
+    const response = await search(interaction, query, settings);
+    if (response)
+      await interaction.safeFollowUp(response, typeof response === "object" ? noticeSeconds(settings) : undefined);
     else interaction.deleteReply().catch(() => {});
   },
 };
@@ -58,12 +55,15 @@ module.exports = {
 /**
  * @param {import("discord.js").CommandInteraction|import("discord.js").Message} arg0
  * @param {string} query
+ * @param {object} [settings] guild settings document
  */
-async function search({ member, guild, channel }, query) {
+async function search({ member, guild, channel }, query, settings) {
   if (!member.voice.channel) return "🚫 You need to join a voice channel first";
 
   const musicManager = guild.client.musicManager;
   if (!musicManager) return "🚫 Music system is not available. Try again later";
+  if (!hasAvailableNode(musicManager))
+    return "🚫 Music system is temporarily unavailable. No Lavalink node is connected";
 
   const voiceChannel = member.voice.channel;
   const missingVoicePermissions = getMissingVoicePermissions(voiceChannel, guild.members.me);
@@ -83,12 +83,7 @@ async function search({ member, guild, channel }, query) {
 
   let res;
   try {
-    res = normalizeLoadResult(
-      await loadTracks(
-        musicManager,
-        /^https?:\/\//.test(query) ? query : `${search_prefix[MUSIC.DEFAULT_SOURCE]}:${query}`
-      )
-    );
+    res = normalizeLoadResult(await loadTracks(musicManager, searchIdentifier(query, settings, MUSIC.DEFAULT_SOURCE)));
   } catch (err) {
     guild.client.logger.error("Search Exception", toError(err));
     return "🚫 There was an error while searching";
@@ -229,6 +224,28 @@ async function search({ member, guild, channel }, query) {
   if (!tracks) return "🚫 An error occurred while searching";
   tracks = tracks.map(toQueueTrack).filter((track) => track?.track && track?.info);
   if (!tracks.length) return "🚫 No playable tracks were found";
+
+  const limited = applyQueueLimits(tracks, settings, {
+    existingTracks: player?.queue?.tracks || [],
+    requesterName: member.user.username,
+  });
+  tracks = limited.tracks;
+  if (!tracks.length) {
+    if (limited.droppedForQuota) return "🚫 You already have as many tracks queued as this server allows";
+    return "🚫 Every matching track is longer than this server allows";
+  }
+  const skipped = limited.droppedForLength + limited.droppedForQuota;
+  if (skipped > 0) {
+    embed.addFields({
+      name: "Skipped",
+      value: [
+        limited.droppedForLength && `${limited.droppedForLength} too long for this server`,
+        limited.droppedForQuota && `${limited.droppedForQuota} over your queue limit`,
+      ]
+        .filter(Boolean)
+        .join(", "),
+    });
+  }
 
   // create a player and/or join the member's vc
   if (!player?.connected) {

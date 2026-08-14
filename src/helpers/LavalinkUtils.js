@@ -1,3 +1,18 @@
+/**
+ * Whether at least one Lavalink node is actually reachable right now.
+ *
+ * `client.musicManager` existing only means the feature is turned on; a node
+ * can still be offline, in which case every connect attempt would fail one at
+ * a time before finally giving up. Checked up front so that failure is
+ * reported once, clearly, instead of after a string of retries.
+ *
+ * @param {object} manager
+ * @returns {boolean}
+ */
+function hasAvailableNode(manager) {
+  return [...(manager?.nodes?.values?.() || [])].some((node) => node?.ws?.active);
+}
+
 async function loadTracks(manager, identifier) {
   if (manager.api?.loadTracks) return manager.api.loadTracks(identifier);
   if (manager.rest?.loadTracks) return manager.rest.loadTracks(identifier);
@@ -47,6 +62,7 @@ function toError(error) {
 }
 
 module.exports = {
+  hasAvailableNode,
   loadTracks,
   normalizeLoadResult,
   toError,

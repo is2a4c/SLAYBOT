@@ -104,6 +104,56 @@ test("a rejected edit falls back instead of throwing at the command", async () =
   assert.equal(interaction.calls[0].kind, "editReply");
 });
 
+/**
+ * A `seconds` arg deletes the answer after that delay, the same convention
+ * `Message.safeReply`/`GuildChannel.safeSend` already use - but only when what
+ * came back is actually a deletable message, which `editReply`/`followUp`
+ * genuinely return and a bare first `reply()` does not.
+ */
+function makeDeletableInteraction(overrides = {}) {
+  const deletions = [];
+  const interaction = makeInteraction({ deferred: true, ...overrides });
+  interaction.editReply = async (content) => {
+    interaction.calls.push({ kind: "editReply", content });
+    interaction.replied = true;
+    return {
+      id: "message-from-editReply",
+      deletable: true,
+      delete: async () => deletions.push(Date.now()),
+    };
+  };
+  interaction.deletions = deletions;
+  return interaction;
+}
+
+test("a seconds argument schedules deletion of the answer", async () => {
+  const interaction = makeDeletableInteraction();
+
+  await safeFollowUp.call(interaction, "done", 0.01);
+  assert.equal(interaction.deletions.length, 0, "not deleted before the delay elapses");
+
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  assert.equal(interaction.deletions.length, 1);
+});
+
+test("no seconds argument means the answer is left alone", async () => {
+  const interaction = makeDeletableInteraction();
+
+  await safeFollowUp.call(interaction, "done");
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  assert.equal(interaction.deletions.length, 0);
+});
+
+test("a plain reply() is not deletable, so seconds quietly does nothing there", async () => {
+  const interaction = makeInteraction();
+
+  await assert.doesNotReject(() => safeFollowUp.call(interaction, "done", 0.01));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  // makeInteraction's reply() returns a plain object with no delete() at all;
+  // reaching this line without throwing is the assertion.
+});
+
 /* -------------------------------------------------------------- startup gate */
 
 const route = require("@src/events/interactions/interactionCreate");

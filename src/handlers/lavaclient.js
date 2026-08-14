@@ -1,10 +1,14 @@
 const { EmbedBuilder } = require("discord.js");
 const { Cluster } = require("lavaclient");
 const prettyMs = require("pretty-ms");
+const { splitBar } = require("string-progressbar");
 const { load: loadSpotify, SpotifyItemType } = require("@lavaclient/spotify");
 const { Queue, load: loadQueue } = require("@lavaclient/queue");
 const { mayStartNext } = require("@lavaclient/types/v3");
 const { getLavalinkNodes } = require("@helpers/LavalinkNodes");
+const { getSettings } = require("@schemas/Guild");
+const { musicConfig, noticeSeconds } = require("@src/services/music/policy");
+const { startAutoplay } = require("@helpers/MusicPlayer");
 
 Object.assign(mayStartNext, {
   finished: true,
@@ -64,7 +68,11 @@ module.exports = (client) => {
     client.logger.debug(`Node "${node.identifier}" debug: ${event.message || event}`);
   });
 
-  lavaclient.on("nodeTrackStart", (_node, queue, song) => {
+  lavaclient.on("nodeTrackStart", async (_node, queue, song) => {
+    const guild = client.guilds.cache.get(queue.player.id);
+    const settings = guild ? await getSettings(guild).catch(() => null) : null;
+    const config = musicConfig(settings);
+
     const fields = [];
 
     const embed = new EmbedBuilder()
@@ -93,16 +101,43 @@ module.exports = (client) => {
       });
     }
 
+    // A live stream has no real length to bar against, and `song.length` for
+    // one is a placeholder Discord would render as a nonsense timestamp.
+    if (config?.progress_bar !== false && song.length < 6.048e8) {
+      const [bar] = splitBar(song.length, 0, 20);
+      fields.push({
+        name: "Progress",
+        value: `\`00:00\` ${bar} \`${prettyMs(song.length, { colonNotation: true })}\``,
+      });
+    }
+
     embed.setFields(fields);
-    queue.data.channel?.safeSend({ embeds: [embed] }).catch((error) => {
+    await queue.data.channel?.safeSend({ embeds: [embed] }, noticeSeconds(settings)).catch((error) => {
       client.logger.warn(`Could not send the now-playing message: ${error.message}`);
     });
   });
 
   lavaclient.on("nodeQueueFinish", async (_node, queue) => {
-    await queue.data.channel?.safeSend("Queue has ended.").catch((error) => {
+    const guild = client.guilds.cache.get(queue.player.id);
+    const settings = guild ? await getSettings(guild).catch(() => null) : null;
+    const config = musicConfig(settings);
+
+    if (guild && config?.autoplay_enabled) {
+      const restarted = await startAutoplay({
+        manager: client.musicManager,
+        guild,
+        queue,
+        config,
+        settings,
+        logger: client.logger,
+      });
+      if (restarted) return;
+    }
+
+    await queue.data.channel?.safeSend("Queue has ended.", noticeSeconds(settings)).catch((error) => {
       client.logger.warn(`Could not send the queue-finished message: ${error.message}`);
     });
+
     await Promise.resolve(queue.player.disconnect()).catch(() => {});
     if (client.musicManager.getPlayer(queue.player.id) === queue.player) {
       await client.musicManager
