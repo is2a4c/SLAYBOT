@@ -1,3 +1,5 @@
+const { isValidTimeZone } = require("./timezone");
+
 const SNOWFLAKE = /^\d{17,20}$/;
 
 const field = (id, path, type, extra = {}) => ({
@@ -13,7 +15,7 @@ const number = (id, path, min, max, extra = {}) => field(id, path, "number", { m
 const choice = (id, path, choices) => field(id, path, "choice", { choices });
 const channel = (id, path, channelKind = "text", extra = {}) => field(id, path, "channel", { channelKind, ...extra });
 const role = (id, path) => field(id, path, "role");
-const roleList = (id, path, max = 25) => field(id, path, "roleList", { max });
+const roleList = (id, path, max = 25, extra = {}) => field(id, path, "roleList", { max, ...extra });
 const channelList = (id, path, channelKind = "text", max = 25) => field(id, path, "channelList", { channelKind, max });
 
 const CONTROL_MODULES = [
@@ -26,19 +28,23 @@ const CONTROL_MODULES = [
         fields: [
           text("prefix", "prefix", 5),
           choice("language", "language", ["ru", "en", "DISCORD"]),
-          text("timezone", "control_center.common.timezone", 64),
+          text("timezone", "control_center.common.timezone", 64, {
+            runtime: true,
+            format: "timezone",
+            placeholder: "Europe/Moscow",
+          }),
           toggle("slashCommands", "control_center.common.slash_commands", { runtime: true }),
           toggle("textCommands", "control_center.common.text_commands", { runtime: true }),
-          roleList("adminRoles", "control_center.common.admin_roles"),
+          roleList("adminRoles", "control_center.common.admin_roles", 25, { runtime: true }),
         ],
       },
       {
         id: "onboarding",
         fields: [
           roleList("starterRoles", "autorole", 10),
-          toggle("autoroleAlways", "control_center.common.autorole_always"),
+          toggle("autoroleAlways", "control_center.common.autorole_always", { runtime: true }),
           toggle("restoreRoles", "restore_roles.enabled"),
-          toggle("restoreNickname", "control_center.common.restore_nickname"),
+          toggle("restoreNickname", "control_center.common.restore_nickname", { runtime: true }),
           number("restoreDays", "restore_roles.retention_days", 1, 365),
           toggle("restorePrivileged", "restore_roles.include_privileged"),
           toggle("voiceRolesEnabled", "voice_roles.enabled"),
@@ -238,6 +244,21 @@ function channelMatches(entry, kind) {
   return entry.isTextBased?.() && !entry.isThread?.();
 }
 
+/**
+ * A role a server could actually choose to hand meaning to - never @everyone,
+ * never one an integration manages. A stray @everyone here would matter more
+ * than most: `admin_roles` treats everyone holding a listed role as a guild
+ * manager, so this is checked for every role field, not only that one.
+ *
+ * @param {import('discord.js').Guild} guild
+ * @param {string} roleId
+ * @returns {boolean}
+ */
+function realRole(guild, roleId) {
+  const entry = guild.roles.cache.get(roleId);
+  return Boolean(entry) && entry.id !== guild.id && !entry.managed;
+}
+
 function parseIds(raw) {
   const values = Array.isArray(raw) ? raw : String(raw || "").split(",");
   return values
@@ -264,11 +285,11 @@ function parseField(guild, body, current, definition) {
       : null;
   }
   if (definition.type === "role") {
-    return SNOWFLAKE.test(String(raw || "")) && guild.roles.cache.has(raw) ? raw : null;
+    return SNOWFLAKE.test(String(raw || "")) && realRole(guild, raw) ? raw : null;
   }
   if (definition.type === "roleList") {
     return [...new Set(parseIds(raw))]
-      .filter((id) => SNOWFLAKE.test(id) && guild.roles.cache.has(id))
+      .filter((id) => SNOWFLAKE.test(id) && realRole(guild, id))
       .slice(0, definition.max);
   }
   if (definition.type === "channelList") {
@@ -283,6 +304,7 @@ function parseField(guild, body, current, definition) {
   if (!value) return null;
   if (definition.format === "color" && !/^#[0-9a-f]{6}$/i.test(value)) return current;
   if (definition.format === "https" && !/^https:\/\//i.test(value)) return current;
+  if (definition.format === "timezone" && !isValidTimeZone(value)) return current;
   return value;
 }
 

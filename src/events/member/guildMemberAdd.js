@@ -14,16 +14,27 @@ module.exports = async (client, member) => {
     client.telemetry?.record("member_joins", { guildId: guild.id, userId: member.id });
   }
 
-  // Restore roles from a previous membership before autorole, so the snapshot wins
-  const restored = await memberRoleHandler
-    .restoreRoles(member, settings)
-    .catch((err) => client.logger.error("restoreRoles", err));
+  // Restore roles and nickname from a previous membership before autorole, so
+  // the snapshot wins.
+  const { rolesRestored, nicknameRestored } = await memberRoleHandler
+    .restoreMembership(member, settings)
+    .catch((err) => {
+      client.logger.error("restoreMembership", err);
+      return { rolesRestored: [], nicknameRestored: null };
+    });
 
-  // Autorole
-  await memberRoleHandler.applyAutoRoles(member, settings).catch((err) => client.logger.error("autorole", err));
+  // A member whose old roles came back already has real access; autorole is
+  // only reapplied on top of that when the server explicitly asked for it.
+  const skipAutorole = rolesRestored.length > 0 && !settings.control_center?.common?.autorole_always;
+  if (!skipAutorole) {
+    await memberRoleHandler.applyAutoRoles(member, settings).catch((err) => client.logger.error("autorole", err));
+  }
 
-  if (restored?.length) {
-    client.logger.debug(`Restored ${restored.length} roles for ${member.id} in ${guild.id}`);
+  if (rolesRestored.length) {
+    client.logger.debug(`Restored ${rolesRestored.length} roles for ${member.id} in ${guild.id}`);
+  }
+  if (nicknameRestored) {
+    client.logger.debug(`Restored nickname for ${member.id} in ${guild.id}`);
   }
 
   // Check for counter channel

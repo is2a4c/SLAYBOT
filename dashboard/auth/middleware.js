@@ -1,6 +1,8 @@
 const { PermissionsBitField } = require("discord.js");
+const { getSettings } = require("@schemas/Guild");
 const { getStaffAccount } = require("@schemas/StaffAccount");
 const { resolveEffectivePermissions } = require("@src/services/dashboard/permissions");
+const { dateFormatter } = require("../services/timezone");
 const { DEFAULT_LOCALE, translate } = require("../i18n");
 
 // The locale middleware normally puts t() on res.locals. Falling back keeps a guard
@@ -65,6 +67,11 @@ async function requireGuildAccess(req, res, next) {
       });
     }
 
+    const settings = await getSettings(guild).catch(() => null);
+    // A page rendered for this guild reads in the guild's own clock, not UTC,
+    // once one has been configured.
+    res.locals.formatDate = dateFormatter(settings?.control_center?.common?.timezone, res.locals.locale);
+
     const userId = req.session.user.id;
     if (req.isOwner || client.config.OWNER_IDS.includes(userId)) {
       req.guild = guild;
@@ -76,7 +83,12 @@ async function requireGuildAccess(req, res, next) {
 
     try {
       const member = guild.members.cache.get(userId) || (await guild.members.fetch(userId).catch(() => null));
-      const guildManager = Boolean(member?.permissions.has(PermissionsBitField.Flags.ManageGuild));
+      // A role a real admin chose to trust is treated the same as ManageGuild
+      // for this guild's dashboard - a deliberate delegation the server made,
+      // not a way around Discord's own permission.
+      const adminRoleIds = settings?.control_center?.common?.admin_roles || [];
+      const hasAdminRole = Boolean(member && adminRoleIds.some((roleId) => member.roles.cache.has(roleId)));
+      const guildManager = Boolean(member?.permissions.has(PermissionsBitField.Flags.ManageGuild)) || hasAdminRole;
       const staffViewer = req.dashboardPermissions?.has("guilds.view");
       if (!guildManager && !staffViewer) {
         return res.status(403).render("error", {

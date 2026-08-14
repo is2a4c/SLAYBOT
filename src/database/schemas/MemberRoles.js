@@ -8,6 +8,9 @@ const Schema = new mongoose.Schema(
     guild_id: { type: String, required: true },
     user_id: { type: String, required: true },
     roles: { type: [String], default: [] },
+    // Independent of role restore: a server may want a rejoining member's name
+    // back without also wanting their old roles back, or the other way around.
+    nickname: { type: String, default: null, maxlength: 32 },
     saved_at: { type: Date, default: Date.now },
     // TTL anchor: a snapshot nobody came back for is not kept forever.
     expires_at: { type: Date, required: true },
@@ -45,10 +48,11 @@ module.exports = {
   /**
    * @param {import('discord.js').GuildMember} member
    * @param {number} [retentionDays]
+   * @param {{nickname?: string|null}} [extra]
    */
-  saveMemberRoles: async (member, retentionDays = DEFAULT_RETENTION_DAYS) => {
+  saveMemberRoles: async (member, retentionDays = DEFAULT_RETENTION_DAYS, { nickname = null } = {}) => {
     const roles = collectRestorableRoles(member);
-    if (roles.length === 0) return null;
+    if (roles.length === 0 && !nickname) return null;
 
     const now = new Date();
     return Model.findOneAndUpdate(
@@ -56,6 +60,7 @@ module.exports = {
       {
         $set: {
           roles,
+          nickname,
           saved_at: now,
           expires_at: new Date(now.getTime() + retentionDays * 24 * 60 * 60 * 1000),
         },
