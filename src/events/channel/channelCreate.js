@@ -6,9 +6,7 @@ const { resolveAuditActor, routeEvent } = require("@src/services/eventRouter/Eve
  * @param {import('discord.js').GuildChannel} channel
  */
 module.exports = async (client, channel) => {
-  if (client.smartInvites) await client.smartInvites.handleChannelDeleted(channel);
   if (!channel.guild) return;
-
-  const actor = await resolveAuditActor(channel.guild, { type: AuditLogEvent.ChannelDelete, targetId: channel.id });
-  await routeEvent(channel.guild, "CHANNEL_DELETE", { actor, detail: channel.name, logger: client.logger });
+  const actor = await resolveAuditActor(channel.guild, { type: AuditLogEvent.ChannelCreate, targetId: channel.id });
+  await routeEvent(channel.guild, "CHANNEL_CREATE", { actor, detail: channel.name, logger: client.logger });
 };

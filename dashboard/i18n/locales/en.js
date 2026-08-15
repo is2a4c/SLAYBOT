@@ -66,6 +66,7 @@ module.exports = {
     reminders: "Reminders",
     ranking: "Ranking",
     customCommands: "Custom commands",
+    eventRouter: "Event router",
     diagnostics: "Diagnostics",
     audit: "Audit log",
     myServers: "← My servers",
@@ -100,6 +101,39 @@ module.exports = {
     paused: "Paused",
     pause: "Pause",
     resume: "Resume",
+  },
+  eventRouter: {
+    title: "Event router",
+    eyebrow: "Server audit",
+    subtitle:
+      "Send individual moderation actions and server events to their own channel, separately from the shared modlog.",
+    routesTitle: "Routes",
+    routesHint:
+      "Member join/leave and boosts already have their own dedicated setup in Notifications - only what had nowhere to go before is here.",
+    mentionRole: "Mention role",
+    template: "Message template",
+    variablesHint:
+      "Variables: {actor}, {target}, {detail}, {reason}, {server}. Leave a template empty to use the default text shown as a placeholder.",
+    saveHint: "Saving replaces every route at once.",
+    logTitle: "Event log",
+    groups: {
+      moderation: "Moderation",
+      server: "Server",
+      commands: "Commands",
+      subscriptions: "Subscriptions",
+    },
+    events: {
+      WARN: "Member warned",
+      TIMEOUT: "Member timed out",
+      KICK: "Member kicked",
+      BAN: "Member banned",
+      ROLE_CREATE: "Role created",
+      ROLE_DELETE: "Role deleted",
+      CHANNEL_CREATE: "Channel created",
+      CHANNEL_DELETE: "Channel deleted",
+      COMMAND_BLOCKED: "Command blocked by policy",
+      SUBSCRIPTION_PAUSED: "Subscription paused",
+    },
   },
   reminders: {
     title: "Reminders",

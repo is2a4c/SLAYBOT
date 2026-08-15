@@ -70,6 +70,9 @@
             <a class="nav-item <%= routeActive(guildRoot + "/custom-commands") ? "active" : "" %>" href="<%= basePath + guildRoot %>/custom-commands" <%- routeActive(guildRoot + "/custom-commands") ? 'aria-current="page"' : "" %>>
               <%- include("icon", { name: "command" }) %><span><%= t("nav.customCommands") %></span>
             </a>
+            <a class="nav-item <%= routeActive(guildRoot + "/event-router") ? "active" : "" %>" href="<%= basePath + guildRoot %>/event-router" <%- routeActive(guildRoot + "/event-router") ? 'aria-current="page"' : "" %>>
+              <%- include("icon", { name: "link" }) %><span><%= t("nav.eventRouter") %></span>
+            </a>
           <% } %>
           <% if (canGuild("automod.edit")) { %>
             <a class="nav-item <%= routeActive(guildRoot + "/automod") ? "active" : "" %>" href="<%= basePath + guildRoot %>/automod" <%- routeActive(guildRoot + "/automod") ? 'aria-current="page"' : "" %>>

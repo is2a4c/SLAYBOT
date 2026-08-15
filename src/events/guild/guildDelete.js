@@ -12,6 +12,7 @@ const { deleteGuildBackups } = require("@schemas/GuildBackup");
 const { deleteGuildEntries } = require("@schemas/StarboardEntry");
 const { deleteGuildStickies } = require("@schemas/StickyMessage");
 const { deleteGuildChannels: deleteGuildTempVoice } = require("@schemas/TempVoiceChannel");
+const { deleteGuildEventLogs } = require("@schemas/EventLog");
 
 /**
  * @param {import('@src/structures').BotClient} client
@@ -56,6 +57,9 @@ module.exports = async (client, guild) => {
     ),
     deleteGuildTempVoice(guild.id).catch((error) =>
       client.logger.error(`Failed to clear temp voice channels for ${guild.id}`, error)
+    ),
+    deleteGuildEventLogs(guild.id).catch((error) =>
+      client.logger.error(`Failed to clear event log for ${guild.id}`, error)
     ),
   ]);
 

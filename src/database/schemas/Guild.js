@@ -4,6 +4,7 @@ const FixedSizeMap = require("fixedsize-map");
 const { getUser } = require("./User");
 const { PermissionFlagsBits } = require("discord.js");
 const { buttonsPath, fieldsPath } = require("./RichMessage");
+const { EVENT_TYPES } = require("@src/services/eventRouter/catalog");
 
 const cache = new FixedSizeMap(CACHE_SIZE.GUILDS);
 const MAX_WARN_ACTIONS = ["TIMEOUT", "KICK", "BAN"];
@@ -399,6 +400,23 @@ const Schema = new mongoose.Schema({
     knowledge: { type: String, default: "", maxlength: 12000 },
     suggestion_analysis: { type: Boolean, default: false },
     form_analysis: { type: Boolean, default: false },
+  },
+  // One route per event type, each posting to its own channel with its own
+  // template - separate from `modlog_channel`, which still carries every
+  // moderation action for servers that never touch this.
+  event_router: {
+    type: [
+      {
+        _id: false,
+        event: { type: String, required: true, enum: EVENT_TYPES },
+        enabled: { type: Boolean, default: false },
+        channel_id: { type: String, default: null },
+        template: { type: String, default: null, maxlength: 1000 },
+        mention_role_id: { type: String, default: null },
+      },
+    ],
+    default: [],
+    validate: [(value) => value.length <= EVENT_TYPES.length, "One route per event type."],
   },
   control_center: {
     common: {

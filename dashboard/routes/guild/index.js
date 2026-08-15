@@ -11,6 +11,7 @@ router.use("/subscriptions", requireGuildPermission("config.edit"), require("./s
 router.use("/reminders", requireGuildPermission("config.edit"), require("./reminders"));
 router.use("/ranking", requireGuildPermission("config.edit"), require("./ranking"));
 router.use("/custom-commands", requireGuildPermission("config.edit"), require("./custom-commands"));
+router.use("/event-router", requireGuildPermission("config.edit"), require("./event-router"));
 router.use("/automod", requireGuildPermission("automod.edit"), require("./automod"));
 router.use("/commands", requireGuildPermission("guilds.view"), require("./commands"));
 router.use("/modlog", requireGuildPermission("audit.view"), require("./modlog"));

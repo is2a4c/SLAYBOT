@@ -66,6 +66,7 @@ module.exports = {
     reminders: "Напоминания",
     ranking: "Рейтинг",
     customCommands: "Свои команды",
+    eventRouter: "Маршрутизация событий",
     diagnostics: "Диагностика",
     audit: "Audit Log",
     myServers: "← Мои серверы",
@@ -100,6 +101,39 @@ module.exports = {
     paused: "Приостановлена",
     pause: "Пауза",
     resume: "Возобновить",
+  },
+  eventRouter: {
+    title: "Маршрутизация событий",
+    eyebrow: "Аудит сервера",
+    subtitle:
+      "Отправляйте отдельные модерационные действия и события сервера в свой канал — отдельно от общего modlog.",
+    routesTitle: "Маршруты",
+    routesHint:
+      "У входа/выхода участника и бустов уже есть своя настройка в Уведомлениях — здесь только то, чему раньше некуда было идти.",
+    mentionRole: "Упоминаемая роль",
+    template: "Шаблон сообщения",
+    variablesHint:
+      "Переменные: {actor}, {target}, {detail}, {reason}, {server}. Оставьте шаблон пустым, чтобы использовать текст по умолчанию, показанный подсказкой.",
+    saveHint: "Сохранение заменяет сразу все маршруты.",
+    logTitle: "Журнал событий",
+    groups: {
+      moderation: "Модерация",
+      server: "Сервер",
+      commands: "Команды",
+      subscriptions: "Подписки",
+    },
+    events: {
+      WARN: "Выдано предупреждение",
+      TIMEOUT: "Выдан таймаут",
+      KICK: "Кик участника",
+      BAN: "Бан участника",
+      ROLE_CREATE: "Роль создана",
+      ROLE_DELETE: "Роль удалена",
+      CHANNEL_CREATE: "Канал создан",
+      CHANNEL_DELETE: "Канал удалён",
+      COMMAND_BLOCKED: "Команда заблокирована политикой",
+      SUBSCRIPTION_PAUSED: "Подписка приостановлена",
+    },
   },
   reminders: {
     title: "Напоминания",

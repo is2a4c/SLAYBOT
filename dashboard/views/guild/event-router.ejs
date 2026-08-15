@@ -1,0 +1,93 @@
+<%- include("../partials/head", { title, guild }) %>
+<header class="page-header"><div class="page-heading">
+  <p class="eyebrow"><%= t("eventRouter.eyebrow") %></p>
+  <h1><%= t("eventRouter.title") %></h1>
+  <p class="subtitle"><%= t("eventRouter.subtitle") %></p>
+</div></header>
+
+<section class="panel">
+  <h2><%= t("eventRouter.routesTitle") %></h2>
+  <p class="hint"><%= t("eventRouter.routesHint") %></p>
+  <form method="post" action="<%= basePath %>/g/<%= guild.id %>/event-router">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <% let currentGroup = null; %>
+    <% routes.forEach((route) => { %>
+      <% if (route.group !== currentGroup) { currentGroup = route.group; %>
+        <h3 class="event-router-group"><%= t(`eventRouter.groups.${currentGroup}`) %></h3>
+      <% } %>
+      <div class="panel settings-section event-router-row">
+        <div class="form-grid">
+          <div class="checkbox-field field">
+            <input type="checkbox" id="enabled_<%= route.event %>" name="enabled_<%= route.event %>" <%= route.enabled ? "checked" : "" %> />
+            <label for="enabled_<%= route.event %>"><span><%= t(`eventRouter.events.${route.event}`) %></span></label>
+          </div>
+          <div class="field">
+            <label for="channel_<%= route.event %>"><%= t("common.channel") %></label>
+            <select id="channel_<%= route.event %>" name="channel_<%= route.event %>">
+              <option value=""><%= t("common.notSelected") %></option>
+              <% options.channels.forEach((channel) => { %>
+                <option value="<%= channel.id %>" <%= route.channel_id === channel.id ? "selected" : "" %>>#<%= channel.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label for="mention_<%= route.event %>"><%= t("eventRouter.mentionRole") %></label>
+            <select id="mention_<%= route.event %>" name="mention_<%= route.event %>">
+              <option value=""><%= t("common.none") %></option>
+              <% options.roles.forEach((role) => { %>
+                <option value="<%= role.id %>" <%= route.mention_role_id === role.id ? "selected" : "" %>>@<%= role.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="field field-wide">
+            <label for="template_<%= route.event %>"><%= t("eventRouter.template") %></label>
+            <textarea id="template_<%= route.event %>" name="template_<%= route.event %>" rows="2" maxlength="1000" placeholder="<%= route.placeholder %>"><%= route.template %></textarea>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+    <div class="hint"><%= t("eventRouter.variablesHint") %></div>
+    <div class="panel sticky-save"><span class="hint"><%= t("eventRouter.saveHint") %></span><button type="submit" class="btn"><%= t("common.save") %></button></div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="section-heading"><h2><%= t("eventRouter.logTitle") %></h2></div>
+  <form class="panel" method="get" action="<%= basePath %>/g/<%= guild.id %>/event-router">
+    <div class="field">
+      <label for="type"><%= t("common.type") %></label>
+      <select id="type" name="type">
+        <option value=""><%= t("common.all") %></option>
+        <% eventTypes.forEach((type) => { %>
+          <option value="<%= type %>" <%= filterType === type ? "selected" : "" %>><%= t(`eventRouter.events.${type}`) %></option>
+        <% }) %>
+      </select>
+    </div>
+    <button type="submit" class="btn secondary"><%= t("common.filter") %></button>
+  </form>
+
+  <% if (!entries.length) { %>
+    <div class="empty"><%= t("common.notFound") %></div>
+  <% } else { %>
+    <div class="table-shell"><table>
+      <thead><tr><th><%= t("common.time") %></th><th><%= t("common.type") %></th><th><%= t("common.who") %></th><th><%= t("common.target") %></th><th><%= t("common.reason") %></th></tr></thead>
+      <tbody>
+        <% entries.forEach((entry) => { %>
+          <tr>
+            <td><%= formatDate(entry.created_at) %></td>
+            <td><%= t(`eventRouter.events.${entry.type}`) %></td>
+            <td><%= entry.actor_id ? `<@${entry.actor_id}>` : t("common.none") %></td>
+            <td><%= entry.target_id || entry.detail || t("common.none") %></td>
+            <td><%= entry.reason || t("common.none") %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table></div>
+    <div class="pagination">
+      <% if (page > 1) { %><a class="btn secondary" href="?page=<%= page - 1 %>&type=<%= filterType || '' %>"><%= t("common.back") %></a><% } %>
+      <span><%= t("common.page", { page, total: totalPages }) %></span>
+      <% if (page < totalPages) { %><a class="btn secondary" href="?page=<%= page + 1 %>&type=<%= filterType || '' %>"><%= t("common.next") %></a><% } %>
+    </div>
+  <% } %>
+</section>
+<%- include("../partials/foot") %>

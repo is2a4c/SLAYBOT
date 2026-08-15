@@ -2,6 +2,7 @@ const { EmbedBuilder } = require("discord.js");
 const { EMBED_COLORS } = require("@root/config");
 const { listEnabledFeeds } = require("@schemas/Feed");
 const { FeedError, fetchLatest } = require("./providers");
+const { routeEvent } = require("@src/services/eventRouter/EventRouter");
 
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_FAILURES_BEFORE_PAUSE = 10;
@@ -169,6 +170,11 @@ class FeedWatcher {
         this.client.logger?.warn(
           `Feed paused after repeated failures: ${feed.type} ${feed.target} (${feed.last_error})`
         );
+        await routeEvent(guild, "SUBSCRIPTION_PAUSED", {
+          detail: `${feed.type.toLowerCase()} ${feed.target}`,
+          reason: feed.last_error,
+          logger: this.client.logger,
+        });
       }
 
       feed.last_checked_at = new Date();

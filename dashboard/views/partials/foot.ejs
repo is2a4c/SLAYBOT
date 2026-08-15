@@ -18,7 +18,7 @@
         <% if (hasGuild) { %>
           <a href="<%= basePath + guildRoot %>"><span><%= t("nav.overview") %></span><small><%= guild.name %></small></a>
           <a href="<%= basePath + guildRoot %>/commands"><span><%= t("nav.commands") %></span><small><%= t("commands.title") %></small></a>
-          <% if (canGuild("config.edit")) { %><a href="<%= basePath + guildRoot %>/config"><span><%= t("nav.config") %></span><small><%= guild.name %></small></a><% } %>
+          <% if (canGuild("config.edit")) { %><a href="<%= basePath + guildRoot %>/config"><span><%= t("nav.config") %></span><small><%= guild.name %></small></a><a href="<%= basePath + guildRoot %>/event-router"><span><%= t("nav.eventRouter") %></span><small><%= guild.name %></small></a><% } %>
           <% if (canGuild("automod.edit")) { %><a href="<%= basePath + guildRoot %>/automod"><span><%= t("nav.automod") %></span><small><%= guild.name %></small></a><% } %>
           <% if (canGuild("members.moderate")) { %><a href="<%= basePath + guildRoot %>#member-lookup"><span><%= t("nav.members") %></span><small><%= t("overview.memberLookup") %></small></a><% } %>
           <% if (canGuild("smartinvites.manage")) { %><a href="<%= basePath + guildRoot %>/smart-invites"><span><%= t("nav.smartInvites") %></span><small><%= guild.name %></small></a><% } %>

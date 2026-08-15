@@ -93,6 +93,7 @@ test("every editable guild setting is reachable from the control panel", () => {
     "welcome.buttons",
     "farewell.fields",
     "farewell.buttons",
+    "event_router",
   ]);
 
   for (const path of Object.keys(schema.paths)) {

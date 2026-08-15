@@ -5,6 +5,7 @@ const { timeformat } = require("@helpers/Utils");
 const { getSettings } = require("@schemas/Guild");
 const { effectiveCooldown, policyProblem } = require("@src/services/commands/policy");
 const { musicProblem } = require("@src/services/music/policy");
+const { routeEvent } = require("@src/services/eventRouter/EventRouter");
 
 const cooldownCache = new Map();
 
@@ -138,7 +139,15 @@ module.exports = {
         parentId: message.channel?.parentId,
         source: "prefix",
       }) || musicProblem(settings, cmd, { member: message.member, channelId: message.channelId });
-    if (policy) return message.safeReply(policy);
+    if (policy) {
+      await routeEvent(message.guild, "COMMAND_BLOCKED", {
+        actor: message.author,
+        detail: cmd.name,
+        reason: policy,
+        logger: message.client.logger,
+      });
+      return message.safeReply(policy);
+    }
 
     // minArgs count
     if (cmd.command.minArgsCount > args.length) {
@@ -223,7 +232,29 @@ module.exports = {
         source: "slash",
       }) || cooldownProblem(cmd, interaction.user.id, settings);
 
-    if (problem) return interaction.reply({ content: problem, ephemeral: true });
+    if (problem) {
+      // Only a refusal from this server's own policy is worth routing - a
+      // missing Discord permission or an active cooldown is not the signal
+      // COMMAND_BLOCKED exists for.
+      const policyRefusal =
+        settings &&
+        (policyProblem(settings, cmd, {
+          member: interaction.member,
+          channelId: interaction.channel?.id,
+          parentId: interaction.channel?.parentId,
+          source: "slash",
+        }) ||
+          musicProblem(settings, cmd, { member: interaction.member, channelId: interaction.channel?.id }));
+      if (policyRefusal) {
+        await routeEvent(interaction.guild, "COMMAND_BLOCKED", {
+          actor: interaction.user,
+          detail: cmd.name,
+          reason: policyRefusal,
+          logger: interaction.client.logger,
+        });
+      }
+      return interaction.reply({ content: problem, ephemeral: true });
+    }
 
     try {
       // Deferring costs an extra round-trip and shows a "thinking" placeholder
