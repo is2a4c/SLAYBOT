@@ -1,5 +1,7 @@
 const { inviteHandler, greetingHandler, memberRoleHandler } = require("@src/handlers");
 const { getSettings } = require("@schemas/Guild");
+const { deleteMemberStats } = require("@schemas/MemberStats");
+const { resetOnLeave } = require("@src/services/stats/RankingPolicy");
 
 /**
  * @param {import('@src/structures').BotClient} client
@@ -27,6 +29,12 @@ module.exports = async (client, member) => {
       await settings.save();
     }
     if (!client.counterUpdateQueue.includes(guild.id)) client.counterUpdateQueue.push(guild.id);
+  }
+
+  // A server that wants a clean slate for a rejoin clears ranking progress -
+  // never blocks the rest of the leave handling if it fails.
+  if (resetOnLeave(settings)) {
+    await deleteMemberStats(guild.id, member.id).catch((err) => client.logger.error("resetRankingOnLeave", err));
   }
 
   // Invite Tracker

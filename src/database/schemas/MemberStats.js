@@ -57,6 +57,19 @@ module.exports = {
     return member;
   },
 
+  /**
+   * Clears a member's ranking progress, and the cached document it lives in -
+   * leaving the cache behind would let a stale `.save()` on the old object
+   * quietly resurrect what this just deleted.
+   *
+   * @param {string} guildId
+   * @param {string} memberId
+   */
+  deleteMemberStats: async (guildId, memberId) => {
+    cache.remove(`${guildId}|${memberId}`);
+    return Model.deleteOne({ guild_id: guildId, member_id: memberId });
+  },
+
   getXpLb: async (guildId, limit = 10) =>
     Model.find({
       guild_id: guildId,

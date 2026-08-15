@@ -122,6 +122,10 @@ module.exports.launch = async function launch(client) {
   const statusRouter = require("./routes/status");
   dashboardRouter.get("/status.json", statusRouter.statusJson);
   dashboardRouter.use("/status", statusRouter);
+  // Public: a server's own leaderboard, shown only when that server turned it
+  // on - registered ahead of the login-gated guild router below so this one
+  // path never runs into requireGuildAccess.
+  dashboardRouter.use("/g/:guildId/ranking/public", require("./routes/guild/rankingPublic"));
   dashboardRouter.use("/", require("./routes/selector"));
   dashboardRouter.use("/g/:guildId", require("./routes/guild"));
   dashboardRouter.use("/owner", require("./routes/owner"));

@@ -81,6 +81,27 @@
     window.setTimeout(reenable, 8000);
   });
 
+  const rankPreview = document.querySelector("[data-rank-preview]");
+  if (rankPreview) {
+    const image = rankPreview.querySelector("[data-rank-preview-image]");
+    const accentInput = document.getElementById(rankPreview.dataset.rankPreviewAccent);
+    const backgroundInput = document.getElementById(rankPreview.dataset.rankPreviewBackground);
+    let refreshTimer = null;
+    const refreshPreview = () => {
+      const params = new URLSearchParams();
+      if (accentInput?.value) params.set("accent", accentInput.value);
+      if (backgroundInput?.value) params.set("background", backgroundInput.value);
+      params.set("t", String(Date.now()));
+      image.src = `${rankPreview.dataset.rankPreviewSrc}?${params.toString()}`;
+    };
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(refreshPreview, 500);
+    };
+    accentInput?.addEventListener("input", scheduleRefresh);
+    backgroundInput?.addEventListener("input", scheduleRefresh);
+  }
+
   const commandSearch = document.querySelector("[data-command-search]");
   const commandCategory = document.querySelector("[data-command-category]");
   const commandReadiness = document.querySelector("[data-command-readiness]");

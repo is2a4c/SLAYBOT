@@ -704,6 +704,11 @@ textarea:focus {
 .field-wide {
   grid-column: 1 / -1;
 }
+.rank-card-preview-image {
+  max-width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
 .sticky-save {
   position: sticky;
   bottom: 14px;

@@ -59,6 +59,20 @@
             <div class="field <%= locked ? 'control-staged' : '' %>"><label for="<%= inputId %>"><%= t(`control.fields.${field.id}`) %><% if (locked) { %><small><%= t("control.stagedField") %></small><% } %></label><input type="<%= field.type === 'number' ? 'number' : 'text' %>" id="<%= inputId %>" name="<%= field.id %>" value="<%= field.value ?? '' %>" <%= locked ? "disabled" : "" %> placeholder="<%= field.placeholder || '' %>" <% if (field.type === "number") { %>min="<%= field.min %>" max="<%= field.max %>" step="<%= field.step || 1 %>"<% } else { %>maxlength="<%= field.maxLength %>"<% } %> /></div>
           <% } %>
         <% }) %>
+        <% if (selected.id === "ranking" && group.id === "card") {
+          const previewSrc = `${basePath}/g/${guild.id}/ranking/preview.png`;
+          const accentValue = group.fields.find((entry) => entry.id === "rankCardAccent")?.value;
+          const backgroundValue = group.fields.find((entry) => entry.id === "rankCardBackground")?.value;
+          const initialParams = new URLSearchParams();
+          if (accentValue) initialParams.set("accent", accentValue);
+          if (backgroundValue) initialParams.set("background", backgroundValue);
+          const initialQuery = initialParams.toString();
+        %>
+          <div class="field field-wide" data-rank-preview data-rank-preview-src="<%= previewSrc %>" data-rank-preview-accent="control_ranking_rankCardAccent" data-rank-preview-background="control_ranking_rankCardBackground">
+            <label><%= t("control.fields.rankCardPreview") %></label>
+            <img data-rank-preview-image src="<%= previewSrc %><%= initialQuery ? `?${initialQuery}` : "" %>" alt="<%= t('control.fields.rankCardPreview') %>" class="rank-card-preview-image" />
+          </div>
+        <% } %>
       </div>
     </details>
   <% }) %>

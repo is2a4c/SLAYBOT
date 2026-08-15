@@ -1,0 +1,25 @@
+<%- include("../partials/head", { title }) %>
+<header class="page-header"><div class="page-heading">
+  <p class="eyebrow"><%= t("ranking.publicEyebrow") %></p>
+  <h1><%= guildName %></h1>
+  <p class="subtitle"><%= t("ranking.publicSubtitle") %></p>
+</div></header>
+
+<% if (!leaderboard.length) { %>
+  <div class="panel empty"><%= t("ranking.noMembers") %></div>
+<% } else { %>
+  <div class="table-shell"><table>
+    <thead><tr><th>#</th><th><%= t("common.member") %></th><th><%= t("ranking.level") %></th><th>XP</th></tr></thead>
+    <tbody>
+      <% leaderboard.forEach((entry) => { %>
+        <tr>
+          <td><%= entry.rank %></td>
+          <td><%= entry.name %></td>
+          <td><%= entry.level %></td>
+          <td><%= entry.xp %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table></div>
+<% } %>
+<%- include("../partials/foot") %>

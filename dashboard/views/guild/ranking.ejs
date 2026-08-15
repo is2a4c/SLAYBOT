@@ -2,6 +2,16 @@
 <header class="page-header"><div class="page-heading"><p class="eyebrow"><%= t("ranking.eyebrow") %></p><h1><%= t("ranking.title") %></h1><p class="subtitle"><%= t("ranking.subtitle") %></p></div><span class="badge pass"><%= t("ranking.live") %></span></header>
 <% if (error) { %><div class="error-banner"><%= error %></div><% } %>
 
+<% if (settings.control_center?.ranking?.public_page) { %>
+  <section class="panel"><label for="ranking-public-link"><%= t("ranking.publicLink") %></label>
+    <div class="btn-row"><input id="ranking-public-link" class="table-input" type="text" value="<%= publicUrl %>" readonly style="flex: 1; min-width: 220px;" />
+      <button type="button" class="btn secondary" data-copy="<%= publicUrl %>" data-copied="<%= t('common.copied') %>"><%= t("common.copy") %></button></div>
+    <p class="hint"><%= t("ranking.publicLinkHint") %></p>
+  </section>
+<% } else { %>
+  <section class="panel empty"><%= t("ranking.publicDisabled") %></section>
+<% } %>
+
 <section class="panel collection-create"><h2><%= t("ranking.createReward") %></h2><form method="post" action="<%= basePath %>/g/<%= guild.id %>/ranking/rewards" class="form-grid">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
   <div class="field"><label for="reward-type"><%= t("ranking.rewardType") %></label><select id="reward-type" name="type"><option value="LEVEL"><%= t("ranking.levelReward") %></option><option value="VOICE"><%= t("ranking.voiceReward") %></option></select></div>

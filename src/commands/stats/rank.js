@@ -1,7 +1,6 @@
 const { AttachmentBuilder, ApplicationCommandOptionType } = require("discord.js");
-const { EMBED_COLORS, IMAGE } = require("@root/config");
-const { getBuffer } = require("@helpers/HttpUtils");
 const { getMemberStats, getXpLb } = require("@schemas/MemberStats");
+const { buildRankCardUrl, fetchRankCard } = require("@src/services/stats/RankCard");
 
 /**
  * @type {import("@structures/Command")}
@@ -57,25 +56,23 @@ async function getRank({ guild }, member, settings) {
     }
   });
 
-  const xpNeeded = memberStats.level * memberStats.level * 100;
+  // The same multiplier the level-up math itself uses, so the card never
+  // shows a "next level" bar that disagrees with when the member actually levels.
+  const multiplier = Math.min(10000, Math.max(10, Number(settings?.stats?.xp?.level_multiplier) || 100));
+  const xpNeeded = memberStats.level * memberStats.level * multiplier;
   const rank = pos !== -1 ? pos : 0;
 
-  const url = new URL(`${IMAGE.BASE_API}/utils/rank-card`);
-  url.searchParams.append("name", user.username);
-  if (user.discriminator && user.discriminator !== "0") url.searchParams.append("discriminator", user.discriminator);
-  url.searchParams.append("avatar", user.displayAvatarURL({ extension: "png", size: 128 }));
-  url.searchParams.append("currentxp", memberStats.xp);
-  url.searchParams.append("reqxp", xpNeeded);
-  url.searchParams.append("level", memberStats.level);
-  url.searchParams.append("barcolor", EMBED_COLORS.BOT_EMBED);
-  url.searchParams.append("status", member?.presence?.status?.toString() || "idle");
-  url.searchParams.append("rank", rank);
-
-  const response = await getBuffer(url.href, {
-    headers: {
-      Authorization: `Bearer ${process.env.STRANGE_API_KEY}`,
-    },
+  const url = buildRankCardUrl({
+    user,
+    level: memberStats.level,
+    xp: memberStats.xp,
+    xpNeeded,
+    rank,
+    presenceStatus: member?.presence?.status?.toString(),
+    settings,
   });
+
+  const response = await fetchRankCard(url);
   if (!response.success) return "Failed to generate rank-card";
 
   const attachment = new AttachmentBuilder(response.buffer, { name: "rank.png" });

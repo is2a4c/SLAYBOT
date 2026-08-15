@@ -2,6 +2,14 @@ const { getMemberStats } = require("@schemas/MemberStats");
 const { getRandomInt } = require("@helpers/Utils");
 const { EcosystemService } = require("@src/services/ecosystem/EcosystemService");
 const { applyRoleRewards } = require("@src/services/stats/RoleRewards");
+const {
+  textMultiplier,
+  textXpIgnored,
+  voiceMultiplier,
+  voiceXpEnabled,
+  voiceXpForSeconds,
+  voiceXpIgnored,
+} = require("@src/services/stats/RankingPolicy");
 
 const cooldownCache = new Map();
 const voiceStates = new Map();
@@ -36,7 +44,61 @@ const parse = (content, member, level) => {
     .replaceAll(/{level}/g, level);
 };
 
+/**
+ * Add XP to a member's stats, level them up as many times as it takes, and -
+ * only when a level was actually gained - announce it and apply its role
+ * rewards. Shared by text and voice, so both earn levels the same way.
+ *
+ * @param {object} statsDb member-stats document, not yet saved
+ * @param {number} xpGained
+ * @param {import('discord.js').GuildMember} member
+ * @param {object} settings
+ * @param {import('discord.js').TextBasedChannel} [fallbackChannel] where to
+ *   announce a level-up when the server never configured its own channel -
+ *   the channel a text message was sent in, or nothing for a voice session
+ */
+async function applyXpGain(statsDb, xpGained, member, settings, fallbackChannel = null) {
+  if (!(xpGained > 0)) {
+    await statsDb.save();
+    return;
+  }
+
+  statsDb.xp += xpGained;
+
+  let { xp, level } = statsDb;
+  const previousLevel = level;
+  const multiplier = Math.min(10000, Math.max(10, Number(settings?.stats?.xp?.level_multiplier) || 100));
+  let needed = level * level * multiplier;
+
+  while (xp >= needed) {
+    level += 1;
+    xp -= needed;
+    needed = level * level * multiplier;
+  }
+
+  if (level !== statsDb.level) {
+    statsDb.xp = xp;
+    statsDb.level = level;
+    let lvlUpMessage = settings?.stats?.xp?.message || member.client.config.STATS.DEFAULT_LVL_UP_MSG;
+    lvlUpMessage = parse(lvlUpMessage, member, level);
+
+    const xpChannel = settings?.stats?.xp?.channel && member.guild.channels.cache.get(settings.stats.xp.channel);
+    const lvlUpChannel = xpChannel || fallbackChannel || member.guild.systemChannel;
+    lvlUpChannel?.safeSend?.(lvlUpMessage);
+  }
+
+  await statsDb.save();
+
+  if (level !== previousLevel) {
+    await applyRoleRewards(member, settings?.stats?.rewards?.level, previousLevel, level).catch((error) => {
+      member.client.logger.warn(`Could not apply level rewards for ${member.id}: ${error.message}`);
+    });
+  }
+}
+
 module.exports = {
+  applyXpGain,
+
   /**
    * This function saves stats for a new message
    * @param {import("discord.js").Message} message
@@ -50,7 +112,7 @@ module.exports = {
     if (isCommand) statsDb.commands.prefix++;
     statsDb.messages++;
 
-    if (skipXp) {
+    if (skipXp || textXpIgnored(settings, message.member, message.channelId)) {
       await statsDb.save();
       return;
     }
@@ -67,40 +129,10 @@ module.exports = {
       cooldownCache.delete(key);
     }
 
-    // Update member's XP in DB
-    const earnedXp = xpToAdd(settings?.stats?.xp);
-    statsDb.xp += earnedXp;
-
-    // Check if member has levelled up
-    let { xp, level } = statsDb;
-    const previousLevel = level;
-    const multiplier = Math.min(10000, Math.max(10, Number(settings?.stats?.xp?.level_multiplier) || 100));
-    let needed = level * level * multiplier;
-
-    while (xp >= needed) {
-      level += 1;
-      xp -= needed;
-      needed = level * level * multiplier;
-    }
-
-    if (level !== statsDb.level) {
-      statsDb.xp = xp;
-      statsDb.level = level;
-      let lvlUpMessage = settings?.stats?.xp?.message || message.client.config.STATS.DEFAULT_LVL_UP_MSG;
-      lvlUpMessage = parse(lvlUpMessage, message.member, level);
-
-      const xpChannel = settings?.stats?.xp?.channel && message.guild.channels.cache.get(settings.stats.xp.channel);
-      const lvlUpChannel = xpChannel || message.channel;
-
-      lvlUpChannel.safeSend(lvlUpMessage);
-    }
-    await statsDb.save();
-    if (level !== previousLevel) {
-      await applyRoleRewards(message.member, settings?.stats?.rewards?.level, previousLevel, level).catch((error) => {
-        message.client.logger.warn(`Could not apply level rewards for ${message.member.id}: ${error.message}`);
-      });
-    }
+    const earnedXp = Math.round(xpToAdd(settings?.stats?.xp) * textMultiplier(settings));
+    await applyXpGain(statsDb, earnedXp, message.member, settings, message.channel);
     cooldownCache.set(key, Date.now());
+
     await ecosystemService
       .recordActivity({
         eventId: message.id,
@@ -156,14 +188,24 @@ module.exports = {
       const key = getVoiceStateKey(member.guild.id, member.id);
       if (voiceStates.has(key)) {
         const previousTime = statsDb.voice.time;
-        const time = now - voiceStates.get(key);
-        statsDb.voice.time += time / 1000; // add time in seconds
-        await statsDb.save();
+        const seconds = (now - voiceStates.get(key)) / 1000;
+        statsDb.voice.time += seconds;
+
+        // The channel they were just in decides whether this session earns
+        // XP - the same one the time itself was just credited to. Voice-time
+        // role rewards are a separate, older system and keep working
+        // regardless of whether XP is turned on.
+        const earnsXp = voiceXpEnabled(settings) && !voiceXpIgnored(settings, member, oldChannel.id);
+        const earnedXp = earnsXp ? voiceXpForSeconds(seconds, voiceMultiplier(settings)) : 0;
+        if (earnedXp > 0) await applyXpGain(statsDb, earnedXp, member, settings);
+        else await statsDb.save();
+
         await applyRoleRewards(member, settings?.stats?.rewards?.voice, previousTime, statsDb.voice.time).catch(
           (error) => {
             member.client.logger.warn(`Could not apply voice rewards for ${member.id}: ${error.message}`);
           }
         );
+
         voiceStates.delete(key);
       }
     }

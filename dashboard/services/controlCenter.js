@@ -12,11 +12,12 @@ const field = (id, path, type, extra = {}) => ({
 const toggle = (id, path, extra = {}) => field(id, path, "toggle", extra);
 const text = (id, path, maxLength = 1000, extra = {}) => field(id, path, "text", { maxLength, ...extra });
 const number = (id, path, min, max, extra = {}) => field(id, path, "number", { min, max, ...extra });
-const choice = (id, path, choices) => field(id, path, "choice", { choices });
+const choice = (id, path, choices, extra = {}) => field(id, path, "choice", { choices, ...extra });
 const channel = (id, path, channelKind = "text", extra = {}) => field(id, path, "channel", { channelKind, ...extra });
 const role = (id, path) => field(id, path, "role");
 const roleList = (id, path, max = 25, extra = {}) => field(id, path, "roleList", { max, ...extra });
-const channelList = (id, path, channelKind = "text", max = 25) => field(id, path, "channelList", { channelKind, max });
+const channelList = (id, path, channelKind = "text", max = 25, extra = {}) =>
+  field(id, path, "channelList", { channelKind, max, ...extra });
 
 const CONTROL_MODULES = [
   {
@@ -106,28 +107,30 @@ const CONTROL_MODULES = [
       {
         id: "access",
         fields: [
-          channel("musicChannel", "control_center.music.channel_id"),
-          toggle("musicAnyChannel", "control_center.music.allow_any_channel"),
-          roleList("djRoles", "control_center.music.dj_roles"),
-          choice("musicSource", "control_center.music.default_source", ["YOUTUBE", "YANDEX", "SPOTIFY", "SOUNDCLOUD"]),
+          channel("musicChannel", "control_center.music.channel_id", "text", { runtime: true }),
+          toggle("musicAnyChannel", "control_center.music.allow_any_channel", { runtime: true }),
+          roleList("djRoles", "control_center.music.dj_roles", 25, { runtime: true }),
+          choice("musicSource", "control_center.music.default_source", ["YOUTUBE", "YANDEX", "SPOTIFY", "SOUNDCLOUD"], {
+            runtime: true,
+          }),
         ],
       },
       {
         id: "playback",
         fields: [
-          toggle("compactQueue", "control_center.music.compact_queue"),
-          toggle("deleteMusicNotices", "control_center.music.delete_notices"),
-          toggle("progressBar", "control_center.music.progress_bar"),
-          number("queueLimit", "control_center.music.max_queue_per_user", 1, 500),
-          number("trackLimit", "control_center.music.max_track_minutes", 1, 1440),
+          toggle("compactQueue", "control_center.music.compact_queue", { runtime: true }),
+          toggle("deleteMusicNotices", "control_center.music.delete_notices", { runtime: true }),
+          toggle("progressBar", "control_center.music.progress_bar", { runtime: true }),
+          number("queueLimit", "control_center.music.max_queue_per_user", 1, 500, { runtime: true }),
+          number("trackLimit", "control_center.music.max_track_minutes", 1, 1440, { runtime: true }),
         ],
       },
       {
         id: "autoplay",
         fields: [
-          toggle("autoplay", "control_center.music.autoplay_enabled"),
-          text("autoplayQuery", "control_center.music.autoplay_query", 500),
-          channel("autoplayChannel", "control_center.music.autoplay_output_channel"),
+          toggle("autoplay", "control_center.music.autoplay_enabled", { runtime: true }),
+          text("autoplayQuery", "control_center.music.autoplay_query", 500, { runtime: true }),
+          channel("autoplayChannel", "control_center.music.autoplay_output_channel", "text", { runtime: true }),
         ],
       },
     ],
@@ -140,14 +143,16 @@ const CONTROL_MODULES = [
         id: "textXp",
         fields: [
           toggle("rankingEnabled", "stats.enabled"),
-          toggle("publicRanking", "control_center.ranking.public_page"),
-          toggle("resetOnLeave", "control_center.ranking.reset_on_leave"),
-          roleList("rankingIgnoredRoles", "control_center.ranking.ignored_roles"),
-          channelList("rankingIgnoredText", "control_center.ranking.ignored_text_channels", "text"),
+          toggle("publicRanking", "control_center.ranking.public_page", { runtime: true }),
+          toggle("resetOnLeave", "control_center.ranking.reset_on_leave", { runtime: true }),
+          roleList("rankingIgnoredRoles", "control_center.ranking.ignored_roles", 25, { runtime: true }),
+          channelList("rankingIgnoredText", "control_center.ranking.ignored_text_channels", "text", 25, {
+            runtime: true,
+          }),
           number("xpCooldown", "stats.xp.cooldown_seconds", 0, 3600),
           number("xpMin", "stats.xp.min_per_message", 0, 1000),
           number("xpMax", "stats.xp.max_per_message", 0, 1000),
-          number("textMultiplier", "control_center.ranking.text_multiplier", 0, 100, { step: "0.1" }),
+          number("textMultiplier", "control_center.ranking.text_multiplier", 0, 100, { step: "0.1", runtime: true }),
           channel("levelChannel", "stats.xp.channel"),
           text("levelMessage", "stats.xp.message", 500, { multiline: true }),
         ],
@@ -155,17 +160,22 @@ const CONTROL_MODULES = [
       {
         id: "voiceXp",
         fields: [
-          toggle("voiceRanking", "control_center.ranking.voice_enabled"),
-          channelList("rankingIgnoredVoice", "control_center.ranking.ignored_voice_channels", "voice"),
-          number("voiceMultiplier", "control_center.ranking.voice_multiplier", 0, 100, { step: "0.1" }),
-          number("rankingMaxMembers", "control_center.ranking.max_members", 100, 1000000),
+          toggle("voiceRanking", "control_center.ranking.voice_enabled", { runtime: true }),
+          channelList("rankingIgnoredVoice", "control_center.ranking.ignored_voice_channels", "voice", 25, {
+            runtime: true,
+          }),
+          number("voiceMultiplier", "control_center.ranking.voice_multiplier", 0, 100, { step: "0.1", runtime: true }),
+          number("rankingMaxMembers", "control_center.ranking.max_members", 100, 1000000, { runtime: true }),
         ],
       },
       {
         id: "card",
         fields: [
-          text("rankCardAccent", "control_center.ranking.card_accent", 7, { format: "color" }),
-          text("rankCardBackground", "control_center.ranking.card_background", 300, { format: "https" }),
+          text("rankCardAccent", "control_center.ranking.card_accent", 7, { format: "color", runtime: true }),
+          text("rankCardBackground", "control_center.ranking.card_background", 300, {
+            format: "https",
+            runtime: true,
+          }),
         ],
       },
     ],

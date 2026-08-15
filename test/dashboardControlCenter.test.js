@@ -110,3 +110,42 @@ test("notification controls backed by event handlers are live", () => {
     assert.equal(fields.find((field) => field.id === id).runtime, true, id);
   }
 });
+
+test("ranking controls are live: ignore rules, multipliers, public page and card style", () => {
+  const fields = findModule("ranking").groups.flatMap((group) => group.fields);
+  for (const id of [
+    "publicRanking",
+    "resetOnLeave",
+    "rankingIgnoredRoles",
+    "rankingIgnoredText",
+    "textMultiplier",
+    "voiceRanking",
+    "rankingIgnoredVoice",
+    "voiceMultiplier",
+    "rankingMaxMembers",
+    "rankCardAccent",
+    "rankCardBackground",
+  ]) {
+    assert.equal(fields.find((field) => field.id === id).runtime, true, id);
+  }
+});
+
+test("music controls are live, matching the settings src/services/music/policy.js already reads", () => {
+  const fields = findModule("music").groups.flatMap((group) => group.fields);
+  for (const id of [
+    "musicChannel",
+    "musicAnyChannel",
+    "djRoles",
+    "musicSource",
+    "compactQueue",
+    "deleteMusicNotices",
+    "progressBar",
+    "queueLimit",
+    "trackLimit",
+    "autoplay",
+    "autoplayQuery",
+    "autoplayChannel",
+  ]) {
+    assert.equal(fields.find((field) => field.id === id).runtime, true, id);
+  }
+});
