@@ -6,7 +6,7 @@
   "author": "isaac",
   "license": "Other",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "dev": "nodemon .",
@@ -98,7 +98,7 @@
     "eslint": "^8.57.1",
     "eslint-plugin-jsdoc": "^46.10.1",
     "mongodb-memory-server": "^10.1.4",
-    "node": "^18.20.6",
+    "node": "^24.19.0",
     "nodemon": "^3.1.9",
     "prettier": "3.4.2"
   },

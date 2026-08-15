@@ -11,7 +11,7 @@
       <img src="https://github.com/is2a4c/SLAYBOT/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status">
     </a>
     <a href="https://nodejs.org/">
-      <img src="https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white" alt="Node.js 18 or newer">
+      <img src="https://img.shields.io/badge/Node.js-24%2B-339933?logo=node.js&logoColor=white" alt="Node.js 24 or newer">
     </a>
     <a href="https://discord.js.org/">
       <img src="https://img.shields.io/badge/discord.js-v14-5865F2?logo=discord&logoColor=white" alt="discord.js v14">
@@ -75,7 +75,7 @@
 
 ### Что понадобится
 
-- **Node.js 18+** — для production рекомендуется Node.js 22.
+- **Node.js 24+**.
 - **MongoDB** — хранилище конфигурации серверов, статистики, тикетов, инвайтов и очереди SlayNode.
 - **Discord application** с bot token и нужными intents.
 

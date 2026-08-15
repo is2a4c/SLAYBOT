@@ -1,11 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 require("module-alias/register");
-// The real-command coverage tests below load every file under src/commands,
-// including the giveaway commands - discord-giveaways pulls in
-// serialize-javascript, which references the bare `crypto` global that
-// Node only exposes unconditionally from v19 onward. See polyfillGlobalCrypto.
-require("@helpers/polyfillGlobalCrypto")();
 
 const { ApplicationCommandOptionType, ButtonStyle, Collection } = require("discord.js");
 const panel = require("@src/handlers/commandPanel");
