@@ -222,7 +222,7 @@ const CONTROL_MODULES = [
     id: "fun",
     icon: "grid",
     groups: [
-      { id: "roulette", fields: [toggle("roulette", "control_center.fun.roulette_enabled")] },
+      { id: "roulette", fields: [toggle("roulette", "control_center.fun.roulette_enabled", { runtime: true })] },
       {
         id: "forestFuss",
         fields: [
