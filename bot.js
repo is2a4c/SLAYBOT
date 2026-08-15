@@ -1,4 +1,5 @@
 require("module-alias/register");
+require("@helpers/polyfillGlobalCrypto")();
 require("@helpers/loadEnvironment")();
 require("@helpers/ConfigDefaults").applyConfigDefaults();
 

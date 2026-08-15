@@ -1,6 +1,11 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 require("module-alias/register");
+// The real-command coverage tests below load every file under src/commands,
+// including the giveaway commands - discord-giveaways pulls in
+// serialize-javascript, which references the bare `crypto` global that
+// Node only exposes unconditionally from v19 onward. See polyfillGlobalCrypto.
+require("@helpers/polyfillGlobalCrypto")();
 
 const { ApplicationCommandOptionType, ButtonStyle, Collection } = require("discord.js");
 const panel = require("@src/handlers/commandPanel");
@@ -427,4 +432,73 @@ test("a lost draft leaves the panel usable instead of stuck", async () => {
   await route(interaction);
 
   assert.match(interaction.seen.update[0].embeds[0].data.title, /Все команды/, "it falls back to the catalogue");
+});
+
+/* ------------------------------------------------------- real command coverage */
+
+/**
+ * Every command file the bot actually ships, loaded the same way BotClient
+ * loads them - so this checks the real inventory, not a couple of fixtures.
+ */
+function loadRealCommands() {
+  const { recursiveReadDirSync } = require("@helpers/Utils");
+  return recursiveReadDirSync("src/commands")
+    .map((file) => require(file))
+    .filter((entry) => entry && typeof entry === "object" && typeof entry.name === "string");
+}
+
+test("every real command can be seen by the panel - neither surface is left disabled by mistake", () => {
+  const commands = loadRealCommands();
+  assert.ok(commands.length > 100, "sanity check: this should be the whole command set, not a fragment");
+
+  const invisible = commands.filter((command) => !command.slashCommand?.enabled && !command.command?.enabled);
+  assert.deepEqual(
+    invisible.map((command) => command.name),
+    [],
+    "a command with neither surface enabled never reaches catalog.allowed() at all"
+  );
+});
+
+test("the catalogue's dynamic discovery finds the whole real command set, deduplicated by name", () => {
+  const commands = loadRealCommands();
+  const client = {
+    commands,
+    slashCommands: new Map(
+      commands.filter((command) => command.slashCommand?.enabled).map((command) => [command.name, command])
+    ),
+  };
+
+  const found = new Set(catalog.allCommands(client).map((command) => command.name));
+  const expected = new Set(commands.map((command) => command.name));
+  assert.deepEqual(found, expected);
+});
+
+test("an ordinary staff member reaches every real command name except the panel itself and owner-only ones", () => {
+  const { OWNER_IDS } = require("@root/config");
+  const commands = loadRealCommands();
+  const client = {
+    commands,
+    slashCommands: new Map(
+      commands.filter((command) => command.slashCommand?.enabled).map((command) => [command.name, command])
+    ),
+  };
+  const member = { id: "999999999999999999", permissions: { has: () => true } };
+  assert.ok(!OWNER_IDS.includes(member.id), "the fixture member must not accidentally be an owner");
+
+  const reachable = new Set(catalog.commandsFor(client, member).map((command) => command.name));
+  // A handful of names (e.g. "purge", "invites") are deliberately split across
+  // two files - a prefix-only one and a slash-only one sharing a name, so both
+  // ?purge and /purge work. The catalogue shows one entry per name, so the
+  // expected set is names, not files.
+  const uniqueNames = new Set(commands.map((command) => command.name));
+  const expectedExcluded = new Set(
+    commands
+      .filter((command) => command.name === "panel" || command.category === "OWNER")
+      .map((command) => command.name)
+  );
+
+  for (const name of expectedExcluded) {
+    assert.ok(!reachable.has(name), `${name} should not be reachable`);
+  }
+  assert.equal(reachable.size, uniqueNames.size - expectedExcluded.size);
 });
