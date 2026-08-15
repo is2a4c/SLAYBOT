@@ -50,24 +50,23 @@ test("advanced settings expose every declared field exactly once", () => {
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(new Set(paths).size, paths.length);
 
-  const viewFields = fieldsForView({ ai: { enabled: true } }).flatMap((section) => section.fields);
+  const viewFields = fieldsForView({ voice_roles: { enabled: true } }).flatMap((section) => section.fields);
   assert.equal(viewFields.length, ADVANCED_FIELDS.length);
-  assert.equal(viewFields.find((field) => field.id === "aiEnabled").value, true);
+  assert.equal(viewFields.find((field) => field.id === "voiceRolesEnabled").value, true);
 });
 
 test("advanced parser validates Discord objects, bounds, lists and formats", () => {
   const settings = {
-    max_warn: { limit: 5 },
+    max_warn: { limit: 5, action: "BAN" },
     branding: { color: "#112233", iconURL: "https://old.example/icon.png" },
-    ai: { automod_mode: "SHADOW" },
   };
   const patch = buildAdvancedPatch(
     mockGuild(),
     {
       warnLimit: "999",
+      warnAction: "INVALID",
       brandColor: "a855f7",
       brandIcon: "http://unsafe.example/icon.png",
-      aiMode: "INVALID",
       tempVoiceHub: VOICE_ID,
       tempVoiceCategory: TEXT_ID,
       verificationRole: ROLE_ID,
@@ -79,9 +78,9 @@ test("advanced parser validates Discord objects, bounds, lists and formats", () 
   );
 
   assert.equal(patch["max_warn.limit"], 20);
+  assert.equal(patch["max_warn.action"], "BAN");
   assert.equal(patch["branding.color"], "#A855F7");
   assert.equal(patch["branding.iconURL"], "https://old.example/icon.png");
-  assert.equal(patch["ai.automod_mode"], "SHADOW");
   assert.equal(patch["temp_voice.hub_channel_id"], VOICE_ID);
   assert.equal(patch["temp_voice.category_id"], null);
   assert.equal(patch["verification.role_id"], ROLE_ID);
@@ -91,8 +90,8 @@ test("advanced parser validates Discord objects, bounds, lists and formats", () 
 });
 
 test("unchecked advanced switches are explicitly disabled", () => {
-  const patch = buildAdvancedPatch(mockGuild(), {}, { ai: { enabled: true }, modmail: { enabled: true } });
-  assert.equal(patch["ai.enabled"], false);
+  const patch = buildAdvancedPatch(mockGuild(), {}, { voice_roles: { enabled: true }, modmail: { enabled: true } });
+  assert.equal(patch["voice_roles.enabled"], false);
   assert.equal(patch["modmail.enabled"], false);
 });
 

@@ -219,6 +219,39 @@ const CONTROL_MODULES = [
     ],
   },
   {
+    id: "ai",
+    icon: "spark",
+    groups: [
+      {
+        id: "status",
+        fields: [toggle("aiEnabled", "ai.enabled")],
+      },
+      {
+        id: "automod",
+        fields: [
+          toggle("aiAutomod", "ai.automod_enabled"),
+          choice("aiMode", "ai.automod_mode", ["SHADOW", "ENFORCE"]),
+          number("aiThreshold", "ai.automod_threshold", 50, 100),
+        ],
+      },
+      {
+        id: "assist",
+        fields: [
+          toggle("aiTickets", "ai.ticket_summaries"),
+          toggle("aiSuggestions", "ai.suggestion_analysis"),
+          toggle("aiForms", "ai.form_analysis"),
+        ],
+      },
+      {
+        id: "knowledge",
+        fields: [
+          toggle("aiKnowledge", "ai.knowledge_enabled"),
+          text("aiKnowledgeText", "ai.knowledge", 12000, { multiline: true }),
+        ],
+      },
+    ],
+  },
+  {
     id: "fun",
     icon: "grid",
     groups: [

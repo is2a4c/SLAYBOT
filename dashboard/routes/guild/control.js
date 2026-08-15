@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { getSettings } = require("@schemas/Guild");
 const { applyGuildConfigPatch } = require("@src/services/dashboard/guildConfig");
+const { getAiService } = require("@src/services/ai/AiService");
 const { requireCsrf } = require("../../auth/csrf");
 const { CONTROL_MODULES, buildControlPatch, findModule, moduleForView } = require("../../services/controlCenter");
 
@@ -26,6 +27,7 @@ router.get("/:module?", async (req, res) => {
     modules: CONTROL_MODULES,
     selected: moduleForView(selected, settings),
     options: availableOptions(req.guild),
+    aiConfigured: getAiService().isConfigured(),
   });
 });
 

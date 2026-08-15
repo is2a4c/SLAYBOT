@@ -223,20 +223,6 @@ const ADVANCED_SECTIONS = [
     ],
   },
   {
-    id: "ai",
-    fields: [
-      toggle("aiEnabled", "ai.enabled"),
-      toggle("aiAutomod", "ai.automod_enabled"),
-      choice("aiMode", "ai.automod_mode", ["SHADOW", "ENFORCE"]),
-      number("aiThreshold", "ai.automod_threshold", 50, 100),
-      toggle("aiTickets", "ai.ticket_summaries"),
-      toggle("aiKnowledge", "ai.knowledge_enabled"),
-      text("aiKnowledgeText", "ai.knowledge", 12000, { multiline: true, nullable: true }),
-      toggle("aiSuggestions", "ai.suggestion_analysis"),
-      toggle("aiForms", "ai.form_analysis"),
-    ],
-  },
-  {
     id: "voiceRoles",
     fields: [toggle("voiceRolesEnabled", "voice_roles.enabled"), role("voiceRolesDefault", "voice_roles.default_role")],
   },

@@ -59,6 +59,12 @@
             <div class="field <%= locked ? 'control-staged' : '' %>"><label for="<%= inputId %>"><%= t(`control.fields.${field.id}`) %><% if (locked) { %><small><%= t("control.stagedField") %></small><% } %></label><input type="<%= field.type === 'number' ? 'number' : 'text' %>" id="<%= inputId %>" name="<%= field.id %>" value="<%= field.value ?? '' %>" <%= locked ? "disabled" : "" %> placeholder="<%= field.placeholder || '' %>" <% if (field.type === "number") { %>min="<%= field.min %>" max="<%= field.max %>" step="<%= field.step || 1 %>"<% } else { %>maxlength="<%= field.maxLength %>"<% } %> /></div>
           <% } %>
         <% }) %>
+        <% if (selected.id === "ai" && group.id === "status") { %>
+          <div class="field field-wide">
+            <label><%= t("control.fields.aiProviderStatus") %></label>
+            <span class="badge <%= aiConfigured ? 'ok' : 'warn' %>"><%= t(aiConfigured ? "control.aiProviderConfigured" : "control.aiProviderMissing") %></span>
+          </div>
+        <% } %>
         <% if (selected.id === "ranking" && group.id === "card") {
           const previewSrc = `${basePath}/g/${guild.id}/ranking/preview.png`;
           const accentValue = group.fields.find((entry) => entry.id === "rankCardAccent")?.value;

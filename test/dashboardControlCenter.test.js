@@ -170,3 +170,41 @@ test("music controls are live, matching the settings src/services/music/policy.j
     assert.equal(fields.find((field) => field.id === id).runtime, true, id);
   }
 });
+
+test("AI controls are live and point at the same ai.* paths src/commands/admin/ai.js reads", () => {
+  const fields = findModule("ai").groups.flatMap((group) => group.fields);
+  for (const id of [
+    "aiEnabled",
+    "aiAutomod",
+    "aiMode",
+    "aiThreshold",
+    "aiTickets",
+    "aiSuggestions",
+    "aiForms",
+    "aiKnowledge",
+    "aiKnowledgeText",
+  ]) {
+    assert.equal(fields.find((field) => field.id === id).runtime, true, id);
+  }
+});
+
+test("AI control patch validates the automod mode and threshold, and stores the knowledge text", () => {
+  const ai = findModule("ai");
+  const patch = buildControlPatch(
+    mockGuild(),
+    {
+      aiAutomod: "on",
+      aiMode: "INVALID",
+      aiThreshold: "40",
+      aiKnowledgeText: "Verification requires /verify.",
+    },
+    { ai: { automod_mode: "ENFORCE", automod_threshold: 85 } },
+    ai
+  );
+
+  assert.equal(patch["ai.enabled"], false, "an unchecked switch is stored as off");
+  assert.equal(patch["ai.automod_enabled"], true);
+  assert.equal(patch["ai.automod_mode"], "ENFORCE", "an invalid choice keeps the current value");
+  assert.equal(patch["ai.automod_threshold"], 50, "the threshold clamps to its 50-100 range");
+  assert.equal(patch["ai.knowledge"], "Verification requires /verify.");
+});
