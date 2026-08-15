@@ -94,7 +94,6 @@ const CONTROL_MODULES = [
           toggle("repeatedText", "automod.anti_spam", { runtime: true }),
           toggle("antiLinks", "automod.anti_links"),
           toggle("antiInvites", "automod.anti_invites"),
-          toggle("antiSpam", "automod.anti_spam"),
           toggle("antiImageSpam", "automod.anti_image_spam"),
         ],
       },

@@ -674,7 +674,6 @@ module.exports = {
       repeatedText: "Фильтр повторов",
       antiLinks: "Фильтр ссылок",
       antiInvites: "Фильтр приглашений",
-      antiSpam: "Антиспам",
       antiImageSpam: "Image Spam Guard",
       musicChannel: "Музыкальный канал",
       musicAnyChannel: "Разрешить музыку в любом канале",

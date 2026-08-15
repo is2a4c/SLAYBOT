@@ -39,6 +39,16 @@ test("control center fields are unique and point to guild schema paths", () => {
   for (const field of fields) assert.ok(schema.path(field.path), `${field.id}: ${field.path}`);
 });
 
+test("no two fields write the same schema path - one would silently discard the other's edit on save", () => {
+  const fields = CONTROL_MODULES.flatMap((module) => module.groups.flatMap((group) => group.fields));
+  const byPath = new Map();
+  for (const field of fields) {
+    const existing = byPath.get(field.path);
+    assert.equal(existing, undefined, `${field.path} is claimed by both "${existing}" and "${field.id}"`);
+    byPath.set(field.path, field.id);
+  }
+});
+
 test("control parser updates runtime settings and ignores staged settings", () => {
   const module = findModule("moderation");
   const patch = buildControlPatch(
