@@ -6,6 +6,10 @@ const { containsLink } = require("@helpers/Utils");
 const { error } = require("@helpers/Logger");
 const { sendModerationDm, sendWarningDm } = require("@src/services/moderationNotifications");
 const { routeEvent } = require("@src/services/eventRouter/EventRouter");
+const { muteRoleId, respectsRoleHierarchy, usesRoleMute, usesTimeoutMute } = require("@src/services/moderation/policy");
+const { ensureGuildOverwrites } = require("@src/services/moderation/muteRole");
+const { ensureScheduled: ensureWarningExpiryScheduled } = require("@src/services/moderation/warningExpiry");
+const { grantTempRole, cancelTempRole } = require("@src/services/roles/TempRoles");
 
 // Schemas
 const { getSettings } = require("@schemas/Guild");
@@ -18,6 +22,29 @@ const memberInteract = (issuer, target) => {
   const { guild } = issuer;
   if (guild.ownerId === issuer.id) return true;
   if (guild.ownerId === target.id) return false;
+  return issuer.roles.highest.position > target.roles.highest.position;
+};
+
+/**
+ * Whether a human moderator may act on this target: always the owner,
+ * never against the owner, and otherwise gated by role position unless the
+ * server turned that check off. Passing no settings (or none found) keeps
+ * the check always-on, matching the behaviour before this was configurable.
+ *
+ * The bot's own hierarchy check stays a plain `memberInteract(bot, target)`
+ * everywhere below - Discord enforces that at the API level regardless of
+ * what a server wants, so disabling it here would only turn a clear refusal
+ * into a confusing failed API call.
+ *
+ * @param {import('discord.js').GuildMember} issuer
+ * @param {import('discord.js').GuildMember} target
+ * @param {object} [settings]
+ */
+const issuerCanModerate = (issuer, target, settings = null) => {
+  const { guild } = issuer;
+  if (guild.ownerId === issuer.id) return true;
+  if (guild.ownerId === target.id) return false;
+  if (!respectsRoleHierarchy(settings)) return true;
   return issuer.roles.highest.position > target.roles.highest.position;
 };
 
@@ -166,9 +193,11 @@ module.exports = class ModUtils {
   /**
    * @param {import('discord.js').GuildMember} issuer
    * @param {import('discord.js').GuildMember} target
+   * @param {object} [settings] when given, honours the server's own
+   *   hierarchy-enforcement toggle; omit it for the always-on check
    */
-  static canModerate(issuer, target) {
-    return memberInteract(issuer, target);
+  static canModerate(issuer, target, settings = null) {
+    return issuerCanModerate(issuer, target, settings);
   }
 
   /**
@@ -312,7 +341,8 @@ module.exports = class ModUtils {
    * @param {string} reason
    */
   static async warnTarget(issuer, target, reason) {
-    if (!memberInteract(issuer, target)) return "MEMBER_PERM";
+    const settings = await getSettings(issuer.guild);
+    if (!issuerCanModerate(issuer, target, settings)) return "MEMBER_PERM";
     if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
 
     try {
@@ -320,7 +350,6 @@ module.exports = class ModUtils {
       await routeEvent(issuer.guild, "WARN", { actor: issuer, target, reason, logger: issuer.client.logger });
       const memberDb = await getMember(issuer.guild.id, target.id);
       memberDb.warnings += 1;
-      const settings = await getSettings(issuer.guild);
       const warningCount = memberDb.warnings;
       const automaticAction = warningCount >= settings.max_warn.limit ? settings.max_warn.action : null;
 
@@ -331,6 +360,9 @@ module.exports = class ModUtils {
       }
 
       await memberDb.save();
+      await ensureWarningExpiryScheduled(issuer.guild.id).catch((ex) =>
+        error("warnTarget: could not arrange warning expiry", ex)
+      );
       await sendWarningDm({
         target,
         settings,
@@ -348,29 +380,47 @@ module.exports = class ModUtils {
   }
 
   /**
-   * Timeouts(aka mutes) the target and logs to the database, channel
+   * Mutes the target and logs to the database, channel. Applies whichever
+   * mechanism (or both) the server's own `mute_mode` selects - Discord's
+   * timeout, the configured mute role, or both together.
    * @param {import('discord.js').GuildMember} issuer
    * @param {import('discord.js').GuildMember} target
    * @param {number} ms
    * @param {string} reason
    */
   static async timeoutTarget(issuer, target, ms, reason) {
-    if (!memberInteract(issuer, target)) return "MEMBER_PERM";
+    const settings = await getSettings(issuer.guild);
+    if (!issuerCanModerate(issuer, target, settings)) return "MEMBER_PERM";
     if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
-    if (target.communicationDisabledUntilTimestamp - Date.now() > 0) return "ALREADY_TIMEOUT";
+
+    const usesTimeout = usesTimeoutMute(settings);
+    const usesRole = usesRoleMute(settings);
+
+    let role = null;
+    if (usesRole) {
+      const roleId = muteRoleId(settings);
+      role = roleId ? issuer.guild.roles.cache.get(roleId) : null;
+      if (!role) return "NO_MUTE_ROLE";
+    }
+
+    const timeoutActive = usesTimeout && target.communicationDisabledUntilTimestamp - Date.now() > 0;
+    const roleActive = usesRole && target.roles.cache.has(role.id);
+    const timeoutSatisfied = !usesTimeout || timeoutActive;
+    const roleSatisfied = !usesRole || roleActive;
+    if (timeoutSatisfied && roleSatisfied) return "ALREADY_TIMEOUT";
 
     try {
-      await target.timeout(ms, reason);
+      if (usesTimeout && !timeoutActive) {
+        await target.timeout(ms, reason);
+      }
+      if (usesRole && !roleActive) {
+        await ensureGuildOverwrites(issuer.guild, role, settings);
+        await grantTempRole({ member: target, role, durationMs: ms, reason, moderatorId: issuer.id });
+      }
+
       await logModeration(issuer, target, reason, "Timeout");
       await routeEvent(issuer.guild, "TIMEOUT", { actor: issuer, target, reason, logger: issuer.client.logger });
-      await sendModerationDm({
-        target,
-        guild: issuer.guild,
-        settings: await getSettings(issuer.guild),
-        action: "TIMEOUT",
-        issuer,
-        reason,
-      });
+      await sendModerationDm({ target, guild: issuer.guild, settings, action: "TIMEOUT", issuer, reason });
       return true;
     } catch (ex) {
       error("timeoutTarget", ex);
@@ -379,18 +429,31 @@ module.exports = class ModUtils {
   }
 
   /**
-   * UnTimeouts(aka mutes) the target and logs to the database, channel
+   * Removes an active mute, by whichever mechanism actually put it there.
    * @param {import('discord.js').GuildMember} issuer
    * @param {import('discord.js').GuildMember} target
    * @param {string} reason
    */
   static async unTimeoutTarget(issuer, target, reason) {
-    if (!memberInteract(issuer, target)) return "MEMBER_PERM";
+    const settings = await getSettings(issuer.guild);
+    if (!issuerCanModerate(issuer, target, settings)) return "MEMBER_PERM";
     if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
-    if (target.communicationDisabledUntilTimestamp - Date.now() < 0) return "NO_TIMEOUT";
+
+    const usesTimeout = usesTimeoutMute(settings);
+    const usesRole = usesRoleMute(settings);
+    const roleId = usesRole ? muteRoleId(settings) : null;
+    const role = roleId ? issuer.guild.roles.cache.get(roleId) : null;
+
+    const timeoutActive = usesTimeout && target.communicationDisabledUntilTimestamp - Date.now() > 0;
+    const roleActive = Boolean(usesRole && role && target.roles.cache.has(role.id));
+    if (!timeoutActive && !roleActive) return "NOT_MUTED";
 
     try {
-      await target.timeout(null, reason);
+      if (timeoutActive) await target.timeout(null, reason);
+      if (roleActive) {
+        await target.roles.remove(role, reason || "Mute removed");
+        await cancelTempRole({ guildId: issuer.guild.id, userId: target.id, roleId: role.id });
+      }
       await logModeration(issuer, target, reason, "UnTimeout");
       return true;
     } catch (ex) {
@@ -406,21 +469,15 @@ module.exports = class ModUtils {
    * @param {string} reason
    */
   static async kickTarget(issuer, target, reason) {
-    if (!memberInteract(issuer, target)) return "MEMBER_PERM";
+    const settings = await getSettings(issuer.guild);
+    if (!issuerCanModerate(issuer, target, settings)) return "MEMBER_PERM";
     if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
 
     try {
       await target.kick(reason);
       await logModeration(issuer, target, reason, "Kick");
       await routeEvent(issuer.guild, "KICK", { actor: issuer, target, reason, logger: issuer.client.logger });
-      await sendModerationDm({
-        target,
-        guild: issuer.guild,
-        settings: await getSettings(issuer.guild),
-        action: "KICK",
-        issuer,
-        reason,
-      });
+      await sendModerationDm({ target, guild: issuer.guild, settings, action: "KICK", issuer, reason });
       return true;
     } catch (ex) {
       error("kickTarget", ex);
@@ -435,7 +492,8 @@ module.exports = class ModUtils {
    * @param {string} reason
    */
   static async softbanTarget(issuer, target, reason) {
-    if (!memberInteract(issuer, target)) return "MEMBER_PERM";
+    const settings = await getSettings(issuer.guild);
+    if (!issuerCanModerate(issuer, target, settings)) return "MEMBER_PERM";
     if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
 
     try {
@@ -456,23 +514,17 @@ module.exports = class ModUtils {
    * @param {string} reason
    */
   static async banTarget(issuer, target, reason) {
+    const settings = await getSettings(issuer.guild);
     const targetMem = await issuer.guild.members.fetch(target.id).catch(() => {});
 
-    if (targetMem && !memberInteract(issuer, targetMem)) return "MEMBER_PERM";
+    if (targetMem && !issuerCanModerate(issuer, targetMem, settings)) return "MEMBER_PERM";
     if (targetMem && !memberInteract(issuer.guild.members.me, targetMem)) return "BOT_PERM";
 
     try {
       await issuer.guild.bans.create(target.id, { deleteMessageSeconds: 0, reason });
       await logModeration(issuer, target, reason, "Ban");
       await routeEvent(issuer.guild, "BAN", { actor: issuer, target, reason, logger: issuer.client.logger });
-      await sendModerationDm({
-        target,
-        guild: issuer.guild,
-        settings: await getSettings(issuer.guild),
-        action: "BAN",
-        issuer,
-        reason,
-      });
+      await sendModerationDm({ target, guild: issuer.guild, settings, action: "BAN", issuer, reason });
       return true;
     } catch (ex) {
       error(`banTarget`, ex);
@@ -504,7 +556,8 @@ module.exports = class ModUtils {
    * @param {string} reason
    */
   static async vMuteTarget(issuer, target, reason) {
-    if (!memberInteract(issuer, target)) return "MEMBER_PERM";
+    const settings = await getSettings(issuer.guild);
+    if (!issuerCanModerate(issuer, target, settings)) return "MEMBER_PERM";
     if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
 
     if (!target.voice.channel) return "NO_VOICE";
@@ -527,7 +580,8 @@ module.exports = class ModUtils {
    * @param {string} reason
    */
   static async vUnmuteTarget(issuer, target, reason) {
-    if (!memberInteract(issuer, target)) return "MEMBER_PERM";
+    const settings = await getSettings(issuer.guild);
+    if (!issuerCanModerate(issuer, target, settings)) return "MEMBER_PERM";
     if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
 
     if (!target.voice.channel) return "NO_VOICE";
@@ -550,7 +604,8 @@ module.exports = class ModUtils {
    * @param {string} reason
    */
   static async deafenTarget(issuer, target, reason) {
-    if (!memberInteract(issuer, target)) return "MEMBER_PERM";
+    const settings = await getSettings(issuer.guild);
+    if (!issuerCanModerate(issuer, target, settings)) return "MEMBER_PERM";
     if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
 
     if (!target.voice.channel) return "NO_VOICE";
@@ -572,7 +627,8 @@ module.exports = class ModUtils {
    * @param {string} reason
    */
   static async unDeafenTarget(issuer, target, reason) {
-    if (!memberInteract(issuer, target)) return "MEMBER_PERM";
+    const settings = await getSettings(issuer.guild);
+    if (!issuerCanModerate(issuer, target, settings)) return "MEMBER_PERM";
     if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
 
     if (!target.voice.channel) return "NO_VOICE";
@@ -595,7 +651,8 @@ module.exports = class ModUtils {
    * @param {string} reason
    */
   static async disconnectTarget(issuer, target, reason) {
-    if (!memberInteract(issuer, target)) return "MEMBER_PERM";
+    const settings = await getSettings(issuer.guild);
+    if (!issuerCanModerate(issuer, target, settings)) return "MEMBER_PERM";
     if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
 
     if (!target.voice.channel) return "NO_VOICE";
@@ -618,7 +675,8 @@ module.exports = class ModUtils {
    * @param {import('discord.js').VoiceChannel|import('discord.js').StageChannel} channel
    */
   static async moveTarget(issuer, target, reason, channel) {
-    if (!memberInteract(issuer, target)) return "MEMBER_PERM";
+    const settings = await getSettings(issuer.guild);
+    if (!issuerCanModerate(issuer, target, settings)) return "MEMBER_PERM";
     if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
 
     if (!target.voice?.channel) return "NO_VOICE";

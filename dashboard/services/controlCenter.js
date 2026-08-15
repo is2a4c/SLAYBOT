@@ -14,7 +14,7 @@ const text = (id, path, maxLength = 1000, extra = {}) => field(id, path, "text",
 const number = (id, path, min, max, extra = {}) => field(id, path, "number", { min, max, ...extra });
 const choice = (id, path, choices, extra = {}) => field(id, path, "choice", { choices, ...extra });
 const channel = (id, path, channelKind = "text", extra = {}) => field(id, path, "channel", { channelKind, ...extra });
-const role = (id, path) => field(id, path, "role");
+const role = (id, path, extra = {}) => field(id, path, "role", extra);
 const roleList = (id, path, max = 25, extra = {}) => field(id, path, "roleList", { max, ...extra });
 const channelList = (id, path, channelKind = "text", max = 25, extra = {}) =>
   field(id, path, "channelList", { channelKind, max, ...extra });
@@ -61,10 +61,10 @@ const CONTROL_MODULES = [
       {
         id: "team",
         fields: [
-          roleList("moderatorRoles", "control_center.moderation.moderator_roles"),
-          toggle("cooldownExempt", "control_center.moderation.cooldown_exempt"),
-          toggle("roleHierarchy", "control_center.moderation.respect_role_hierarchy"),
-          number("warningExpiry", "control_center.moderation.warning_expiry_days", 0, 3650),
+          roleList("moderatorRoles", "control_center.moderation.moderator_roles", 25, { runtime: true }),
+          toggle("cooldownExempt", "control_center.moderation.cooldown_exempt", { runtime: true }),
+          toggle("roleHierarchy", "control_center.moderation.respect_role_hierarchy", { runtime: true }),
+          number("warningExpiry", "control_center.moderation.warning_expiry_days", 0, 3650, { runtime: true }),
           number("warningLimit", "max_warn.limit", 1, 100),
           choice("warningAction", "max_warn.action", ["TIMEOUT", "KICK", "BAN"]),
         ],
@@ -72,11 +72,15 @@ const CONTROL_MODULES = [
       {
         id: "mute",
         fields: [
-          choice("muteScope", "control_center.moderation.default_mute_scope", ["ALL", "TEXT", "VOICE"]),
-          choice("muteMode", "control_center.moderation.mute_mode", ["TIMEOUT", "ROLE", "BOTH"]),
-          role("muteRole", "control_center.moderation.mute_role"),
-          channelList("muteExcluded", "control_center.moderation.mute_excluded_channels", "text"),
-          toggle("blockReactions", "control_center.moderation.block_reactions"),
+          choice("muteScope", "control_center.moderation.default_mute_scope", ["ALL", "TEXT", "VOICE"], {
+            runtime: true,
+          }),
+          choice("muteMode", "control_center.moderation.mute_mode", ["TIMEOUT", "ROLE", "BOTH"], { runtime: true }),
+          role("muteRole", "control_center.moderation.mute_role", { runtime: true }),
+          channelList("muteExcluded", "control_center.moderation.mute_excluded_channels", "text", 25, {
+            runtime: true,
+          }),
+          toggle("blockReactions", "control_center.moderation.block_reactions", { runtime: true }),
         ],
       },
       {

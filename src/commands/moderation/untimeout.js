@@ -57,6 +57,6 @@ async function untimeout(issuer, target, reason) {
   if (typeof response === "boolean") return `Timeout of ${target.user.username} is removed!`;
   if (response === "BOT_PERM") return `I do not have permission to remove timeout of ${target.user.username}`;
   else if (response === "MEMBER_PERM") return `You do not have permission to remove timeout of ${target.user.username}`;
-  else if (response === "NO_TIMEOUT") return `${target.user.username} is not timed out!`;
+  else if (response === "NOT_MUTED") return `${target.user.username} is not muted!`;
   else return `Failed to remove timeout of ${target.user.username}`;
 }

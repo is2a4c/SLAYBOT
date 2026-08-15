@@ -49,7 +49,7 @@ test("no two fields write the same schema path - one would silently discard the 
   }
 });
 
-test("control parser updates runtime settings and ignores staged settings", () => {
+test("control parser updates runtime settings and validates their input", () => {
   const module = findModule("moderation");
   const patch = buildControlPatch(
     mockGuild(),
@@ -69,12 +69,31 @@ test("control parser updates runtime settings and ignores staged settings", () =
     module
   );
 
-  assert.equal(patch["control_center.moderation.moderator_roles"], undefined);
-  assert.equal(patch["control_center.moderation.warning_expiry_days"], undefined);
-  assert.equal(patch["max_warn.action"], "BAN");
-  assert.equal(patch["control_center.moderation.mute_role"], undefined);
-  assert.equal(patch["control_center.moderation.anti_caps"], undefined);
-  assert.equal(patch["automod.anti_links"], false);
+  assert.deepEqual(
+    patch["control_center.moderation.moderator_roles"],
+    [ROLE_ID],
+    "a duplicate and a role that does not exist are both dropped"
+  );
+  assert.equal(patch["control_center.moderation.warning_expiry_days"], 3650, "clamped to the field's own max");
+  assert.equal(patch["max_warn.action"], "BAN", "an invalid choice keeps the current value");
+  assert.equal(patch["control_center.moderation.mute_role"], null, "an id that is not a real role is rejected");
+  assert.equal(patch["automod.anti_caps"], true);
+  assert.equal(patch["automod.anti_links"], false, "an unchecked switch is stored as off");
+});
+
+test("buildControlPatch skips any field a module still marks as staged", () => {
+  const stagedModule = {
+    id: "staged-example",
+    groups: [
+      {
+        id: "example",
+        fields: [{ id: "example", path: "control_center.example.value", type: "toggle", runtime: false }],
+      },
+    ],
+  };
+
+  const patch = buildControlPatch(mockGuild(), { example: "on" }, {}, stagedModule);
+  assert.deepEqual(patch, {}, "a staged field is never written, however the form submitted it");
 });
 
 test("control view isolates one module and preserves current values", () => {
@@ -103,6 +122,23 @@ test("both command switches are live now that the command policy enforces them",
   );
   assert.equal(patch["control_center.common.text_commands"], true);
   assert.equal(patch["control_center.common.slash_commands"], false, "an unchecked switch is stored as off");
+});
+
+test("the moderation team and mute groups are live now that a real moderation team and mute role exist", () => {
+  const fields = findModule("moderation").groups.flatMap((group) => group.fields);
+  for (const id of [
+    "moderatorRoles",
+    "cooldownExempt",
+    "roleHierarchy",
+    "warningExpiry",
+    "muteScope",
+    "muteMode",
+    "muteRole",
+    "muteExcluded",
+    "blockReactions",
+  ]) {
+    assert.equal(fields.find((field) => field.id === id).runtime, true, id);
+  }
 });
 
 test("notification controls backed by event handlers are live", () => {

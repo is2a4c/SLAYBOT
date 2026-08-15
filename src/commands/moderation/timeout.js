@@ -74,7 +74,8 @@ async function timeout(issuer, target, ms, reason) {
   if (typeof response !== "boolean") {
     if (response === "BOT_PERM") return `I do not have permission to timeout ${target.user.username}`;
     if (response === "MEMBER_PERM") return `You do not have permission to timeout ${target.user.username}`;
-    if (response === "ALREADY_TIMEOUT") return `${target.user.username} is already timed out!`;
+    if (response === "ALREADY_TIMEOUT") return `${target.user.username} is already muted!`;
+    if (response === "NO_MUTE_ROLE") return "This server's mute mode needs a mute role, but none is configured yet.";
     return `Failed to timeout ${target.user.username}`;
   }
 

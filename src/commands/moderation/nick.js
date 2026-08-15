@@ -62,7 +62,7 @@ module.exports = {
     ],
   },
 
-  async messageRun(message, args) {
+  async messageRun(message, args, data) {
     const sub = args[0].toLowerCase();
 
     if (sub === "set") {
@@ -71,7 +71,7 @@ module.exports = {
       const name = args.slice(2).join(" ");
       if (!name) return message.safeReply("Please specify a nickname");
 
-      const response = await nickname(message, target, name);
+      const response = await nickname(message, target, name, data.settings);
       return message.safeReply(response);
     }
 
@@ -80,22 +80,22 @@ module.exports = {
       const target = await message.guild.resolveMember(args[1]);
       if (!target) return message.safeReply("Could not find matching member");
 
-      const response = await nickname(message, target);
+      const response = await nickname(message, target, undefined, data.settings);
       return message.safeReply(response);
     }
   },
 
-  async interactionRun(interaction) {
+  async interactionRun(interaction, data) {
     const name = interaction.options.getString("name");
     const target = await interaction.guild.members.fetch(interaction.options.getUser("user"));
 
-    const response = await nickname(interaction, target, name);
+    const response = await nickname(interaction, target, name, data.settings);
     await interaction.safeFollowUp(response);
   },
 };
 
-async function nickname({ member, guild }, target, name) {
-  if (!canModerate(member, target)) {
+async function nickname({ member, guild }, target, name, settings) {
+  if (!canModerate(member, target, settings)) {
     return `Oops! You cannot manage nickname of ${target.user.username}`;
   }
   if (!canModerate(guild.members.me, target)) {

@@ -12,6 +12,7 @@ const {
 } = require("@src/services/imageSpamClassifier");
 const { getAiService } = require("@src/services/ai/AiService");
 const { selectEscalationRule } = require("@src/services/automodEscalation");
+const { isModerator } = require("@src/services/moderation/policy");
 
 const antispamCache = new Map();
 const DEFAULT_SPAM_WINDOW_SECONDS = 3;
@@ -173,8 +174,9 @@ setInterval(
 /**
  * Check if the message needs to be moderated and has required permissions
  * @param {import('discord.js').Message} message
+ * @param {object} settings
  */
-const shouldModerate = (message) => {
+const shouldModerate = (message, settings) => {
   const { member, guild, channel } = message;
 
   // Ignore if bot cannot delete channel messages
@@ -185,6 +187,10 @@ const shouldModerate = (message) => {
 
   // Ignore Possible Channel Moderators
   if (channel.permissionsFor(message.member).has("ManageMessages")) return false;
+
+  // Ignore the server's own listed moderator roles
+  if (isModerator(settings, member)) return false;
+
   return true;
 };
 
@@ -305,7 +311,7 @@ async function inspectTextRisk(message, aiSettings, classifier) {
  */
 async function performAutomod(message, settings, imageClassifier = classifyImage, textClassifier) {
   const { automod } = settings;
-  const ordinaryMember = shouldModerate(message);
+  const ordinaryMember = shouldModerate(message, settings);
 
   if ((automod.wh_channels || []).includes(message.channelId)) {
     return { triggered: false, deleted: false, strikes: 0 };

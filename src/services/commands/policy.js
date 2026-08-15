@@ -12,6 +12,8 @@
  * member a moderation command they could not run anyway.
  */
 
+const { isCooldownExemptModerator } = require("@src/services/moderation/policy");
+
 const MAX_COOLDOWN_SECONDS = 86400;
 const MAX_POLICY_IDS = 25;
 const MAX_COMMAND_NAME = 32;
@@ -42,13 +44,18 @@ function categoryDisabled(settings, category) {
  * How long this member has to wait between uses of this command.
  *
  * A server override of `0` is a deliberate "no cooldown" and is honoured; only
- * an absent override falls back to what the command itself declares.
+ * an absent override falls back to what the command itself declares. A member
+ * holding one of the server's own moderator roles skips cooldowns entirely,
+ * unless the server turned that exemption off.
  *
  * @param {object} settings guild settings document
  * @param {object} command
+ * @param {import('discord.js').GuildMember} [member]
  * @returns {number} seconds
  */
-function effectiveCooldown(settings, command) {
+function effectiveCooldown(settings, command, member) {
+  if (isCooldownExemptModerator(settings, member)) return 0;
+
   const override = commandPolicy(settings, command?.name)?.cooldown_seconds;
   if (override === null || override === undefined) return Number(command?.cooldown || 0);
   const parsed = Number(override);

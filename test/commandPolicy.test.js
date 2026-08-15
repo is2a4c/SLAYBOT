@@ -96,6 +96,31 @@ test("a cooldown override wins, and zero really means none", () => {
   assert.equal(effectiveCooldown(null, BAN), 10);
 });
 
+test("a member holding a listed moderator role skips cooldowns entirely, before any override is even read", () => {
+  const settings = {
+    ...settingsWith({ commands: [{ name: "ban", cooldown_seconds: 60 }] }),
+    control_center: {
+      common: { text_commands: true, slash_commands: true },
+      moderation: { moderator_roles: [STAFF_ROLE] },
+    },
+  };
+
+  assert.equal(effectiveCooldown(settings, BAN, member(STAFF_ROLE)), 0);
+  assert.equal(effectiveCooldown(settings, BAN, member(OTHER_ROLE)), 60, "an unrelated role still waits");
+  assert.equal(effectiveCooldown(settings, BAN), 60, "no member to check means no exemption");
+});
+
+test("a server can turn the moderator cooldown exemption off without removing the role list", () => {
+  const settings = {
+    control_center: {
+      common: { text_commands: true, slash_commands: true },
+      moderation: { moderator_roles: [STAFF_ROLE], cooldown_exempt: false },
+    },
+  };
+
+  assert.equal(effectiveCooldown(settings, BAN, member(STAFF_ROLE)), 10, "the exemption itself is off");
+});
+
 /* ------------------------------------------------------- no way around this */
 
 test("the policy never grants what Discord's permissions refuse", () => {

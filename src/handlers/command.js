@@ -60,10 +60,11 @@ function accessProblem(cmd, { user, member, guild, settings, channel, source }) 
  * @param {import('@structures/Command')} cmd
  * @param {string} userId
  * @param {object} [settings] guild settings, for a server's own cooldown
+ * @param {import('discord.js').GuildMember} [member] for the moderator cooldown exemption
  * @returns {string|null}
  */
-function cooldownProblem(cmd, userId, settings) {
-  const cooldown = effectiveCooldown(settings, cmd);
+function cooldownProblem(cmd, userId, settings, member) {
+  const cooldown = effectiveCooldown(settings, cmd, member);
   if (!(cooldown > 0)) return null;
 
   const remaining = getRemainingCooldown(userId, cmd, cooldown);
@@ -156,7 +157,7 @@ module.exports = {
     }
 
     // cooldown check
-    const cooldown = effectiveCooldown(settings, cmd);
+    const cooldown = effectiveCooldown(settings, cmd, message.member);
     if (cooldown > 0) {
       const remaining = getRemainingCooldown(message.author.id, cmd, cooldown);
       if (remaining > 0) {
@@ -230,7 +231,7 @@ module.exports = {
         settings,
         channel: interaction.channel,
         source: "slash",
-      }) || cooldownProblem(cmd, interaction.user.id, settings);
+      }) || cooldownProblem(cmd, interaction.user.id, settings, interaction.member);
 
     if (problem) {
       // Only a refusal from this server's own policy is worth routing - a
@@ -276,7 +277,7 @@ module.exports = {
         success: succeeded,
         durationMs: Date.now() - startedAt,
       });
-      if (effectiveCooldown(settings, cmd) > 0) applyCooldown(interaction.user.id, cmd);
+      if (effectiveCooldown(settings, cmd, interaction.member) > 0) applyCooldown(interaction.user.id, cmd);
     }
   },
 

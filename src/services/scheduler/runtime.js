@@ -5,6 +5,7 @@ const birthdays = require("@src/services/birthdays/Birthdays");
 const polls = require("@handlers/polls");
 const scheduledEvents = require("@src/services/events/ScheduledEvents");
 const forestFuss = require("@src/services/forestFuss/game");
+const warningExpiry = require("@src/services/moderation/warningExpiry");
 
 /**
  * Wire every deferred feature into a single durable scheduler and start polling.
@@ -28,6 +29,7 @@ function startScheduler(client) {
   polls.register(scheduler);
   scheduledEvents.register(scheduler);
   forestFuss.register(scheduler);
+  warningExpiry.register(scheduler);
 
   client.scheduler = scheduler;
   return scheduler.start();
