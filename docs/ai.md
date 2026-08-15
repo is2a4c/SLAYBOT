@@ -27,6 +27,19 @@ npm run ai:check
 
 `IO_INTELLIGENCE_API_KEY` is also used by the existing remote image-spam classifier. Image analysis can keep a separate model override through `IMAGE_SPAM_REMOTE_MODEL`.
 
+### Optional fallback provider
+
+Text AI (moderation, tickets, knowledge, suggestions, forms) can fall back to a second OpenAI-compatible provider when io.net times out, errors, or is unreachable. This is opt-in: without `AI_FALLBACK_PROVIDER` nothing changes.
+
+```bash
+AI_FALLBACK_PROVIDER=gemini      # one of the presets in src/services/ai/visionProvider.js: ionet, gemini, openrouter, mistral, cloudflare
+AI_FALLBACK_API_KEY=<key>        # optional override; otherwise the preset's own key env is read (e.g. GEMINI_API_KEY)
+AI_FALLBACK_MODEL=<model>        # optional override of the preset's default model
+AI_FALLBACK_BASE_URL=<url>       # optional override of the preset's base URL
+```
+
+A single request first retries the primary provider once, then tries the fallback once, only for transient failures (timeout, network error, or an HTTP 5xx). A provider error caused by bad input or a bad credential is not retried.
+
 Never place API credentials in `config.js`, MongoDB, command arguments, commits, screenshots, or logs. Revoke any token that has been pasted into chat or another shared location before production use.
 
 ## Guild configuration

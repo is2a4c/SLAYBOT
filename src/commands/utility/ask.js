@@ -2,7 +2,7 @@ const { ApplicationCommandOptionType, EmbedBuilder } = require("discord.js");
 const { EMBED_COLORS } = require("@root/config");
 const { getAiService } = require("@src/services/ai/AiService");
 
-async function answerQuestion(guildId, question, settings, service = getAiService()) {
+async function answerQuestion(guildId, question, settings, client, service = getAiService()) {
   const ai = settings.ai;
   if (!ai?.enabled || !ai.knowledge_enabled || !String(ai.knowledge || "").trim()) {
     return { error: "AI server knowledge is not configured." };
@@ -15,7 +15,8 @@ async function answerQuestion(guildId, question, settings, service = getAiServic
       knowledge: ai.knowledge,
       question,
     });
-  } catch {
+  } catch (error) {
+    client?.logger.warn(`AI knowledge answer failed in ${guildId}: ${error.message}`);
     return { error: "The AI service is temporarily unavailable. Please try again later." };
   }
 }
@@ -57,14 +58,14 @@ module.exports = {
 
   async messageRun(message, args, data) {
     const question = args.join(" ").trim().slice(0, 2000);
-    const result = await answerQuestion(message.guildId, question, data.settings);
+    const result = await answerQuestion(message.guildId, question, data.settings, message.client);
     if (result.error) return message.safeReply(result.error);
     return message.safeReply({ embeds: [answerEmbed(question, result)] });
   },
 
   async interactionRun(interaction, data) {
     const question = interaction.options.getString("question").trim().slice(0, 2000);
-    const result = await answerQuestion(interaction.guildId, question, data.settings);
+    const result = await answerQuestion(interaction.guildId, question, data.settings, interaction.client);
     if (result.error) return interaction.safeFollowUp(result.error);
     return interaction.safeFollowUp({ embeds: [answerEmbed(question, result)] });
   },

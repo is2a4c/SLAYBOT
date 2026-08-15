@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 
 require("module-alias/register");
 
-const { IoIntelligenceClient } = require("../src/services/ai/IoIntelligenceClient");
+const { IoIntelligenceClient, resolveFallbackProvider } = require("../src/services/ai/IoIntelligenceClient");
 const { AiService } = require("../src/services/ai/AiService");
 const { inspectTextRisk } = require("../src/handlers/automod");
 const { analyzeFormResponseSafely } = require("../src/handlers/form");
@@ -143,6 +143,71 @@ test("io.net client bounds concurrency and aborts a stalled request", async () =
       }),
   });
   await assert.rejects(stalled.complete({ system: "system", user: "stall" }), (error) => error.code === "AI_TIMEOUT");
+});
+
+test("io.net client retries the primary once before giving up without a fallback", async () => {
+  let calls = 0;
+  const client = new IoIntelligenceClient({
+    apiKey: "primary-key",
+    retryDelayMs: 0,
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls === 1) return { ok: false, status: 502 };
+      return jsonResponse("recovered");
+    },
+  });
+
+  const result = await client.complete({ system: "system", user: "user" });
+
+  assert.equal(result.content, "recovered");
+  assert.equal(calls, 2);
+});
+
+test("io.net client falls back to a configured secondary provider after two primary failures", async () => {
+  let primaryCalls = 0;
+  const client = new IoIntelligenceClient({
+    apiKey: "primary-key",
+    retryDelayMs: 0,
+    fallback: { baseURL: "https://fallback.example/v1", apiKey: "fallback-key", model: "fallback-model" },
+    fetchImpl: async (url) => {
+      if (url === "https://fallback.example/v1/chat/completions")
+        return jsonResponse("fallback answer", "fallback-model");
+      primaryCalls += 1;
+      return { ok: false, status: 503 };
+    },
+  });
+
+  const result = await client.complete({ system: "system", user: "user" });
+
+  assert.equal(primaryCalls, 2);
+  assert.equal(result.content, "fallback answer");
+  assert.equal(result.model, "fallback-model");
+});
+
+test("io.net client does not retry or fall back on a non-transient provider error", async () => {
+  let calls = 0;
+  const client = new IoIntelligenceClient({
+    apiKey: "primary-key",
+    retryDelayMs: 0,
+    fallback: { baseURL: "https://fallback.example/v1", apiKey: "fallback-key", model: "fallback-model" },
+    fetchImpl: async () => {
+      calls += 1;
+      return { ok: false, status: 400 };
+    },
+  });
+
+  await assert.rejects(client.complete({ system: "system", user: "user" }), (error) => error.code === "AI_HTTP_ERROR");
+  assert.equal(calls, 1);
+});
+
+test("resolveFallbackProvider stays inactive unless AI_FALLBACK_PROVIDER names a known, keyed preset", () => {
+  assert.equal(resolveFallbackProvider({}), null);
+  assert.equal(resolveFallbackProvider({ AI_FALLBACK_PROVIDER: "gemini" }), null);
+
+  const resolved = resolveFallbackProvider({ AI_FALLBACK_PROVIDER: "gemini", GEMINI_API_KEY: "g-key" });
+  assert.equal(resolved.name, "gemini");
+  assert.equal(resolved.apiKey, "g-key");
+  assert.match(resolved.baseURL, /generativelanguage/);
 });
 
 test("AI service normalizes semantic moderation output", async () => {
@@ -323,6 +388,29 @@ test("suggestion and form AI failures preserve their parent workflows", async ()
     null
   );
   assert.equal(warnings.length, 2);
+});
+
+test("ask command logs when the AI service fails instead of failing silently", async () => {
+  const warnings = [];
+  const client = { logger: { warn: (message) => warnings.push(message) } };
+  const failingService = {
+    isConfigured: () => true,
+    answerFromKnowledge: async () => {
+      throw new Error("provider down");
+    },
+  };
+
+  const result = await askCommand.answerQuestion(
+    "guild-1",
+    "How do I verify?",
+    { ai: { enabled: true, knowledge_enabled: true, knowledge: "Verification requires /verify." } },
+    client,
+    failingService
+  );
+
+  assert.equal(result.error, "The AI service is temporarily unavailable. Please try again later.");
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /guild-1/);
 });
 
 test("AI commands expose safe configuration, grounded Q&A, and ticket summaries", () => {

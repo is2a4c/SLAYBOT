@@ -1,12 +1,15 @@
+const { PRESETS } = require("./visionProvider");
+
 const DEFAULT_ENDPOINT = "https://api.intelligence.io.solutions/api/v1/chat/completions";
 const DEFAULT_MODELS_ENDPOINT = "https://api.intelligence.io.solutions/api/v1/models";
 const DEFAULT_MODEL = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8";
 
 class AiError extends Error {
-  constructor(code, message, cause) {
+  constructor(code, message, cause, status) {
     super(message, cause ? { cause } : undefined);
     this.name = "AiError";
     this.code = code;
+    if (status) this.status = status;
   }
 }
 
@@ -41,6 +44,30 @@ function extractJson(content) {
   }
 }
 
+/**
+ * Resolves an optional second provider text completions can fall back to.
+ *
+ * Opt-in only: unlike vision's provider auto-selection, this never activates just
+ * because some *_API_KEY happens to be set for an unrelated feature (e.g. image
+ * checks) - it requires an explicit AI_FALLBACK_PROVIDER, reusing the same preset
+ * table as visionProvider.js so the two stay consistent without duplication.
+ *
+ * @param {object} [env]
+ * @returns {{name: string, baseURL: string, model: string, apiKey: string}|null}
+ */
+function resolveFallbackProvider(env = process.env) {
+  const name = String(env.AI_FALLBACK_PROVIDER || "").toLowerCase();
+  const preset = PRESETS[name];
+  if (!preset) return null;
+
+  const apiKey = env.AI_FALLBACK_API_KEY || env[preset.keyEnv] || null;
+  if (!apiKey) return null;
+
+  const presetUrl = typeof preset.baseURL === "function" ? preset.baseURL(env) : preset.baseURL;
+  const baseURL = (env.AI_FALLBACK_BASE_URL || presetUrl).replace(/\/+$/, "");
+  return { name, baseURL, model: env.AI_FALLBACK_MODEL || preset.model, apiKey };
+}
+
 class IoIntelligenceClient {
   constructor(options = {}) {
     this.apiKey = options.apiKey ?? process.env.IO_INTELLIGENCE_API_KEY ?? "";
@@ -54,6 +81,8 @@ class IoIntelligenceClient {
       options.callsPerMinute ?? parsePositiveInt(process.env.IO_INTELLIGENCE_CALLS_PER_MINUTE, 20, 600);
     this.maxSystemChars = options.maxSystemChars ?? 12_000;
     this.maxUserChars = options.maxUserChars ?? 24_000;
+    this.retryDelayMs = options.retryDelayMs ?? 200;
+    this.fallback = options.fallback !== undefined ? options.fallback : resolveFallbackProvider();
     this.active = 0;
     this.waiters = [];
     this.guildCalls = new Map();
@@ -89,6 +118,93 @@ class IoIntelligenceClient {
     this.waiters.shift()?.();
   }
 
+  /** Transient failures are worth a retry or a fallback provider; anything else (bad key, bad input) is not. */
+  isTransient(error) {
+    if (!(error instanceof AiError)) return false;
+    if (error.code === "AI_TIMEOUT" || error.code === "AI_UNAVAILABLE") return true;
+    return error.code === "AI_HTTP_ERROR" && Number(error.status) >= 500;
+  }
+
+  async dispatch({ endpoint, apiKey, model }, boundedSystem, boundedUser, maxTokens, temperature) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const response = await this.fetchImpl(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: boundedSystem },
+            { role: "user", content: boundedUser },
+          ],
+          temperature: clamp(temperature, 0, 1, 0),
+          max_tokens: parsePositiveInt(maxTokens, 400, 1200),
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response?.ok) {
+        const status = Number(response?.status) || 500;
+        throw new AiError("AI_HTTP_ERROR", `AI provider returned HTTP ${status}`, undefined, status);
+      }
+
+      const payload = await response.json();
+      const content = payload?.choices?.[0]?.message?.content;
+      if (typeof content !== "string" || !content.trim()) {
+        throw new AiError("AI_INVALID_RESPONSE", "AI provider returned an invalid response");
+      }
+
+      return { content: content.trim(), model: String(payload.model || model) };
+    } catch (error) {
+      if (error instanceof AiError) throw error;
+      if (error?.name === "AbortError") {
+        throw new AiError("AI_TIMEOUT", `AI request timed out after ${this.timeoutMs} ms`, error);
+      }
+      throw new AiError("AI_UNAVAILABLE", "AI provider request failed", error);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  /**
+   * Tries the primary provider, one same-provider retry, then the fallback provider
+   * (if configured) - stopping as soon as one attempt succeeds or hitting a
+   * non-transient error, so a bad key or malformed input fails fast instead of
+   * burning every slot in the chain.
+   */
+  async completeWithResilience(boundedSystem, boundedUser, maxTokens, temperature, model) {
+    const primary = { endpoint: this.endpoint, apiKey: this.apiKey, model };
+    const attempts = this.fallback
+      ? [
+          primary,
+          primary,
+          {
+            endpoint: `${this.fallback.baseURL}/chat/completions`,
+            apiKey: this.fallback.apiKey,
+            model: this.fallback.model,
+          },
+        ]
+      : [primary, primary];
+
+    let lastError;
+    for (let index = 0; index < attempts.length; index += 1) {
+      if (index > 0) {
+        if (!this.isTransient(lastError)) throw lastError;
+        if (this.retryDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.retryDelayMs));
+      }
+      try {
+        return await this.dispatch(attempts[index], boundedSystem, boundedUser, maxTokens, temperature);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
+  }
+
   async complete({ system, user, maxTokens = 400, temperature = 0, model = this.model, guildId }) {
     if (!this.isConfigured()) {
       throw new AiError("AI_NOT_CONFIGURED", "AI service is not configured");
@@ -109,51 +225,9 @@ class IoIntelligenceClient {
 
     this.assertRateLimit(guildId);
     await this.acquire();
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const response = await this.fetchImpl(this.endpoint, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: boundedSystem },
-            { role: "user", content: boundedUser },
-          ],
-          temperature: clamp(temperature, 0, 1, 0),
-          max_tokens: parsePositiveInt(maxTokens, 400, 1200),
-        }),
-        signal: controller.signal,
-      });
-
-      if (!response?.ok) {
-        const status = Number(response?.status) || 500;
-        throw new AiError("AI_HTTP_ERROR", `AI provider returned HTTP ${status}`);
-      }
-
-      const payload = await response.json();
-      const content = payload?.choices?.[0]?.message?.content;
-      if (typeof content !== "string" || !content.trim()) {
-        throw new AiError("AI_INVALID_RESPONSE", "AI provider returned an invalid response");
-      }
-
-      return {
-        content: content.trim(),
-        model: String(payload.model || model),
-      };
-    } catch (error) {
-      if (error instanceof AiError) throw error;
-      if (error?.name === "AbortError") {
-        throw new AiError("AI_TIMEOUT", `AI request timed out after ${this.timeoutMs} ms`, error);
-      }
-      throw new AiError("AI_UNAVAILABLE", "AI provider request failed", error);
+      return await this.completeWithResilience(boundedSystem, boundedUser, maxTokens, temperature, model);
     } finally {
-      clearTimeout(timeout);
       this.release();
     }
   }
@@ -235,5 +309,6 @@ module.exports = {
   DEFAULT_MODELS_ENDPOINT,
   DEFAULT_MODEL,
   extractJson,
+  resolveFallbackProvider,
   getIoIntelligenceClient,
 };
