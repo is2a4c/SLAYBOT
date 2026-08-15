@@ -732,4 +732,75 @@ module.exports = {
       statusActive: "**Active channels:** {value}",
     },
   },
+
+  forestFuss: {
+    disabled: "Forest Fuss is turned off on this server.",
+    missingCategory: "The configured category is missing. Ask an admin to set one in the dashboard.",
+    alreadyInGame: "You are already in a Forest Fuss game.",
+    tooManySessions: "This server already has the maximum number of Forest Fuss games running ({max}).",
+    missingPermissions: "I need **Manage Channels** and **Embed Links** to run Forest Fuss.",
+    createFailed: "Could not create the lobby channel. Try again in a moment.",
+    started: "Your lobby is ready: {channel}",
+    stopped: "The game was stopped early.",
+
+    lobby: {
+      title: "🌲 Forest Fuss",
+      recruitmentDescription: "Recruiting players — **{count}/{max}** joined.\nRecruitment ends {time}.",
+      dayDescription: "**Day {round}** — talk it out, then vote.\n{alive} alive, {votes} voted.\nDay ends {time}.",
+      nightDescription: "**Night {round}** falls. The wolves are choosing.\n{alive} alive.\nNight ends {time}.",
+      resultWolves: "🐺 The wolves win.",
+      resultVillagers: "🌲 The villagers win.",
+      players: "Players",
+      roles: "Roles revealed",
+    },
+
+    wolves: {
+      title: "🐺 Wolves' den",
+      description: "Only wolves can see this channel. Pick tonight's target before night ends.\n{alive} wolves alive.",
+    },
+
+    buttons: {
+      join: "Join",
+      leave: "Leave",
+      startNow: "Start now",
+      skip: "Skip phase",
+      stop: "Stop game",
+    },
+
+    vote: {
+      placeholder: "Choose who to eliminate",
+      recorded: "Your vote: **{name}**",
+      cleared: "Your vote was cleared.",
+      notAlive: "You are no longer part of this game.",
+      notWolf: "Only wolves vote at night.",
+      wrongPhase: "There is nothing to vote on right now.",
+    },
+
+    errors: {
+      notFound: "This game no longer exists.",
+      fullLobby: "This lobby is full.",
+      alreadyJoined: "You already joined this game.",
+      notInGame: "You are not part of this game.",
+      leaderOnly: "Only the game leader can do that.",
+      leaderCannotLeave: "The leader cannot leave. Stop the game instead.",
+      notEnoughPlayers: "You need at least {min} players to start.",
+      notRecruiting: "Recruitment is already over.",
+    },
+
+    announce: {
+      dayEliminated: "☀️ **{name}** was voted out. They were a **{role}**.",
+      dayNoElimination: "☀️ The vote was tied — nobody was eliminated.",
+      nightEliminated: "🌙 **{name}** was found eliminated. They were a **{role}**.",
+      nightNoElimination: "🌙 Everyone made it through the night.",
+    },
+
+    roles: {
+      WOLF: "Wolf",
+      VILLAGER: "Villager",
+    },
+
+    dm: {
+      wolfChannel: "You are a **Wolf** in {guild}. Coordinate in {channel}.",
+    },
+  },
 };

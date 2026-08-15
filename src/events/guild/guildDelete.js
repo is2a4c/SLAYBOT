@@ -13,6 +13,7 @@ const { deleteGuildEntries } = require("@schemas/StarboardEntry");
 const { deleteGuildStickies } = require("@schemas/StickyMessage");
 const { deleteGuildChannels: deleteGuildTempVoice } = require("@schemas/TempVoiceChannel");
 const { deleteGuildEventLogs } = require("@schemas/EventLog");
+const { deleteGuildSessions: deleteGuildForestFuss } = require("@schemas/ForestFussSession");
 
 /**
  * @param {import('@src/structures').BotClient} client
@@ -60,6 +61,9 @@ module.exports = async (client, guild) => {
     ),
     deleteGuildEventLogs(guild.id).catch((error) =>
       client.logger.error(`Failed to clear event log for ${guild.id}`, error)
+    ),
+    deleteGuildForestFuss(guild.id).catch((error) =>
+      client.logger.error(`Failed to clear Forest Fuss sessions for ${guild.id}`, error)
     ),
   ]);
 

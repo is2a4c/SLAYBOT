@@ -6,6 +6,7 @@ module.exports = {
   contextHandler: require("./context"),
   controlPanelHandler: require("./controlPanel"),
   counterHandler: require("./counter"),
+  forestFussHandler: require("./forestFuss"),
   formHandler: require("./form"),
   greetingHandler: require("./greeting"),
   inviteHandler: require("./invite"),

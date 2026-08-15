@@ -130,11 +130,11 @@ test("ranking controls are live: ignore rules, multipliers, public page and card
   }
 });
 
-test("the roulette switch is live; Forest Fuss stays staged until it has a runtime behind it", () => {
+test("every fun-module control is live: roulette and Forest Fuss both have a runtime behind them now", () => {
   const fields = findModule("fun").groups.flatMap((group) => group.fields);
-  assert.equal(fields.find((field) => field.id === "roulette").runtime, true);
 
   for (const id of [
+    "roulette",
     "forestFuss",
     "fussCategory",
     "fussSessions",
@@ -147,7 +147,7 @@ test("the roulette switch is live; Forest Fuss stays staged until it has a runti
     "fussNight",
     "fussResults",
   ]) {
-    assert.equal(fields.find((field) => field.id === id).runtime, false, id);
+    assert.equal(fields.find((field) => field.id === id).runtime, true, id);
   }
 });
 

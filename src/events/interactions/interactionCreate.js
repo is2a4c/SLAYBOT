@@ -5,6 +5,7 @@ const {
   commandPanelHandler,
   contextHandler,
   controlPanelHandler,
+  forestFussHandler,
   formHandler,
   languageHandler,
   statsHandler,
@@ -142,6 +143,10 @@ async function route(client, interaction) {
       return tempVoiceHandler.handleButton(interaction, await getSettings(interaction.guild));
     }
 
+    if (forestFussHandler.matchesButton(interaction.customId)) {
+      return forestFussHandler.handleButton(interaction, await getSettings(interaction.guild));
+    }
+
     // language picker: LANG:<auto|ru|en>
     if (interaction.customId.startsWith(`${languageHandler.BUTTON_PREFIX}:`)) {
       return languageHandler.handleButton(interaction, await getSettings(interaction.guild));
@@ -216,6 +221,10 @@ async function route(client, interaction) {
     // poll voting: POLL_VOTE:<messageId>
     if (interaction.customId.startsWith(`${pollHandler.VOTE_PREFIX}:`)) {
       return pollHandler.handleVote(interaction);
+    }
+
+    if (forestFussHandler.matchesSelect(interaction.customId)) {
+      return forestFussHandler.handleSelect(interaction, await getSettings(interaction.guild));
     }
   }
 
