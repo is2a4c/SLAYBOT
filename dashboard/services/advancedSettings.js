@@ -93,6 +93,13 @@ const ADVANCED_SECTIONS = [
     ],
   },
   {
+    id: "boost",
+    fields: [
+      richFields("boostFields", "control_center.notifications.boost_fields"),
+      richButtons("boostButtons", "control_center.notifications.boost_buttons"),
+    ],
+  },
+  {
     id: "ticket",
     fields: [
       channel("ticketLog", "ticket.log_channel"),

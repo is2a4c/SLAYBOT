@@ -447,6 +447,7 @@ module.exports = {
     sections: {
       server: "Server, levels and branding",
       greetings: "Welcome and farewell",
+      boost: "Boost card",
       ticket: "Tickets",
       tempVoice: "Temporary voice channels",
       verification: "Verification",
@@ -492,6 +493,10 @@ module.exports = {
       welcomeFieldsHint: "One per line: name | value | inline?. Up to 25 fields.",
       welcomeButtons: "Welcome buttons",
       welcomeButtonsHint: "One per line: label | https://link | emoji?. Up to 5 buttons, links only.",
+      boostFields: "Boost card fields",
+      boostFieldsHint: "One per line: name | value | inline?. Up to 25 fields.",
+      boostButtons: "Boost buttons",
+      boostButtonsHint: "One per line: label | https://link | emoji?. Up to 5 buttons, links only.",
       farewellEnabled: "Enable farewell messages",
       farewellChannel: "Farewell channel",
       farewellContent: "Farewell message text",

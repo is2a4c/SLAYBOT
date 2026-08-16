@@ -449,6 +449,7 @@ module.exports = {
     sections: {
       server: "Сервер, уровни и оформление",
       greetings: "Приветствия и прощания",
+      boost: "Карточка буста",
       ticket: "Тикеты",
       tempVoice: "Временные голосовые каналы",
       verification: "Верификация",
@@ -494,6 +495,10 @@ module.exports = {
       welcomeFieldsHint: "По одному в строке: имя | значение | inline?. До 25 полей.",
       welcomeButtons: "Кнопки приветствия",
       welcomeButtonsHint: "По одной в строке: подпись | https://ссылка | emoji?. До 5 кнопок, только ссылки.",
+      boostFields: "Поля карточки буста",
+      boostFieldsHint: "По одному в строке: имя | значение | inline?. До 25 полей.",
+      boostButtons: "Кнопки буста",
+      boostButtonsHint: "По одной в строке: подпись | https://ссылка | emoji?. До 5 кнопок, только ссылки.",
       farewellEnabled: "Включить прощания",
       farewellChannel: "Канал прощаний",
       farewellContent: "Текст сообщения о выходе",

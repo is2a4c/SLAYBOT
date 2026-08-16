@@ -139,6 +139,7 @@ const SYSTEM_ICONS = {
   verification: "🛡️",
   welcome: "👋",
   farewell: "🚪",
+  boost: "🚀",
   automod: "🤖",
   automodfilters: "🧹",
   starboard: "⭐",
@@ -172,6 +173,7 @@ const SYSTEM_ACTIVE = {
   verification: (settings) => Boolean(settings?.verification?.enabled),
   welcome: (settings) => Boolean(settings?.welcome?.enabled),
   farewell: (settings) => Boolean(settings?.farewell?.enabled),
+  boost: (settings) => Boolean(settings?.control_center?.notifications?.boost_enabled),
   automod: (settings) => {
     const config = settings?.automod || {};
     const checks = [
@@ -439,6 +441,33 @@ const PANELS = {
         validate: httpsUrl,
         example: "https://example.com/banner.png",
       }),
+    ],
+  ]),
+
+  boost: system("boost", "control_center.notifications", [
+    [
+      toggle("enabled", "🔘", "boost_enabled"),
+      channel("channel", "📢", "boost_channel"),
+      text("message", "📝", "boost_message", {
+        long: true,
+        maxLength: 1000,
+        required: false,
+        example: "{member:mention} boosted {server} to {boosts}!",
+      }),
+      text("color", "🎨", "boost_color", { maxLength: 7, required: false, validate: color, example: "#A855F7" }),
+      text("title", "🏷️", "boost_title", { maxLength: 256, required: false }),
+    ],
+    [
+      text("author", "✍️", "boost_author", { maxLength: 256, required: false }),
+      text("footer", "🔻", "boost_footer", { maxLength: 200, required: false }),
+      toggle("thumbnail", "🖼️", "boost_thumbnail"),
+      text("image", "🏞️", "boost_image", {
+        maxLength: 300,
+        required: false,
+        validate: httpsUrl,
+        example: "https://example.com/banner.png",
+      }),
+      toggle("timestamp", "🕒", "boost_timestamp"),
     ],
   ]),
 

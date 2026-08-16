@@ -271,6 +271,23 @@ module.exports = {
       },
     },
 
+    boost: {
+      title: "Boost",
+      description: "What the bot says when somebody boosts the server.",
+      fields: {
+        enabled: "Boost notification",
+        channel: "Channel",
+        message: "Embed description",
+        color: "Colour",
+        title: "Embed title",
+        author: "Embed author",
+        footer: "Footer",
+        thumbnail: "Booster avatar",
+        image: "Image",
+        timestamp: "Show timestamp",
+      },
+    },
+
     automod: {
       title: "Automod",
       description: "What the bot catches in messages, and what it does about it.",

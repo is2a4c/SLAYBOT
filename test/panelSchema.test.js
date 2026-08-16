@@ -93,6 +93,8 @@ test("every editable guild setting is reachable from the control panel", () => {
     "welcome.buttons",
     "farewell.fields",
     "farewell.buttons",
+    "control_center.notifications.boost_fields",
+    "control_center.notifications.boost_buttons",
     "event_router",
     "event_router_ignored_channels",
   ]);
