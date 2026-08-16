@@ -145,6 +145,7 @@ module.exports = {
         actor: message.author,
         detail: cmd.name,
         reason: policy,
+        channelId: message.channelId,
         logger: message.client.logger,
       });
       return message.safeReply(policy);
@@ -251,6 +252,7 @@ module.exports = {
           actor: interaction.user,
           detail: cmd.name,
           reason: policyRefusal,
+          channelId: interaction.channel?.id,
           logger: interaction.client.logger,
         });
       }

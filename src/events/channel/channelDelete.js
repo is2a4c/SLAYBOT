@@ -10,5 +10,10 @@ module.exports = async (client, channel) => {
   if (!channel.guild) return;
 
   const actor = await resolveAuditActor(channel.guild, { type: AuditLogEvent.ChannelDelete, targetId: channel.id });
-  await routeEvent(channel.guild, "CHANNEL_DELETE", { actor, detail: channel.name, logger: client.logger });
+  await routeEvent(channel.guild, "CHANNEL_DELETE", {
+    actor,
+    detail: channel.name,
+    channelId: channel.id,
+    logger: client.logger,
+  });
 };

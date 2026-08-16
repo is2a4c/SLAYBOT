@@ -102,6 +102,17 @@ test("every fire is logged, whether or not a route is configured", async () => {
   assert.equal(guild._sent.length, 0, "no route was configured, so nothing was posted");
 });
 
+test("a channelId in context is stored on the log entry; omitting it leaves the field null", async () => {
+  const guild = testGuild();
+  const { logged, deps } = testDependencies({ event_router: [] });
+
+  await routeEvent(guild, "CHANNEL_CREATE", { detail: "general", channelId: CHANNEL_ID }, deps);
+  await routeEvent(guild, "WARN", { actor: { id: ACTOR_ID }, target: { id: TARGET_ID } }, deps);
+
+  assert.equal(logged[0].channel_id, CHANNEL_ID);
+  assert.equal(logged[1].channel_id, null, "an event with nothing channel-scoped about it stores no channel");
+});
+
 test("an enabled route posts to its channel with the default template", async () => {
   const guild = testGuild();
   const { deps } = testDependencies({

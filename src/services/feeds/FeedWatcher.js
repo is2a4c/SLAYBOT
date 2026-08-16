@@ -173,6 +173,7 @@ class FeedWatcher {
         await routeEvent(guild, "SUBSCRIPTION_PAUSED", {
           detail: `${feed.type.toLowerCase()} ${feed.target}`,
           reason: feed.last_error,
+          channelId: feed.channel_id,
           logger: this.client.logger,
         });
       }

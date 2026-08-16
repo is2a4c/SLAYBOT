@@ -63,6 +63,19 @@
         <% }) %>
       </select>
     </div>
+    <div class="field">
+      <label for="memberId"><%= t("eventRouter.memberId") %></label>
+      <input type="text" id="memberId" name="memberId" value="<%= filterMemberId || '' %>" />
+    </div>
+    <div class="field">
+      <label for="channelId"><%= t("common.channel") %></label>
+      <select id="channelId" name="channelId">
+        <option value=""><%= t("eventRouter.anyChannel") %></option>
+        <% [...guild.channels.cache.values()].forEach((channel) => { %>
+          <option value="<%= channel.id %>" <%= filterChannelId === channel.id ? "selected" : "" %>>#<%= channel.name %></option>
+        <% }) %>
+      </select>
+    </div>
     <button type="submit" class="btn secondary"><%= t("common.filter") %></button>
   </form>
 
@@ -70,7 +83,7 @@
     <div class="empty"><%= t("common.notFound") %></div>
   <% } else { %>
     <div class="table-shell"><table>
-      <thead><tr><th><%= t("common.time") %></th><th><%= t("common.type") %></th><th><%= t("common.who") %></th><th><%= t("common.target") %></th><th><%= t("common.reason") %></th></tr></thead>
+      <thead><tr><th><%= t("common.time") %></th><th><%= t("common.type") %></th><th><%= t("common.who") %></th><th><%= t("common.target") %></th><th><%= t("common.channel") %></th><th><%= t("common.reason") %></th></tr></thead>
       <tbody>
         <% entries.forEach((entry) => { %>
           <tr>
@@ -78,15 +91,17 @@
             <td><%= t(`eventRouter.events.${entry.type}`) %></td>
             <td><%= entry.actor_id ? `<@${entry.actor_id}>` : t("common.none") %></td>
             <td><%= entry.target_id || entry.detail || t("common.none") %></td>
+            <td><%= entry.channel_id ? `<#${entry.channel_id}>` : t("common.none") %></td>
             <td><%= entry.reason || t("common.none") %></td>
           </tr>
         <% }) %>
       </tbody>
     </table></div>
+    <% const filterQuery = `&type=${filterType || ''}&memberId=${filterMemberId || ''}&channelId=${filterChannelId || ''}`; %>
     <div class="pagination">
-      <% if (page > 1) { %><a class="btn secondary" href="?page=<%= page - 1 %>&type=<%= filterType || '' %>"><%= t("common.back") %></a><% } %>
+      <% if (page > 1) { %><a class="btn secondary" href="?page=<%= page - 1 %><%= filterQuery %>"><%= t("common.back") %></a><% } %>
       <span><%= t("common.page", { page, total: totalPages }) %></span>
-      <% if (page < totalPages) { %><a class="btn secondary" href="?page=<%= page + 1 %>&type=<%= filterType || '' %>"><%= t("common.next") %></a><% } %>
+      <% if (page < totalPages) { %><a class="btn secondary" href="?page=<%= page + 1 %><%= filterQuery %>"><%= t("common.next") %></a><% } %>
     </div>
   <% } %>
 </section>

@@ -11,7 +11,12 @@ const { ensureChannelOverwrite } = require("@src/services/moderation/muteRole");
 module.exports = async (client, channel) => {
   if (!channel.guild) return;
   const actor = await resolveAuditActor(channel.guild, { type: AuditLogEvent.ChannelCreate, targetId: channel.id });
-  await routeEvent(channel.guild, "CHANNEL_CREATE", { actor, detail: channel.name, logger: client.logger });
+  await routeEvent(channel.guild, "CHANNEL_CREATE", {
+    actor,
+    detail: channel.name,
+    channelId: channel.id,
+    logger: client.logger,
+  });
 
   // A fresh channel should not be a hole in an already-configured mute role.
   const settings = await getSettings(channel.guild);

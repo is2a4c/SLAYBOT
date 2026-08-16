@@ -16,12 +16,23 @@ function options(guild) {
   };
 }
 
+const SNOWFLAKE = /^\d{17,20}$/;
+
 router.get("/", async (req, res) => {
   const settings = await getSettings(req.guild);
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
   const type = EVENT_TYPES.includes(req.query.type) ? req.query.type : null;
+  const memberId = SNOWFLAKE.test(req.query.memberId || "") ? req.query.memberId : null;
+  const channelId = req.guild.channels.cache.has(req.query.channelId) ? req.query.channelId : null;
 
-  const [entries, total] = await listEventLogs({ guildId: req.guild.id, type, page, pageSize: PAGE_SIZE });
+  const [entries, total] = await listEventLogs({
+    guildId: req.guild.id,
+    type,
+    memberId,
+    channelId,
+    page,
+    pageSize: PAGE_SIZE,
+  });
 
   res.render("guild/event-router", {
     title: `${res.locals.t("eventRouter.title")} — ${req.guild.name}`,
@@ -32,6 +43,8 @@ router.get("/", async (req, res) => {
     page,
     totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
     filterType: type,
+    filterMemberId: memberId,
+    filterChannelId: channelId,
     eventTypes: EVENT_TYPES,
   });
 });

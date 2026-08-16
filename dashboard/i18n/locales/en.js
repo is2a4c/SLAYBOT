@@ -116,6 +116,8 @@ module.exports = {
       "Variables: {actor}, {target}, {detail}, {reason}, {server}. Leave a template empty to use the default text shown as a placeholder.",
     saveHint: "Saving replaces every route at once.",
     logTitle: "Event log",
+    memberId: "Member id",
+    anyChannel: "Any channel",
     groups: {
       moderation: "Moderation",
       server: "Server",

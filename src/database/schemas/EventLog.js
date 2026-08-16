@@ -33,10 +33,11 @@ module.exports = {
 
   createEventLog: (data) => Model.create(data),
 
-  listEventLogs: ({ guildId, type, memberId, page = 1, pageSize = 25 }) => {
+  listEventLogs: ({ guildId, type, memberId, channelId, page = 1, pageSize = 25 }) => {
     const filter = { guild_id: guildId };
     if (type) filter.type = type;
     if (memberId) filter.$or = [{ actor_id: memberId }, { target_id: memberId }];
+    if (channelId) filter.channel_id = channelId;
 
     return Promise.all([
       Model.find(filter)

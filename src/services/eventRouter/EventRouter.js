@@ -62,13 +62,14 @@ async function resolveAuditActor(guild, { type, targetId }) {
  * @param {import('discord.js').User|import('discord.js').GuildMember} [context.target] who it happened to
  * @param {string} [context.detail] a name that isn't a mentionable Discord object - a role, a channel, a command
  * @param {string} [context.reason]
+ * @param {string} [context.channelId] the channel the event happened in or is about, when there is one
  * @param {object} [context.logger] falls back to nothing rather than throwing when omitted
  * @param {Object} [dependencies] test seam; production code never passes this
  */
 async function routeEvent(guild, eventType, context = {}, dependencies = {}) {
   if (!guild || !EVENT_TYPES.includes(eventType)) return;
 
-  const { actor, target, detail, reason, logger } = context;
+  const { actor, target, detail, reason, channelId, logger } = context;
   const readSettings = dependencies.getSettings || getSettings;
   const writeLog = dependencies.createEventLog || createEventLog;
 
@@ -77,6 +78,7 @@ async function routeEvent(guild, eventType, context = {}, dependencies = {}) {
     type: eventType,
     actor_id: actor?.id || null,
     target_id: target?.id || null,
+    channel_id: channelId || null,
     detail: detail ? String(detail).slice(0, 300) : null,
     reason: reason ? String(reason).slice(0, 500) : null,
   }).catch((error) => logger?.error?.(`event router: could not log ${eventType} for ${guild.id}`, error));
