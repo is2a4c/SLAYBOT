@@ -5,10 +5,12 @@ require("module-alias/register");
 const mongoose = require("mongoose");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 
+const { ChannelType } = require("discord.js");
 const reminders = require("../src/services/reminders/Reminders");
 const birthdays = require("../src/services/birthdays/Birthdays");
 const scheduledTask = require("../src/database/schemas/ScheduledTask");
 const birthdaySchema = require("../src/database/schemas/Birthday");
+const pollSchema = require("../src/database/schemas/Poll");
 
 const GUILD_ID = "456789012345678901";
 const USER_ID = "567890123456789012";
@@ -122,6 +124,106 @@ test("a reminder falls back to a DM when the channel is unreachable", async () =
   );
 
   assert.equal(dms.length, 1);
+});
+
+test("a poll replaces the reminder text, never sits alongside it", () => {
+  const poll = { question: "Q?", options: ["A", "B"] };
+  assert.throws(() => reminders.assertMessageOrPoll("some text", poll), /poll replaces the reminder text/);
+  assert.throws(() => reminders.assertMessageOrPoll("", null), /what to remind you about/);
+  assert.doesNotThrow(() => reminders.assertMessageOrPoll("", poll));
+  assert.doesNotThrow(() => reminders.assertMessageOrPoll("some text", null));
+});
+
+test("a poll reminder posts a real poll instead of an embed when it fires", async () => {
+  const sent = { id: "poll-message" };
+  sent.edit = async (payload) => {
+    sent.editedWith = payload;
+    return sent;
+  };
+  const channel = {
+    id: CHANNEL_ID,
+    isTextBased: () => true,
+    permissionsFor: () => ({ has: () => true }),
+    send: async () => sent,
+  };
+  channel.guild = { id: GUILD_ID, members: { me: {} }, channels: { cache: new Map([[CHANNEL_ID, channel]]) } };
+  const client = { channels: { fetch: async () => channel }, users: { fetch: async () => null } };
+
+  await reminders.handleReminder(
+    { userId: USER_ID, channelId: CHANNEL_ID, dm: false, poll: { question: "Pizza tonight?", options: ["Yes", "No"] } },
+    { client, task: { guild_id: GUILD_ID, created_at: new Date() } }
+  );
+
+  const stored = await pollSchema.model.findOne({ guild_id: GUILD_ID, question: "Pizza tonight?" });
+  assert.ok(stored, "the poll was actually posted, not an embed");
+});
+
+test("a reminder configured to publish crossposts itself in an announcement channel", async () => {
+  const sent = { crossposted: false };
+  sent.crosspost = async () => {
+    sent.crossposted = true;
+    return sent;
+  };
+  const channel = { type: ChannelType.GuildAnnouncement, isTextBased: () => true, send: async () => sent };
+  const client = { channels: { fetch: async () => channel }, users: { fetch: async () => null } };
+
+  await reminders.handleReminder(
+    { userId: USER_ID, channelId: CHANNEL_ID, content: "we shipped it", dm: false, presentation: { crosspost: true } },
+    { client, task: { guild_id: GUILD_ID, created_at: new Date() } }
+  );
+
+  assert.equal(sent.crossposted, true);
+});
+
+test("crosspost is skipped outside an announcement channel, and when it was not requested", async () => {
+  let crossposted = false;
+  const makeChannel = (type) => ({
+    type,
+    isTextBased: () => true,
+    send: async () => ({ crosspost: async () => (crossposted = true) }),
+  });
+
+  await reminders.handleReminder(
+    { userId: USER_ID, channelId: CHANNEL_ID, content: "a", dm: false, presentation: { crosspost: true } },
+    {
+      client: {
+        channels: { fetch: async () => makeChannel(ChannelType.GuildText) },
+        users: { fetch: async () => null },
+      },
+      task: { guild_id: GUILD_ID, created_at: new Date() },
+    }
+  );
+  assert.equal(crossposted, false, "not an announcement channel");
+
+  await reminders.handleReminder(
+    { userId: USER_ID, channelId: CHANNEL_ID, content: "b", dm: false, presentation: { crosspost: false } },
+    {
+      client: {
+        channels: { fetch: async () => makeChannel(ChannelType.GuildAnnouncement) },
+        users: { fetch: async () => null },
+      },
+      task: { guild_id: GUILD_ID, created_at: new Date() },
+    }
+  );
+  assert.equal(crossposted, false, "crosspost was not requested");
+});
+
+test("a poll reminder's summary and listing never touch a null content field", async () => {
+  await scheduledTask.scheduleTask({
+    type: reminders.TASK_TYPE,
+    guildId: GUILD_ID,
+    runAt: new Date(Date.now() + 60_000),
+    payload: {
+      userId: USER_ID,
+      channelId: CHANNEL_ID,
+      content: null,
+      poll: { question: "Snacks?", options: ["Yes", "No"] },
+    },
+  });
+
+  const [pollReminder] = await reminders.listReminders({ guildId: GUILD_ID, userId: USER_ID });
+  assert.equal(reminders.reminderSummary(pollReminder), "📊 Snacks?");
+  assert.match(reminders.describeReminder(pollReminder, 1), /📊 Snacks\?/);
 });
 
 /* ------------------------------------------------------------------- birthdays */

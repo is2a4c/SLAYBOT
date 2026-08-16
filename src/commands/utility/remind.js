@@ -8,6 +8,7 @@ const {
   createReminder,
   describeReminder,
   listReminders,
+  reminderSummary,
 } = require("@src/services/reminders/Reminders");
 
 /**
@@ -99,7 +100,7 @@ module.exports = {
         const index = Number.parseInt(args[1], 10);
         if (!Number.isInteger(index)) return message.safeReply("Provide the reminder number from `remind list`");
         const cancelled = await cancelReminder({ guildId: message.guildId, userId: message.author.id, index });
-        return message.safeReply(`Cancelled: ${cancelled.payload.content.slice(0, 100)}`);
+        return message.safeReply(`Cancelled: ${reminderSummary(cancelled).slice(0, 100)}`);
       }
 
       const { remindAt } = await createReminder({
@@ -148,7 +149,7 @@ module.exports = {
           userId: interaction.user.id,
           index: interaction.options.getInteger("number"),
         });
-        return interaction.safeFollowUp(`Cancelled: ${cancelled.payload.content.slice(0, 100)}`);
+        return interaction.safeFollowUp(`Cancelled: ${reminderSummary(cancelled).slice(0, 100)}`);
       }
     } catch (ex) {
       if (ex instanceof ReminderError) return interaction.safeFollowUp(ex.message);

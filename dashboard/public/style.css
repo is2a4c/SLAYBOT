@@ -1138,6 +1138,33 @@ tbody tr:hover td {
   margin-top: 18px;
 }
 
+.reminder-preview {
+  margin-top: 18px;
+}
+
+.embed-preview {
+  max-width: 480px;
+  padding: 12px 14px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-soft);
+  border-left: 4px solid var(--accent);
+  border-radius: 6px;
+}
+
+.embed-preview p {
+  margin: 6px 0;
+  white-space: pre-wrap;
+}
+
+.embed-preview small {
+  color: var(--text-muted);
+}
+
+.embed-preview ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
 .quick-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

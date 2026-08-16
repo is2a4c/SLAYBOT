@@ -1,11 +1,27 @@
 const { model: taskModel } = require("@schemas/ScheduledTask");
-const { MAX_DELAY_MS, MIN_DELAY_MS, createReminder } = require("@src/services/reminders/Reminders");
+const {
+  MAX_DELAY_MS,
+  MIN_DELAY_MS,
+  ReminderError,
+  assertMessageOrPoll,
+  buildReminderEmbed,
+  createReminder,
+  normalizePresentation,
+  reminderMention,
+} = require("@src/services/reminders/Reminders");
+const { RichMessageError, sanitizePoll } = require("@src/services/richMessage/RichMessage");
+
+const PAGE_SIZE = 25;
 
 class DashboardReminderError extends Error {
   constructor(message) {
     super(message);
     this.name = "DashboardReminderError";
   }
+}
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function parseBrowserDate(value, timezoneOffsetMinutes = 0, now = Date.now()) {
@@ -40,24 +56,44 @@ function repeatMilliseconds(value) {
   return minutes * 60_000;
 }
 
-async function createDashboardReminder(guild, actorId, input, now = Date.now()) {
+/**
+ * What both creating and previewing a reminder need to agree on: a real
+ * channel, a real role if one was picked, and a message that is either text
+ * or a poll but never neither and never both.
+ *
+ * @param {import('discord.js').Guild} guild
+ * @param {object} input
+ */
+function parseDashboardReminderInput(guild, input) {
   const channelId = String(input.channelId || "");
   const channel = guild.channels.cache.get(channelId);
   if (!channel?.isTextBased?.() || channel.isThread?.()) {
     throw new DashboardReminderError("Choose a server text channel.");
   }
-  const { delayMs } = parseBrowserDate(input.runAt, input.timezoneOffset, now);
   const roleId = String(input.mentionRole || "");
   if (roleId && !guild.roles.cache.has(roleId)) throw new DashboardReminderError("Choose a server role.");
   const mention = roleId ? `ROLE:${roleId}` : String(input.mention || "CREATOR");
 
-  return createReminder({
-    guildId: guild.id,
-    userId: actorId,
+  let poll;
+  try {
+    poll = sanitizePoll(input);
+  } catch (error) {
+    if (error instanceof RichMessageError) throw new DashboardReminderError(error.message);
+    throw error;
+  }
+
+  const content = String(input.content || "").trim();
+  try {
+    assertMessageOrPoll(content, poll);
+  } catch (error) {
+    if (error instanceof ReminderError) throw new DashboardReminderError(error.message);
+    throw error;
+  }
+
+  return {
     channelId,
-    content: input.content,
-    delayMs,
-    repeatMs: repeatMilliseconds(input.repeatMinutes),
+    content,
+    poll,
     presentation: {
       title: input.title,
       footer: input.footer,
@@ -65,12 +101,74 @@ async function createDashboardReminder(guild, actorId, input, now = Date.now()) 
       mention,
       tts: input.tts === "on",
       deleteAfterSeconds: input.deleteAfterSeconds,
+      crosspost: input.crosspost === "on",
     },
-  });
+  };
 }
 
-const listGuildReminders = (guildId) =>
-  taskModel.find({ type: "REMINDER", guild_id: guildId }).sort({ run_at: 1 }).lean();
+async function createDashboardReminder(guild, actorId, input, now = Date.now()) {
+  const parsed = parseDashboardReminderInput(guild, input);
+  const { delayMs } = parseBrowserDate(input.runAt, input.timezoneOffset, now);
+
+  try {
+    return await createReminder({
+      guildId: guild.id,
+      userId: actorId,
+      channelId: parsed.channelId,
+      content: parsed.content,
+      delayMs,
+      repeatMs: repeatMilliseconds(input.repeatMinutes),
+      presentation: parsed.presentation,
+      poll: parsed.poll,
+    });
+  } catch (error) {
+    if (error instanceof ReminderError) throw new DashboardReminderError(error.message);
+    throw error;
+  }
+}
+
+/**
+ * The exact embed or poll a reminder will fire with, built without scheduling
+ * anything - so what an admin previews is never able to drift from what
+ * actually gets sent.
+ *
+ * @param {import('discord.js').Guild} guild
+ * @param {string} actorId
+ * @param {object} input
+ */
+function previewDashboardReminder(guild, actorId, input) {
+  const parsed = parseDashboardReminderInput(guild, input);
+  if (parsed.poll) return { poll: parsed.poll };
+
+  const presentation = normalizePresentation(parsed.presentation);
+  const embed = buildReminderEmbed({ content: parsed.content, presentation }, Date.now());
+  const mention = reminderMention({ userId: actorId, presentation });
+  return { embed: embed.toJSON(), mention };
+}
+
+/**
+ * @param {string} guildId
+ * @param {{channelId?: string, creatorId?: string, q?: string, page?: number}} [filters]
+ */
+async function listGuildReminders(guildId, filters = {}) {
+  const query = { type: "REMINDER", guild_id: guildId };
+  if (filters.channelId) query["payload.channelId"] = filters.channelId;
+  if (filters.creatorId) query["payload.userId"] = filters.creatorId;
+  if (filters.q) query["payload.content"] = { $regex: escapeRegex(filters.q), $options: "i" };
+
+  const page = Math.max(1, Number.parseInt(filters.page, 10) || 1);
+  const [reminders, total] = await Promise.all([
+    taskModel
+      .find(query)
+      .sort({ run_at: 1 })
+      .skip((page - 1) * PAGE_SIZE)
+      .limit(PAGE_SIZE)
+      .lean(),
+    taskModel.countDocuments(query),
+  ]);
+
+  return { reminders, page, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
+}
 
 async function deleteGuildReminder(guildId, id) {
   if (!/^[a-f\d]{24}$/i.test(String(id || ""))) throw new DashboardReminderError("Invalid reminder id.");
@@ -84,5 +182,6 @@ module.exports = {
   deleteGuildReminder,
   listGuildReminders,
   parseBrowserDate,
+  previewDashboardReminder,
   repeatMilliseconds,
 };

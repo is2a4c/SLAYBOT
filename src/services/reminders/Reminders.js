@@ -1,6 +1,7 @@
-const { EmbedBuilder, time } = require("discord.js");
+const { ChannelType, EmbedBuilder, time } = require("discord.js");
 const { EMBED_COLORS } = require("@root/config");
 const { scheduleTask, listTasks, model: taskModel } = require("@schemas/ScheduledTask");
+const { startPollFromConfig } = require("@src/services/richMessage/RichMessage");
 
 const TASK_TYPE = "REMINDER";
 const MIN_DELAY_MS = 30_000;
@@ -26,7 +27,19 @@ function assertDelay(delayMs) {
 }
 
 /**
- * @param {{guildId: string, userId: string, channelId: string, content: string, delayMs: number, repeatMs?: number|null, dm?: boolean, presentation?: object|null}} input
+ * A poll takes over the whole message, the same way it does for a custom
+ * command's send-message action - there is no "poll plus text" reminder.
+ *
+ * @param {string} text
+ * @param {object|null} poll
+ */
+function assertMessageOrPoll(text, poll) {
+  if (poll && text) throw new ReminderError("A poll replaces the reminder text — remove the content, or the poll.");
+  if (!poll && !text) throw new ReminderError("Tell me what to remind you about.");
+}
+
+/**
+ * @param {{guildId: string, userId: string, channelId: string, content: string, delayMs: number, repeatMs?: number|null, dm?: boolean, presentation?: object|null, poll?: object|null}} input
  */
 async function createReminder({
   guildId,
@@ -37,11 +50,12 @@ async function createReminder({
   repeatMs = null,
   dm = false,
   presentation = null,
+  poll = null,
 }) {
   assertDelay(delayMs);
 
   const text = String(content || "").trim();
-  if (!text) throw new ReminderError("Tell me what to remind you about.");
+  assertMessageOrPoll(text, poll);
   if (text.length > MAX_CONTENT) throw new ReminderError(`Keep the reminder under ${MAX_CONTENT} characters.`);
 
   if (repeatMs !== null && repeatMs !== undefined) {
@@ -63,10 +77,11 @@ async function createReminder({
     payload: {
       userId,
       channelId,
-      content: text,
+      content: text || null,
       repeatMs: repeatMs || null,
       dm: Boolean(dm),
       presentation: normalizePresentation(presentation),
+      poll: poll || null,
     },
   });
 
@@ -88,7 +103,35 @@ function normalizePresentation(value) {
     ? String(value.mention)
     : "CREATOR";
   const deleteAfterSeconds = Math.min(86400, Math.max(0, Number.parseInt(value.deleteAfterSeconds, 10) || 0));
-  return { title, footer, color, mention, tts: Boolean(value.tts), deleteAfterSeconds };
+  return {
+    title,
+    footer,
+    color,
+    mention,
+    tts: Boolean(value.tts),
+    deleteAfterSeconds,
+    crosspost: Boolean(value.crosspost),
+  };
+}
+
+/**
+ * The embed a reminder shows when it fires - built the same way whether it is
+ * actually being sent or only being previewed before it is saved.
+ *
+ * @param {{content: string, presentation?: object|null}} payload
+ * @param {Date|number} createdAt
+ */
+function buildReminderEmbed(payload, createdAt) {
+  const presentation = normalizePresentation(payload.presentation);
+  const embed = new EmbedBuilder()
+    .setColor(EMBED_COLORS.BOT_EMBED)
+    .setAuthor({ name: presentation?.title || "Reminder" })
+    .setDescription(payload.content)
+    .setFooter({
+      text: presentation?.footer || `Set ${new Date(createdAt).toISOString().slice(0, 16).replace("T", " ")} UTC`,
+    });
+  if (presentation?.color) embed.setColor(presentation.color);
+  return embed;
 }
 
 function reminderMention(payload) {
@@ -130,36 +173,47 @@ async function cancelReminder({ guildId, userId, index }) {
  * @param {{client: import('discord.js').Client, task: object}} context
  */
 async function handleReminder(payload, { client, task }) {
-  const presentation = normalizePresentation(payload.presentation);
-  const embed = new EmbedBuilder()
-    .setColor(EMBED_COLORS.BOT_EMBED)
-    .setAuthor({ name: presentation?.title || "Reminder" })
-    .setDescription(payload.content)
-    .setFooter({
-      text: presentation?.footer || `Set ${new Date(task.created_at).toISOString().slice(0, 16).replace("T", " ")} UTC`,
-    });
-  if (presentation?.color) embed.setColor(presentation.color);
-
-  const mention = reminderMention({ ...payload, presentation });
-  const delivery = { ...mention, embeds: [embed], tts: Boolean(presentation?.tts) };
-
-  let delivered = false;
-
-  if (!payload.dm) {
-    const channel = await client.channels.fetch(payload.channelId).catch(() => null);
-    if (channel?.isTextBased()) {
-      const sent = await channel.send(delivery).catch(() => null);
-      delivered = Boolean(sent);
-      if (sent && presentation?.deleteAfterSeconds) {
-        setTimeout(() => sent.delete().catch(() => {}), presentation.deleteAfterSeconds * 1000).unref?.();
+  if (payload.poll?.question) {
+    // A poll has nowhere sensible to go as a DM - it only exists as a real
+    // channel poll, so a poll reminder set to DM itself simply does nothing.
+    if (!payload.dm) {
+      const channel = await client.channels.fetch(payload.channelId).catch(() => null);
+      if (channel?.isTextBased?.()) {
+        await startPollFromConfig({
+          guild: channel.guild,
+          channel,
+          authorId: payload.userId,
+          poll: payload.poll,
+        }).catch(() => {});
       }
     }
-  }
+  } else {
+    const presentation = normalizePresentation(payload.presentation);
+    const embed = buildReminderEmbed(payload, task.created_at);
+    const mention = reminderMention({ ...payload, presentation });
+    const delivery = { ...mention, embeds: [embed], tts: Boolean(presentation?.tts) };
 
-  // Fall back to a DM when the channel is gone or the reminder asked for one.
-  if (!delivered) {
-    const user = await client.users.fetch(payload.userId).catch(() => null);
-    if (user) await user.send({ embeds: [embed] }).catch(() => {});
+    let delivered = false;
+
+    if (!payload.dm) {
+      const channel = await client.channels.fetch(payload.channelId).catch(() => null);
+      if (channel?.isTextBased()) {
+        const sent = await channel.send(delivery).catch(() => null);
+        delivered = Boolean(sent);
+        if (sent && presentation?.deleteAfterSeconds) {
+          setTimeout(() => sent.delete().catch(() => {}), presentation.deleteAfterSeconds * 1000).unref?.();
+        }
+        if (sent && presentation?.crosspost && channel.type === ChannelType.GuildAnnouncement) {
+          await sent.crosspost().catch(() => {});
+        }
+      }
+    }
+
+    // Fall back to a DM when the channel is gone or the reminder asked for one.
+    if (!delivered) {
+      const user = await client.users.fetch(payload.userId).catch(() => null);
+      if (user) await user.send({ embeds: [embed] }).catch(() => {});
+    }
   }
 
   if (payload.repeatMs) {
@@ -173,6 +227,16 @@ async function handleReminder(payload, { client, task }) {
 }
 
 /**
+ * What a reminder is "about" in one line - its text, or its poll question
+ * when it has no text of its own to show.
+ *
+ * @param {object} reminder task document
+ */
+function reminderSummary(reminder) {
+  return reminder.payload.poll?.question ? `📊 ${reminder.payload.poll.question}` : reminder.payload.content;
+}
+
+/**
  * @param {object} reminder task document
  */
 function describeReminder(reminder, index) {
@@ -180,7 +244,7 @@ function describeReminder(reminder, index) {
     `**${index}.** ${time(new Date(reminder.run_at), "R")}` +
     `${reminder.payload.repeatMs ? " · repeating" : ""}` +
     `${reminder.payload.dm ? " · via DM" : ` · <#${reminder.payload.channelId}>`}\n` +
-    `> ${reminder.payload.content.replace(/\n/g, " ").slice(0, 150)}`
+    `> ${reminderSummary(reminder).replace(/\n/g, " ").slice(0, 150)}`
   );
 }
 
@@ -200,6 +264,8 @@ module.exports = {
   MAX_DELAY_MS,
   ReminderError,
   assertDelay,
+  assertMessageOrPoll,
+  buildReminderEmbed,
   cancelReminder,
   createReminder,
   describeReminder,
@@ -207,5 +273,6 @@ module.exports = {
   listReminders,
   normalizePresentation,
   reminderMention,
+  reminderSummary,
   register,
 };
