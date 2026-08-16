@@ -1,20 +1,48 @@
 const { ApplicationCommandOptionType } = require("discord.js");
-const { model } = require("@schemas/CustomCommand");
+const { MAX_TIMEOUT_MINUTES, model } = require("@schemas/CustomCommand");
 const { contextLabel } = require("./applicationCommands");
 const { asMessage } = require("@src/services/commands/message");
 const { buildModal, parseModalCustomId } = require("./modalBuilder");
 const modalSessions = require("./modalSessions");
 const { buildPayload, scheduleDeletion, startPollFromConfig } = require("@src/services/richMessage/RichMessage");
 const { isCooldownExemptModerator } = require("@src/services/moderation/policy");
+const { timeoutTarget, unTimeoutTarget } = require("@helpers/ModUtils");
 
 const cooldowns = new Map();
+const RANDOM_PATTERN = /\{random:([^{}]+)\}/g;
+
+/**
+ * `{random:...}`'s own two forms: a range of whole numbers, or a set of
+ * literal choices. A range is only ever two plain integers either side of a
+ * dash, so a hyphenated word falls through to being read as one single
+ * choice rather than being torn apart by accident.
+ *
+ * @param {string} spec
+ * @returns {string}
+ */
+function randomPick(spec) {
+  const trimmed = spec.trim();
+  const range = /^(-?\d+)\s*-\s*(-?\d+)$/.exec(trimmed);
+  if (range) {
+    const [low, high] = [Number(range[1]), Number(range[2])].sort((a, b) => a - b);
+    return String(low + Math.floor(Math.random() * (high - low + 1)));
+  }
+  const options = trimmed
+    .split("|")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (!options.length) return "";
+  return options[Math.floor(Math.random() * options.length)];
+}
 
 /**
  * The variables a custom command may use.
  *
  * Every one of them is a name substituted for a value. There is deliberately no
  * expression, no call and no code: a server administrator writing a message must
- * not be able to make the bot run something.
+ * not be able to make the bot run something. `{random:...}` is the one
+ * exception to "no logic" - it still never runs anything the admin did not
+ * already write out in full, it just picks which of it shows.
  *
  * @param {string} value
  * @param {object} context
@@ -23,11 +51,17 @@ const cooldowns = new Map();
 function renderTemplate(value, context) {
   let text = String(value || "")
     .replaceAll("{server}", context.guild.name)
+    .replaceAll("{server:icon}", context.guild.iconURL?.() || "")
+    .replaceAll("{server:members}", String(context.guild.memberCount ?? ""))
     .replaceAll("{member:id}", context.member.id)
     .replaceAll("{member:name}", context.member.displayName)
     .replaceAll("{member:mention}", `<@${context.member.id}>`)
+    .replaceAll("{member:avatar}", context.member.displayAvatarURL?.() || "")
     .replaceAll("{channel}", `<#${context.channel.id}>`)
-    .replaceAll("{arguments}", context.arguments.join(" "));
+    .replaceAll("{arguments}", context.arguments.join(" "))
+    .replaceAll("{date}", new Date().toISOString().slice(0, 10))
+    .replaceAll("{time}", `${new Date().toISOString().slice(11, 16)} UTC`)
+    .replace(RANDOM_PATTERN, (_, spec) => randomPick(spec));
 
   const target = context.target;
   text = text
@@ -224,6 +258,56 @@ async function executeChangeRoles(action, message) {
 }
 
 /**
+ * Like CHANGE_ROLES, this only ever touches whoever ran the command - a
+ * command that could rename somebody else without their own hierarchy being
+ * checked belongs with the moderation actions, not here.
+ *
+ * @param {object} action
+ * @param {object} message
+ * @param {object} context
+ */
+async function executeSetNickname(action, message, context) {
+  if (typeof message.member?.setNickname !== "function") return;
+  const nickname = renderTemplate(action.nickname, context).trim().slice(0, 32) || null;
+  await message.member.setNickname(nickname, "SLAYBOT custom command").catch(() => {});
+}
+
+/**
+ * TIMEOUT_TARGET / UNTIMEOUT_TARGET only ever touch the real Discord member a
+ * message or member context menu resolved - a typed or slash invocation has
+ * nobody in particular to act on, so the action simply does nothing rather
+ * than guessing at a target.
+ *
+ * Both go through the exact moderation engine `/timeout` itself uses, with
+ * whoever ran the command as the issuer: Discord's own role hierarchy, the
+ * server's mute mode, ModLog, and the event router all apply exactly as they
+ * would for a real moderator typing the real command.
+ *
+ * @param {object} action
+ * @param {object} message
+ * @param {object} context
+ */
+async function executeTimeoutTarget(action, message, context) {
+  const target = context.target?.member;
+  if (!target || !message.member) return;
+  const reason = renderTemplate(action.reason, context).trim().slice(0, 500) || "Custom command";
+  const minutes = Math.min(MAX_TIMEOUT_MINUTES, Math.max(1, Number(action.duration_minutes) || 10));
+  await timeoutTarget(message.member, target, minutes * 60_000, reason).catch(() => {});
+}
+
+/**
+ * @param {object} action
+ * @param {object} message
+ * @param {object} context
+ */
+async function executeUntimeoutTarget(action, message, context) {
+  const target = context.target?.member;
+  if (!target || !message.member) return;
+  const reason = renderTemplate(action.reason, context).trim().slice(0, 500) || "Custom command";
+  await unTimeoutTarget(message.member, target, reason).catch(() => {});
+}
+
+/**
  * One action, whichever kind it is. SHOW_MODAL is never run through here: it is
  * handled at invocation time, before there is a channel message or a deferred
  * interaction to run the rest of the actions against.
@@ -237,6 +321,9 @@ async function runAction(action, message, context) {
   else if (action.type === "SEND_DM") await executeSendDm(action, message, context);
   else if (action.type === "CHANGE_ROLES") await executeChangeRoles(action, message);
   else if (action.type === "ADD_REACTION") await executeAddReaction(action, message);
+  else if (action.type === "SET_NICKNAME") await executeSetNickname(action, message, context);
+  else if (action.type === "TIMEOUT_TARGET") await executeTimeoutTarget(action, message, context);
+  else if (action.type === "UNTIMEOUT_TARGET") await executeUntimeoutTarget(action, message, context);
 }
 
 async function executeCommand(command, message, args, extra = {}, settings = null) {
@@ -300,6 +387,9 @@ function resolveOptionValue(entry) {
   // `.role` when the one that was actually picked is a role.
   if (entry.type === ApplicationCommandOptionType.Mentionable)
     return entry.role ? `<@&${entry.value}>` : `<@${entry.value}>`;
+  // An attachment's value is its own snowflake id, not a link - the url worth
+  // substituting lives on the resolved attachment instead.
+  if (entry.type === ApplicationCommandOptionType.Attachment) return entry.attachment?.url || "";
   return String(entry.value);
 }
 
@@ -540,10 +630,20 @@ async function tryCustomSlashCommand(interaction, settings, dependencies = {}) {
 function contextTarget(interaction) {
   if (interaction.isMessageContextMenuCommand?.()) {
     const target = interaction.targetMessage;
-    return target ? { id: target.id, name: target.author?.username || "", content: target.content || "" } : null;
+    if (!target) return null;
+    return {
+      id: target.id,
+      name: target.author?.username || "",
+      content: target.content || "",
+      // A moderation action needs the real member, not just who wrote the
+      // message - a member the guild has not cached simply has none to act on.
+      member: interaction.guild?.members?.cache?.get(target.author?.id) || null,
+    };
   }
-  const member = interaction.targetMember || interaction.targetUser;
-  return member ? { id: member.id, name: member.displayName || member.username || "", content: "" } : null;
+  const member = interaction.targetMember || null;
+  const user = interaction.targetUser;
+  if (!member && !user) return null;
+  return { id: (member || user).id, name: member?.displayName || user?.username || "", content: "", member };
 }
 
 /**

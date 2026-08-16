@@ -238,6 +238,16 @@ module.exports = {
     sendDm: "Send the author a DM",
     changeRoles: "Change author roles",
     addReaction: "React to the invocation",
+    setNickname: "Set author nickname",
+    nickname: "Nickname",
+    nicknameHint: "Leave blank to clear the nickname instead. Only ever changes the person who ran the command.",
+    nicknameClears: "Clears the nickname",
+    timeoutTarget: "Timeout the target",
+    untimeoutTarget: "Remove the target's timeout",
+    targetActionHint:
+      "Timeout and remove timeout only work on a message or member context menu trigger, where there is a real member to act on - and run as whoever used the command, with the same role hierarchy and permissions a real /timeout would enforce.",
+    timeoutDuration: "Timeout duration, minutes",
+    timeoutReason: "Reason",
     showModal: "Show a form",
     modalHint:
       "The fields below apply only to a form action. It has to be the interaction's first answer, so it needs a slash or context menu trigger.",
@@ -277,7 +287,7 @@ module.exports = {
     embedTitle: "Card title",
     embedDescription: "Card description",
     variables:
-      "Variables: {server}, {member:id}, {member:name}, {member:mention}, {channel}, {arguments}, {target:id}, {target:name}, {target:mention}, {target:content}, {option:<name>}, {modal:<field id>}. {option:*} only fills in for a slash or context menu trigger - a prefix invocation only ever has {arguments}.",
+      "Variables: {server}, {server:icon}, {server:members}, {member:id}, {member:name}, {member:mention}, {member:avatar}, {channel}, {arguments}, {target:id}, {target:name}, {target:mention}, {target:content}, {option:<name>}, {modal:<field id>}, {date}, {time}, {random:1-6}, {random:a|b|c}. {option:*} only fills in for a slash or context menu trigger - a prefix invocation only ever has {arguments}.",
     deleteCommand: "Delete command",
     triggers: "How it can be run",
     triggerPrefix: "After the prefix",
@@ -294,6 +304,12 @@ module.exports = {
     required: "Required",
     choices: "Choices",
     choicesHint: "One per line, written as label = value. Only text and number parameters can offer choices.",
+    optionMin: "Minimum value",
+    optionMax: "Maximum value",
+    optionMinLength: "Minimum length",
+    optionMaxLength: "Maximum length",
+    optionRangeHint:
+      "Minimum/maximum value only applies to a whole number or number parameter; minimum/maximum length only applies to text. Leave blank for no limit.",
     addParameter: "Add parameter",
     subcommand: "Subcommand",
     subcommandName: "Subcommand name",
@@ -309,6 +325,7 @@ module.exports = {
       ROLE: "Role",
       MENTIONABLE: "Member or role",
       NUMBER: "Number",
+      ATTACHMENT: "File",
     },
   },
   selector: {

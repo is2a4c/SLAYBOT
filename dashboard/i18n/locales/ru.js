@@ -237,6 +237,16 @@ module.exports = {
     sendDm: "Отправить автору в ЛС",
     changeRoles: "Изменить роли автора",
     addReaction: "Добавить реакцию на вызов",
+    setNickname: "Изменить ник автора",
+    nickname: "Никнейм",
+    nicknameHint: "Оставьте пустым, чтобы просто сбросить никнейм. Всегда меняет только того, кто вызвал команду.",
+    nicknameClears: "Сбрасывает никнейм",
+    timeoutTarget: "Замьютить цель",
+    untimeoutTarget: "Снять мьют с цели",
+    targetActionHint:
+      "Мьют и снятие мьюта работают только при триггере контекстного меню сообщения или участника, где есть реальная цель для действия — выполняются от имени того, кто вызвал команду, с той же иерархией ролей и правами, что и настоящий /timeout.",
+    timeoutDuration: "Длительность мьюта, минут",
+    timeoutReason: "Причина",
     showModal: "Показать форму",
     modalHint:
       "Поля ниже относятся только к действию-форме. Она должна быть первым ответом на взаимодействие, поэтому нужен slash или контекстный триггер.",
@@ -276,7 +286,7 @@ module.exports = {
     embedTitle: "Заголовок карточки",
     embedDescription: "Описание карточки",
     variables:
-      "Переменные: {server}, {member:id}, {member:name}, {member:mention}, {channel}, {arguments}, {target:id}, {target:name}, {target:mention}, {target:content}, {option:<имя>}, {modal:<id поля>}. {option:*} заполняется только для slash- и контекстных триггеров — у prefix-вызова доступен лишь {arguments}.",
+      "Переменные: {server}, {server:icon}, {server:members}, {member:id}, {member:name}, {member:mention}, {member:avatar}, {channel}, {arguments}, {target:id}, {target:name}, {target:mention}, {target:content}, {option:<имя>}, {modal:<id поля>}, {date}, {time}, {random:1-6}, {random:a|b|c}. {option:*} заполняется только для slash- и контекстных триггеров — у prefix-вызова доступен лишь {arguments}.",
     deleteCommand: "Удалить команду",
     triggers: "Способы запуска",
     triggerPrefix: "После префикса",
@@ -294,6 +304,12 @@ module.exports = {
     choices: "Варианты",
     choicesHint:
       "По одному в строке, в виде подпись = значение. Варианты доступны только текстовым и числовым параметрам.",
+    optionMin: "Минимальное значение",
+    optionMax: "Максимальное значение",
+    optionMinLength: "Минимальная длина",
+    optionMaxLength: "Максимальная длина",
+    optionRangeHint:
+      "Мин./макс. значение действует только для числовых параметров; мин./макс. длина — только для текстовых. Оставьте пустым, если ограничение не нужно.",
     addParameter: "Добавить параметр",
     subcommand: "Подкоманда",
     subcommandName: "Имя подкоманды",
@@ -309,6 +325,7 @@ module.exports = {
       ROLE: "Роль",
       MENTIONABLE: "Участник или роль",
       NUMBER: "Число",
+      ATTACHMENT: "Файл",
     },
   },
   selector: {

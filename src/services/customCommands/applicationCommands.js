@@ -1,5 +1,5 @@
 const { ApplicationCommandType } = require("discord.js");
-const { CHOICE_TYPES, MAX_CHOICES, MAX_OPTIONS, MAX_SUBCOMMANDS } = require("@schemas/CustomCommand");
+const { CHOICE_TYPES, MAX_CHOICES, MAX_OPTIONS, MAX_SUBCOMMANDS, RANGE_TYPES } = require("@schemas/CustomCommand");
 
 /**
  * Publishing a server's own commands to Discord.
@@ -38,6 +38,15 @@ function optionPayload(option) {
       // option offered a string here is rejected for the whole command.
       value: option.type === 3 ? String(choice.value) : Number(choice.value),
     }));
+  }
+
+  if (RANGE_TYPES.includes(option.type)) {
+    if (option.min_value !== null && option.min_value !== undefined) payload.min_value = option.min_value;
+    if (option.max_value !== null && option.max_value !== undefined) payload.max_value = option.max_value;
+  }
+  if (option.type === 3) {
+    if (option.min_length !== null && option.min_length !== undefined) payload.min_length = option.min_length;
+    if (option.max_length !== null && option.max_length !== undefined) payload.max_length = option.max_length;
   }
 
   return payload;
@@ -132,6 +141,12 @@ function matchesExisting(existing, payload) {
   if (payload.type !== ApplicationCommandType.ChatInput) return true;
   if ((existing.description || "") !== payload.description) return false;
 
+  const range = (option) => [
+    option.min_value ?? null,
+    option.max_value ?? null,
+    option.min_length ?? null,
+    option.max_length ?? null,
+  ];
   const normalise = (options) =>
     JSON.stringify(
       (options || []).map((option) => ({
@@ -140,12 +155,14 @@ function matchesExisting(existing, payload) {
         type: option.type,
         required: Boolean(option.required),
         choices: (option.choices || []).map((choice) => [choice.name, String(choice.value)]),
+        range: range(option),
         options: (option.options || []).map((child) => ({
           name: child.name,
           description: child.description || "",
           type: child.type,
           required: Boolean(child.required),
           choices: (child.choices || []).map((choice) => [choice.name, String(choice.value)]),
+          range: range(child),
         })),
       }))
     );

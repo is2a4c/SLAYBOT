@@ -1,7 +1,22 @@
 const mongoose = require("mongoose");
 const { PollSchema, buttonsPath, fieldsPath } = require("./RichMessage");
 
-const ACTION_TYPES = ["SEND_MESSAGE", "SEND_DM", "CHANGE_ROLES", "ADD_REACTION", "SHOW_MODAL"];
+const ACTION_TYPES = [
+  "SEND_MESSAGE",
+  "SEND_DM",
+  "CHANGE_ROLES",
+  "ADD_REACTION",
+  "SHOW_MODAL",
+  "SET_NICKNAME",
+  "TIMEOUT_TARGET",
+  "UNTIMEOUT_TARGET",
+];
+// TIMEOUT_TARGET and UNTIMEOUT_TARGET act on a real Discord member, which only
+// a message or member context menu invocation resolves - a typed or slash
+// invocation has nobody in particular to act on.
+const TARGET_ACTION_TYPES = ["TIMEOUT_TARGET", "UNTIMEOUT_TARGET"];
+// Discord's own timeout ceiling.
+const MAX_TIMEOUT_MINUTES = 40320;
 const MAX_CUSTOM_COMMANDS = 50;
 const MAX_ACTIONS = 10;
 
@@ -23,10 +38,13 @@ const OPTION_TYPES = {
   ROLE: 8,
   MENTIONABLE: 9,
   NUMBER: 10,
+  ATTACHMENT: 11,
 };
 
 // Discord only takes a choice list on the three types that carry a plain value.
 const CHOICE_TYPES = [OPTION_TYPES.STRING, OPTION_TYPES.INTEGER, OPTION_TYPES.NUMBER];
+// A numeric range only ever makes sense on the two types that carry a number.
+const RANGE_TYPES = [OPTION_TYPES.INTEGER, OPTION_TYPES.NUMBER];
 
 // Every one of these is Discord's own limit, not ours.
 const MAX_OPTIONS = 25;
@@ -54,6 +72,12 @@ const OptionSchema = new mongoose.Schema(
       default: [],
       validate: [(value) => value.length <= MAX_CHOICES, `An option can have at most ${MAX_CHOICES} choices.`],
     },
+    // INTEGER/NUMBER only: the range Discord itself refuses to go outside of.
+    min_value: { type: Number, default: null },
+    max_value: { type: Number, default: null },
+    // STRING only: how many characters Discord requires before/allows after.
+    min_length: { type: Number, default: null, min: 0, max: 6000 },
+    max_length: { type: Number, default: null, min: 1, max: 6000 },
   },
   { _id: false }
 );
@@ -134,6 +158,11 @@ const ActionSchema = new mongoose.Schema(
       validate: [(value) => value.length <= MAX_MODAL_INPUTS, `A form can have at most ${MAX_MODAL_INPUTS} fields.`],
     },
     confirm_action_id: { type: String, default: null },
+    // SET_NICKNAME only.
+    nickname: { type: String, default: null, maxlength: 32 },
+    // TIMEOUT_TARGET / UNTIMEOUT_TARGET only.
+    duration_minutes: { type: Number, default: 10, min: 1, max: MAX_TIMEOUT_MINUTES },
+    reason: { type: String, default: null, maxlength: 500 },
   },
   { _id: false }
 );
@@ -197,9 +226,12 @@ module.exports = {
   MAX_MODAL_TITLE,
   MAX_OPTIONS,
   MAX_SUBCOMMANDS,
+  MAX_TIMEOUT_MINUTES,
   MODAL_INPUT_STYLES,
   NAME_PATTERN,
   OPTION_TYPES,
+  RANGE_TYPES,
+  TARGET_ACTION_TYPES,
   model,
   deleteGuildCustomCommands: (guildId) => model.deleteMany({ guild_id: guildId }),
 };

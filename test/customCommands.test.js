@@ -110,6 +110,47 @@ test("templates expose only documented invocation values and suppress broad ment
   assert.equal(controlled.tts, true);
 });
 
+test("{random:...} picks a number from a range or one of several written-out choices", () => {
+  const msg = message();
+  const context = { guild: msg.guild, channel: msg.channel, member: msg.member, arguments: [] };
+
+  for (let i = 0; i < 20; i += 1) {
+    const rolled = Number(renderTemplate("{random:1-6}", context));
+    assert.ok(Number.isInteger(rolled) && rolled >= 1 && rolled <= 6, `${rolled} is out of a 1-6 range`);
+  }
+
+  for (let i = 0; i < 20; i += 1) {
+    const picked = renderTemplate("{random:heads|tails}", context);
+    assert.ok(["heads", "tails"].includes(picked), `"${picked}" was not one of the written choices`);
+  }
+
+  // A reversed range still lands inside the same span either way round.
+  assert.equal(["1", "2", "3"].includes(renderTemplate("{random:3-1}", context)), true);
+  // A hyphenated word is not mistaken for a numeric range: it has nowhere to
+  // split without a pipe, so it comes back exactly as written.
+  assert.equal(renderTemplate("{random:rock-paper-scissors}", context), "rock-paper-scissors");
+});
+
+test("{date}, {time}, and the server/member context placeholders render real values", () => {
+  const msg = message();
+  msg.guild.iconURL = () => "https://cdn/server-icon.png";
+  msg.guild.memberCount = 42;
+  msg.member.displayAvatarURL = () => "https://cdn/avatar.png";
+  const context = { guild: msg.guild, channel: msg.channel, member: msg.member, arguments: [] };
+
+  assert.match(renderTemplate("{date}", context), /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(renderTemplate("{time}", context), /^\d{2}:\d{2} UTC$/);
+  assert.equal(renderTemplate("{server:icon}", context), "https://cdn/server-icon.png");
+  assert.equal(renderTemplate("{server:members}", context), "42");
+  assert.equal(renderTemplate("{member:avatar}", context), "https://cdn/avatar.png");
+
+  // Missing on the guild/member object entirely - degrades to blank, not a crash.
+  const bareGuild = { ...msg.guild, iconURL: undefined, memberCount: undefined };
+  const bareMember = { ...msg.member, displayAvatarURL: undefined };
+  const bareContext = { guild: bareGuild, channel: msg.channel, member: bareMember, arguments: [] };
+  assert.equal(renderTemplate("{server:icon}|{server:members}|{member:avatar}", bareContext), "||");
+});
+
 test("runtime executes ordered channel, DM, reaction and role actions", async () => {
   const msg = message();
   const command = {
@@ -151,6 +192,31 @@ test("dashboard validates DM and reaction actions without accepting arbitrary ac
   assert.equal(reaction.emoji, "✅");
   assert.throws(() => actionFromInput(guild(), { type: "ADD_REACTION", emoji: "not emoji" }), CustomCommandError);
   assert.equal(actionFromInput(guild(), { type: "UNKNOWN", content: "safe fallback" }).type, "SEND_MESSAGE");
+
+  const nickname = actionFromInput(guild(), { type: "SET_NICKNAME", nickname: "  {member:name}  " });
+  assert.equal(nickname.nickname, "{member:name}");
+  const clearing = actionFromInput(guild(), { type: "SET_NICKNAME", nickname: "   " });
+  assert.equal(clearing.nickname, null, "a blank template is stored as null, meaning clear the nickname");
+});
+
+test("SET_NICKNAME renames only whoever ran the command, and a blank template clears it", async () => {
+  const msg = message();
+  const nicknames = [];
+  msg.member.setNickname = async (value) => nicknames.push(value);
+
+  const command = {
+    _id: "nick-command",
+    cooldown_seconds: 0,
+    allowed_roles: [],
+    allowed_channels: [],
+    actions: [{ type: "SET_NICKNAME", nickname: "{member:name} the Bold" }],
+  };
+  await executeCommand(command, msg, []);
+  assert.deepEqual(nicknames, ["Tester the Bold"]);
+
+  const clearing = { ...command, actions: [{ type: "SET_NICKNAME", nickname: null }] };
+  await executeCommand(clearing, msg, []);
+  assert.deepEqual(nicknames, ["Tester the Bold", null]);
 });
 
 test("custom invocation honours feature switch, channel, and role access", async () => {

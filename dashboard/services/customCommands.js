@@ -10,8 +10,11 @@ const {
   MAX_MODAL_TITLE,
   MAX_OPTIONS,
   MAX_SUBCOMMANDS,
+  MAX_TIMEOUT_MINUTES,
   NAME_PATTERN,
   OPTION_TYPES,
+  RANGE_TYPES,
+  TARGET_ACTION_TYPES,
   model,
 } = require("@schemas/CustomCommand");
 const {
@@ -274,6 +277,37 @@ function actionFromInput(guild, input, command = { actions: [], triggers: {} }) 
     }
   }
 
+  if (type === "SET_NICKNAME") {
+    const nickname =
+      String(input.nickname || "")
+        .trim()
+        .slice(0, 32) || null;
+    return { id: crypto.randomUUID(), name, type, nickname };
+  }
+
+  if (TARGET_ACTION_TYPES.includes(type)) {
+    if (!command.triggers?.message_context && !command.triggers?.member_context) {
+      throw new CustomCommandError(
+        "This action needs a real member to act on, so enable the message or member context menu trigger first."
+      );
+    }
+    const reason =
+      String(input.reason || "")
+        .trim()
+        .slice(0, 500) || null;
+    if (type === "UNTIMEOUT_TARGET") return { id: crypto.randomUUID(), name, type, reason };
+
+    const minutes = Number.parseInt(input.durationMinutes, 10);
+    if (!Number.isFinite(minutes) || minutes < 1) throw new CustomCommandError("Choose a timeout duration in minutes.");
+    return {
+      id: crypto.randomUUID(),
+      name,
+      type,
+      reason,
+      duration_minutes: Math.min(MAX_TIMEOUT_MINUTES, minutes),
+    };
+  }
+
   const trimmed = (value, max) =>
     String(value || "")
       .trim()
@@ -410,6 +444,19 @@ function parseChoices(raw, type) {
 }
 
 /**
+ * A number typed into the form, or null when the box was left blank -
+ * blank means "Discord decides", not zero.
+ *
+ * @param {*} raw
+ * @returns {number|null}
+ */
+function optionalNumber(raw) {
+  if (raw === undefined || raw === null || String(raw).trim() === "") return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
  * One parameter, as the dashboard form describes it.
  *
  * @param {object} input
@@ -431,12 +478,42 @@ function optionFromInput(input) {
       .trim()
       .slice(0, 100) || name;
 
+  let minValue = null;
+  let maxValue = null;
+  if (RANGE_TYPES.includes(type)) {
+    const round = (value) => (type === OPTION_TYPES.INTEGER ? Math.trunc(value) : value);
+    minValue = optionalNumber(input.optionMin);
+    maxValue = optionalNumber(input.optionMax);
+    if (minValue !== null) minValue = round(minValue);
+    if (maxValue !== null) maxValue = round(maxValue);
+    if (minValue !== null && maxValue !== null && minValue > maxValue) {
+      throw new CustomCommandError("A parameter's minimum cannot exceed its maximum.");
+    }
+  }
+
+  let minLength = null;
+  let maxLength = null;
+  if (type === OPTION_TYPES.STRING) {
+    const bound = (value) => Math.min(6000, Math.max(0, Math.trunc(value)));
+    const rawMin = optionalNumber(input.optionMinLength);
+    const rawMax = optionalNumber(input.optionMaxLength);
+    minLength = rawMin !== null ? bound(rawMin) : null;
+    maxLength = rawMax !== null ? Math.max(1, bound(rawMax)) : null;
+    if (minLength !== null && maxLength !== null && minLength > maxLength) {
+      throw new CustomCommandError("A parameter's minimum length cannot exceed its maximum length.");
+    }
+  }
+
   return {
     name,
     description,
     type,
     required: input.optionRequired === "on",
     choices: parseChoices(input.choices, type),
+    min_value: minValue,
+    max_value: maxValue,
+    min_length: minLength,
+    max_length: maxLength,
   };
 }
 

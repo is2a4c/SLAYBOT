@@ -145,6 +145,39 @@ test("choice values are typed the way their option is", () => {
   assert.equal(noChoices.choices, undefined, "Discord takes choices only on the value types");
 });
 
+test("a numeric range publishes only for number types, a length range only for text", () => {
+  const bounded = optionPayload({
+    name: "level",
+    description: "l",
+    type: OPTION_TYPES.INTEGER,
+    min_value: 1,
+    max_value: 100,
+  });
+  assert.deepEqual([bounded.min_value, bounded.max_value], [1, 100]);
+
+  const text = optionPayload({
+    name: "note",
+    description: "n",
+    type: OPTION_TYPES.STRING,
+    min_length: 5,
+    max_length: 50,
+  });
+  assert.deepEqual([text.min_length, text.max_length], [5, 50]);
+
+  const unbounded = optionPayload({
+    name: "who",
+    description: "w",
+    type: OPTION_TYPES.USER,
+    min_value: 1,
+    min_length: 5,
+  });
+  assert.deepEqual(
+    [unbounded.min_value, unbounded.max_value, unbounded.min_length, unbounded.max_length],
+    [undefined, undefined, undefined, undefined],
+    "a range on a type that cannot take one is simply not published"
+  );
+});
+
 test("a context entry falls back to the command name for its label", () => {
   assert.equal(contextLabel(command()), "hello");
   assert.equal(contextLabel(command({ context_label: "Say hello" })), "Say hello");
@@ -332,6 +365,42 @@ test("an existing command is compared by everything Discord would show", () => {
   assert.equal(matchesExisting(null, payload), false);
 });
 
+test("a changed numeric range counts as a real difference, not a cosmetic one", () => {
+  const withRange = chatInputPayload(
+    command({
+      options: [
+        {
+          name: "level",
+          description: "l",
+          type: OPTION_TYPES.INTEGER,
+          required: true,
+          choices: [],
+          min_value: 1,
+          max_value: 10,
+        },
+      ],
+    })
+  );
+  const widened = chatInputPayload(
+    command({
+      options: [
+        {
+          name: "level",
+          description: "l",
+          type: OPTION_TYPES.INTEGER,
+          required: true,
+          choices: [],
+          min_value: 1,
+          max_value: 20,
+        },
+      ],
+    })
+  );
+
+  assert.equal(matchesExisting({ ...withRange, options: [...withRange.options] }, withRange), true);
+  assert.equal(matchesExisting(withRange, widened), false);
+});
+
 /* ------------------------------------------------------------- dashboard input */
 
 test("a parameter name must be something Discord accepts", () => {
@@ -342,6 +411,35 @@ test("a parameter name must be something Discord accepts", () => {
   assert.equal(option.name, "size");
   assert.equal(option.required, true);
   assert.equal(option.description, "size", "a parameter without a description borrows its own name");
+});
+
+test("a numeric parameter's min/max is bounded and typed, a text parameter's range only bounds length", () => {
+  const level = optionFromInput({ optionName: "level", optionType: "4", optionMin: "1.9", optionMax: "10.4" });
+  assert.deepEqual([level.min_value, level.max_value], [1, 10], "an integer parameter's range is truncated");
+
+  const rating = optionFromInput({ optionName: "rating", optionType: "10", optionMin: "0.5", optionMax: "9.5" });
+  assert.deepEqual([rating.min_value, rating.max_value], [0.5, 9.5], "a number parameter's range keeps its fraction");
+
+  assert.throws(
+    () => optionFromInput({ optionName: "level", optionType: "4", optionMin: "10", optionMax: "1" }),
+    /minimum cannot exceed its maximum/
+  );
+
+  const note = optionFromInput({ optionName: "note", optionType: "3", optionMinLength: "5", optionMaxLength: "50" });
+  assert.deepEqual([note.min_length, note.max_length], [5, 50]);
+  assert.equal(note.min_value, null, "length bounds do not leak into the numeric range fields");
+
+  assert.throws(
+    () => optionFromInput({ optionName: "note", optionType: "3", optionMinLength: "50", optionMaxLength: "5" }),
+    /minimum length cannot exceed its maximum length/
+  );
+
+  const who = optionFromInput({ optionName: "who", optionType: "6", optionMin: "1", optionMinLength: "5" });
+  assert.deepEqual(
+    [who.min_value, who.max_value, who.min_length, who.max_length],
+    [null, null, null, null],
+    "a range typed for the wrong parameter kind is simply not stored"
+  );
 });
 
 test("choices are read one per line and dropped when the type cannot take them", () => {
@@ -414,6 +512,24 @@ test("user, channel, and role options read back as mentions, not raw ids", () =>
     room: "<#2>",
     team: "<@&3>",
   });
+});
+
+test("an attachment option reads back as its url, not the attachment's own id", () => {
+  const interaction = {
+    options: {
+      getSubcommand: () => null,
+      data: [
+        {
+          name: "proof",
+          type: ApplicationCommandOptionType.Attachment,
+          value: "900000000000000001",
+          attachment: { id: "900000000000000001", url: "https://cdn.discordapp.com/attachments/1/2/proof.png" },
+        },
+      ],
+    },
+  };
+
+  assert.equal(readSlashOptions(interaction).options.proof, "https://cdn.discordapp.com/attachments/1/2/proof.png");
 });
 
 test("a mentionable option reads as a role mention when a role was picked, a user mention otherwise", () => {
