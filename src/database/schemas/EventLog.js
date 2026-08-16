@@ -59,7 +59,10 @@ module.exports = {
 
     return Promise.all([
       Model.find(filter)
-        .sort({ created_at: -1 })
+        // `_id` breaks a tie stably: several entries can share the same
+        // millisecond, and without a second key that tie is free to land on
+        // either side of a page boundary, or on both.
+        .sort({ created_at: -1, _id: -1 })
         .skip((page - 1) * pageSize)
         .limit(pageSize)
         .lean(),
