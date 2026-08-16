@@ -177,7 +177,6 @@ const Schema = new mongoose.Schema(
       default: [],
       validate: [(value) => value.length <= MAX_ACTIONS, `A custom command can have at most ${MAX_ACTIONS} actions.`],
     },
-    created_by: { type: String, default: null },
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );

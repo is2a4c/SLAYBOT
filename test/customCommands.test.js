@@ -7,6 +7,7 @@ const {
   executeCommand,
   messagePayload,
   renderTemplate,
+  resetCooldowns,
   tryCustomCommand,
 } = require("../src/services/customCommands/CustomCommandRuntime");
 const {
@@ -91,7 +92,6 @@ test("custom command names and action inputs are bounded", async () => {
   const created = await createCommand(
     guild(),
     { name: "hello", description: "Greeting" },
-    "actor",
     { getCommand: () => null },
     { countDocuments: async () => 0, create: async (value) => ({ ...value, _id: "id" }) }
   );
@@ -171,4 +171,26 @@ test("custom invocation honours feature switch, channel, and role access", async
   assert.equal(result.handled, true);
   const disabled = await tryCustomCommand(msg, { prefix: "!", control_center: { common: { text_commands: false } } });
   assert.deepEqual(disabled, { handled: false });
+});
+
+test("a server's moderator roles skip a custom command's cooldown, the same way they skip a built-in one's", async () => {
+  resetCooldowns();
+  const command = {
+    _id: "moderated-command",
+    cooldown_seconds: 60,
+    allowed_roles: [],
+    allowed_channels: [],
+    actions: [{ type: "SEND_MESSAGE", content: "ok" }],
+  };
+  const msg = message();
+  const settings = { control_center: { moderation: { moderator_roles: [ROLE_ID] } } };
+
+  const first = await executeCommand(command, msg, []);
+  assert.equal(first.executed, true);
+
+  const blocked = await executeCommand(command, msg, []);
+  assert.equal(blocked.executed, false, "a second run without the exemption is still on cooldown");
+
+  const exempt = await executeCommand(command, msg, [], {}, settings);
+  assert.equal(exempt.executed, true, "the moderator-role exemption bypasses the same cooldown");
 });

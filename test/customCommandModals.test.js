@@ -377,6 +377,23 @@ test("submitting the form runs its confirmation action with the typed values", a
   assert.equal(submit.sentToChannel[0].content, "Hi Ada, you said purple!");
 });
 
+test("a permission restriction added while the form was open is re-checked on submit", async () => {
+  const command = modalCommand();
+  const opener = testInteraction();
+  await presentModal(opener, command, command.actions[1], { args: [], options: {} });
+  const token = parseModalCustomId(opener.seen.modal[0].data.custom_id);
+
+  // The admin locks the command to a different channel while the form is still open.
+  command.allowed_channels = ["999999999999999999"];
+
+  const submit = testInteraction({ customId: modalCustomId(token) });
+  const result = await handleModalSubmit(submit, { model: fakeModel([command]) });
+
+  assert.equal(result, undefined, "the reply promise resolves; nothing runs");
+  assert.equal(submit.sentToChannel.length, 0, "the confirm action never ran");
+  assert.match(submit.seen.reply[0].content, /not available in this channel/);
+});
+
 test("submitting twice runs the action once: the second attempt finds an expired form", async () => {
   const command = modalCommand();
   const opener = testInteraction();

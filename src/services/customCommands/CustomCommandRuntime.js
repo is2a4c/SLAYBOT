@@ -1,9 +1,11 @@
+const { ApplicationCommandOptionType } = require("discord.js");
 const { model } = require("@schemas/CustomCommand");
 const { contextLabel } = require("./applicationCommands");
 const { asMessage } = require("@src/services/commands/message");
 const { buildModal, parseModalCustomId } = require("./modalBuilder");
 const modalSessions = require("./modalSessions");
 const { buildPayload, scheduleDeletion, startPollFromConfig } = require("@src/services/richMessage/RichMessage");
+const { isCooldownExemptModerator } = require("@src/services/moderation/policy");
 
 const cooldowns = new Map();
 
@@ -59,11 +61,15 @@ function subjectUserId(subject) {
 }
 
 /**
+ * Whether a command is off-limits here for anyone, before cooldown even
+ * enters into it - the same check a cooldown re-check after a form comes
+ * back needs, without also re-reading a cooldown this exact invocation just
+ * armed a moment ago.
+ *
  * @param {object} command
- * @param {object} subject anything with `.channelId`, `.guildId` and either
- *   `.member` or the fields a `Message`/`Interaction` already carries
+ * @param {object} subject anything with `.channelId` and `.member`
  */
-function accessProblem(command, subject) {
+function permissionProblem(command, subject) {
   if (command.allowed_channels?.length && !command.allowed_channels.includes(subject.channelId)) {
     return "This custom command is not available in this channel.";
   }
@@ -73,6 +79,36 @@ function accessProblem(command, subject) {
   ) {
     return "You do not have a role allowed to use this custom command.";
   }
+  return null;
+}
+
+/**
+ * A command's cooldown for whoever is about to run it - zero when the
+ * server's moderator-role exemption applies, the command's own configured
+ * seconds otherwise. Mirrors how the built-in command policy treats the
+ * same exemption.
+ *
+ * @param {object} command
+ * @param {object} subject
+ * @param {object|null} settings guild settings document
+ */
+function effectiveCooldown(command, subject, settings) {
+  if (isCooldownExemptModerator(settings, subject.member)) return 0;
+  return Number(command.cooldown_seconds) || 0;
+}
+
+/**
+ * @param {object} command
+ * @param {object} subject anything with `.channelId`, `.guildId` and either
+ *   `.member` or the fields a `Message`/`Interaction` already carries
+ * @param {object|null} [settings] guild settings document, for the
+ *   moderator cooldown exemption
+ */
+function accessProblem(command, subject, settings = null) {
+  const permission = permissionProblem(command, subject);
+  if (permission) return permission;
+
+  if (!(effectiveCooldown(command, subject, settings) > 0)) return null;
   const key = `${subject.guildId}:${command._id}:${subjectUserId(subject)}`;
   const remaining = (cooldowns.get(key) || 0) - Date.now();
   if (remaining > 0) return `This custom command is on cooldown for ${Math.ceil(remaining / 1000)} seconds.`;
@@ -84,13 +120,12 @@ function accessProblem(command, subject) {
  *
  * @param {object} command
  * @param {object} subject
+ * @param {object|null} [settings] guild settings document
  */
-function markCooldown(command, subject) {
-  if (!(command.cooldown_seconds > 0)) return;
-  cooldowns.set(
-    `${subject.guildId}:${command._id}:${subjectUserId(subject)}`,
-    Date.now() + command.cooldown_seconds * 1000
-  );
+function markCooldown(command, subject, settings = null) {
+  const seconds = effectiveCooldown(command, subject, settings);
+  if (!(seconds > 0)) return;
+  cooldowns.set(`${subject.guildId}:${command._id}:${subjectUserId(subject)}`, Date.now() + seconds * 1000);
 }
 
 /**
@@ -204,8 +239,8 @@ async function runAction(action, message, context) {
   else if (action.type === "ADD_REACTION") await executeAddReaction(action, message);
 }
 
-async function executeCommand(command, message, args, extra = {}) {
-  const problem = accessProblem(command, message);
+async function executeCommand(command, message, args, extra = {}, settings = null) {
+  const problem = accessProblem(command, message, settings);
   if (problem) {
     await message.safeReply(problem);
     return { handled: true, executed: false };
@@ -227,7 +262,7 @@ async function executeCommand(command, message, args, extra = {}) {
   }
 
   if (command.delete_invocation && message.deletable) await message.delete().catch(() => {});
-  markCooldown(command, message);
+  markCooldown(command, message, settings);
   return { handled: true, executed: true };
 }
 
@@ -243,7 +278,29 @@ async function tryCustomCommand(message, settings, dependencies = {}) {
     enabled: true,
   });
   if (!command) return { handled: false };
-  return executeCommand(command, message, args);
+  return executeCommand(command, message, args, {}, settings);
+}
+
+/**
+ * A typed option's value, the way `{option:name}` should read in a message.
+ *
+ * Discord resolves a user/channel/role/mentionable option to a real object
+ * alongside the raw id - substituting the raw id would put a bare snowflake
+ * in the sent message where every other placeholder produces a mention.
+ *
+ * @param {object} entry a `CommandInteractionOption`
+ * @returns {string}
+ */
+function resolveOptionValue(entry) {
+  if (entry.value === undefined || entry.value === null) return "";
+  if (entry.type === ApplicationCommandOptionType.User) return `<@${entry.value}>`;
+  if (entry.type === ApplicationCommandOptionType.Channel) return `<#${entry.value}>`;
+  if (entry.type === ApplicationCommandOptionType.Role) return `<@&${entry.value}>`;
+  // A mentionable resolves to either a role or a user - discord.js only sets
+  // `.role` when the one that was actually picked is a role.
+  if (entry.type === ApplicationCommandOptionType.Mentionable)
+    return entry.role ? `<@&${entry.value}>` : `<@${entry.value}>`;
+  return String(entry.value);
 }
 
 /**
@@ -260,7 +317,7 @@ function readSlashOptions(interaction) {
 
   const options = {};
   for (const entry of flat) {
-    options[entry.name] = entry.value === undefined || entry.value === null ? "" : String(entry.value);
+    options[entry.name] = resolveOptionValue(entry);
   }
 
   return {
@@ -317,10 +374,11 @@ function trackedMessage(interaction, command, args) {
  * @param {import('discord.js').Interaction} interaction
  * @param {object} command
  * @param {{args?: string[], options?: object, target?: object}} [input]
+ * @param {object|null} [settings] guild settings document
  */
-async function runFromInteraction(interaction, command, input = {}) {
+async function runFromInteraction(interaction, command, input = {}, settings = null) {
   const modalAction = (command.actions || []).find((action) => action.type === "SHOW_MODAL");
-  if (modalAction) return presentModal(interaction, command, modalAction, input);
+  if (modalAction) return presentModal(interaction, command, modalAction, input, settings);
 
   const args = input.args || [];
 
@@ -329,7 +387,13 @@ async function runFromInteraction(interaction, command, input = {}) {
   }
 
   const { message, answered } = trackedMessage(interaction, command, args);
-  const result = await executeCommand(command, message, args, { options: input.options, target: input.target });
+  const result = await executeCommand(
+    command,
+    message,
+    args,
+    { options: input.options, target: input.target },
+    settings
+  );
   await settle(interaction, answered);
   return result;
 }
@@ -344,9 +408,10 @@ async function runFromInteraction(interaction, command, input = {}) {
  * @param {object} command
  * @param {object} modalAction
  * @param {{args?: string[], options?: object, target?: object}} [extra]
+ * @param {object|null} [settings] guild settings document
  */
-async function presentModal(interaction, command, modalAction, extra = {}) {
-  const problem = accessProblem(command, interaction);
+async function presentModal(interaction, command, modalAction, extra = {}, settings = null) {
+  const problem = accessProblem(command, interaction, settings);
   if (problem) {
     await interaction.reply({ content: problem, ephemeral: true }).catch(() => {});
     return { handled: true, executed: false };
@@ -369,7 +434,7 @@ async function presentModal(interaction, command, modalAction, extra = {}) {
     return { handled: true, executed: false };
   }
 
-  markCooldown(command, interaction);
+  markCooldown(command, interaction, settings);
   return { handled: true, executed: false, presentedModal: true };
 }
 
@@ -410,6 +475,14 @@ async function handleModalSubmit(interaction, dependencies = {}) {
 
   if (!command || !modalAction) {
     return interaction.reply({ content: "This command is no longer available.", ephemeral: true }).catch(() => {});
+  }
+
+  // Access was already checked when the form was opened; a role or channel
+  // change in the meantime is re-checked here, not cooldown - that was
+  // already armed for this exact invocation moments ago.
+  const permission = permissionProblem(command, interaction);
+  if (permission) {
+    return interaction.reply({ content: permission, ephemeral: true }).catch(() => {});
   }
 
   const modalValues = {};
@@ -456,7 +529,7 @@ async function tryCustomSlashCommand(interaction, settings, dependencies = {}) {
   if (!command) return { handled: false };
 
   const { args, options } = readSlashOptions(interaction);
-  return runFromInteraction(interaction, command, { args, options });
+  return runFromInteraction(interaction, command, { args, options }, settings);
 }
 
 /**
@@ -491,12 +564,13 @@ async function tryCustomContextCommand(interaction, settings, dependencies = {})
   if (!command) return { handled: false };
 
   const target = contextTarget(interaction);
-  return runFromInteraction(interaction, command, { args: target?.id ? [target.id] : [], target });
+  return runFromInteraction(interaction, command, { args: target?.id ? [target.id] : [], target }, settings);
 }
 
 module.exports = {
   accessProblem,
   contextTarget,
+  effectiveCooldown,
   executeCommand,
   executeAddReaction,
   executeSendDm,
@@ -505,10 +579,12 @@ module.exports = {
   markCooldown,
   matchesModal,
   messagePayload,
+  permissionProblem,
   presentModal,
   readSlashOptions,
   renderTemplate,
   resetCooldowns: () => cooldowns.clear(),
+  resolveOptionValue,
   runAction,
   runFromInteraction,
   scheduleDeletion,

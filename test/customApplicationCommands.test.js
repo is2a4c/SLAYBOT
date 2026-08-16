@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 require("module-alias/register");
 
-const { ApplicationCommandType, Collection } = require("discord.js");
+const { ApplicationCommandOptionType, ApplicationCommandType, Collection } = require("discord.js");
 const {
   chatInputPayload,
   contextLabel,
@@ -395,4 +395,41 @@ test("a subcommand invocation reads the options nested under it, and leads with 
     options: { count: "2" },
     args: ["add", "2"],
   });
+});
+
+test("user, channel, and role options read back as mentions, not raw ids", () => {
+  const interaction = {
+    options: {
+      getSubcommand: () => null,
+      data: [
+        { name: "member", type: ApplicationCommandOptionType.User, value: "1", user: { id: "1" } },
+        { name: "room", type: ApplicationCommandOptionType.Channel, value: "2", channel: { id: "2" } },
+        { name: "team", type: ApplicationCommandOptionType.Role, value: "3", role: { id: "3" } },
+      ],
+    },
+  };
+
+  assert.deepEqual(readSlashOptions(interaction).options, {
+    member: "<@1>",
+    room: "<#2>",
+    team: "<@&3>",
+  });
+});
+
+test("a mentionable option reads as a role mention when a role was picked, a user mention otherwise", () => {
+  const rolePick = {
+    options: {
+      getSubcommand: () => null,
+      data: [{ name: "who", type: ApplicationCommandOptionType.Mentionable, value: "9", role: { id: "9" } }],
+    },
+  };
+  assert.equal(readSlashOptions(rolePick).options.who, "<@&9>");
+
+  const userPick = {
+    options: {
+      getSubcommand: () => null,
+      data: [{ name: "who", type: ApplicationCommandOptionType.Mentionable, value: "9", user: { id: "9" } }],
+    },
+  };
+  assert.equal(readSlashOptions(userPick).options.who, "<@9>");
 });

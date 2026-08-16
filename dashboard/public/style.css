@@ -927,6 +927,17 @@ tbody tr:hover td {
   gap: 14px;
 }
 
+.custom-command-group {
+  margin: 22px 0 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.custom-command-group:first-child {
+  margin-top: 0;
+}
+
 .command-card {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);

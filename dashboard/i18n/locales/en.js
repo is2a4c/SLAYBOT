@@ -211,7 +211,8 @@ module.exports = {
   customCommands: {
     title: "Command builder",
     eyebrow: "Server automation",
-    subtitle: "Build safe prefix commands from messages, DMs, reactions and role actions.",
+    subtitle:
+      "Build safe slash, prefix, and context-menu commands with typed parameters, forms, polls, and role actions.",
     live: "Executed by the bot",
     create: "New command",
     name: "Command name",
@@ -276,7 +277,7 @@ module.exports = {
     embedTitle: "Card title",
     embedDescription: "Card description",
     variables:
-      "Variables: {server}, {member:id}, {member:name}, {member:mention}, {channel}, {arguments}, {target:id}, {target:name}, {target:mention}, {target:content}, {option:<name>}, {modal:<field id>}.",
+      "Variables: {server}, {member:id}, {member:name}, {member:mention}, {channel}, {arguments}, {target:id}, {target:name}, {target:mention}, {target:content}, {option:<name>}, {modal:<field id>}. {option:*} only fills in for a slash or context menu trigger - a prefix invocation only ever has {arguments}.",
     deleteCommand: "Delete command",
     triggers: "How it can be run",
     triggerPrefix: "After the prefix",

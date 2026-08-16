@@ -17,13 +17,35 @@ const {
   publishCommands,
   updateCommand,
 } = require("../../services/customCommands");
-const { MAX_MODAL_INPUTS, OPTION_TYPES } = require("@schemas/CustomCommand");
+const { MAX_ACTIONS, MAX_CUSTOM_COMMANDS, MAX_MODAL_INPUTS, OPTION_TYPES } = require("@schemas/CustomCommand");
 
 const root = (res, guildId) => `${res.locals.basePath}/g/${guildId}/custom-commands`;
 const options = (guild) => ({
   channels: [...guild.channels.cache.filter((entry) => entry.isTextBased?.() && !entry.isThread?.()).values()],
   roles: [...guild.roles.cache.filter((entry) => entry.id !== guild.id && !entry.managed).values()],
 });
+
+/**
+ * Commands as the list page shows them: ungrouped while nobody has bothered
+ * naming a second group, so the common case stays exactly as plain as it was
+ * before "group" existed.
+ *
+ * @param {object[]} commands
+ * @returns {{group: string|null, commands: object[]}[]}
+ */
+function groupCommands(commands) {
+  const byGroup = new Map();
+  for (const command of commands) {
+    const key = command.group || "CUSTOM";
+    if (!byGroup.has(key)) byGroup.set(key, []);
+    byGroup.get(key).push(command);
+  }
+  const entries = [...byGroup.entries()].sort(([a], [b]) => a.localeCompare(b));
+  // A header above a single, unnamed group would just repeat "CUSTOM" for
+  // every server that never touched grouping at all.
+  if (entries.length <= 1) return [{ group: null, commands }];
+  return entries.map(([group, list]) => ({ group, commands: list }));
+}
 
 /**
  * Republish this guild's commands and say in the audit log what Discord did
@@ -72,6 +94,8 @@ router.get("/", async (req, res) => {
     title: `${res.locals.t("customCommands.title")} — ${req.guild.name}`,
     guild: req.guild,
     commands,
+    groups: groupCommands(commands),
+    maxCustomCommands: MAX_CUSTOM_COMMANDS,
     error: typeof req.query.error === "string" ? req.query.error : null,
   });
 });
@@ -79,7 +103,7 @@ router.get("/", async (req, res) => {
 router.post("/", requireCsrf, async (req, res) => {
   const redirect = root(res, req.guild.id);
   try {
-    const command = await createCommand(req.guild, req.body, req.session.user.id, req.client);
+    const command = await createCommand(req.guild, req.body, req.client);
     await logAudit({
       actorId: req.session.user.id,
       actorTag: req.session.user.username,
@@ -105,6 +129,7 @@ router.get("/:id", async (req, res) => {
       command,
       optionTypes: OPTION_TYPES,
       maxModalInputs: MAX_MODAL_INPUTS,
+      maxActions: MAX_ACTIONS,
       options: options(req.guild),
       error: typeof req.query.error === "string" ? req.query.error : null,
     });

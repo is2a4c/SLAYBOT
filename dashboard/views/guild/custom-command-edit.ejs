@@ -51,7 +51,7 @@
   </form>
 </section>
 
-<section class="panel"><div class="section-heading"><h2><%= t("customCommands.actions") %></h2><span class="control-count"><%= command.actions.length %>/10</span></div><% if (!command.actions.length) { %><div class="empty"><%= t("customCommands.noActions") %></div><% } else { %><div class="stack-list"><% command.actions.forEach((action, index) => {
+<section class="panel"><div class="section-heading"><h2><%= t("customCommands.actions") %></h2><span class="control-count"><%= command.actions.length %>/<%= maxActions %></span></div><% if (!command.actions.length) { %><div class="empty"><%= t("customCommands.noActions") %></div><% } else { %><div class="stack-list"><% command.actions.forEach((action, index) => {
   const confirming = action.type === "SHOW_MODAL" ? command.actions.find((entry) => entry.id === action.confirm_action_id) : null;
   const preview = action.poll?.question
     ? `📊 ${action.poll.question} · ${t("customCommands.pollOptionCount", { count: action.poll.options.length })}`

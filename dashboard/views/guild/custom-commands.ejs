@@ -2,5 +2,21 @@
 <header class="page-header"><div class="page-heading"><p class="eyebrow"><%= t("customCommands.eyebrow") %></p><h1><%= t("customCommands.title") %></h1><p class="subtitle"><%= t("customCommands.subtitle") %></p></div><span class="badge pass"><%= t("customCommands.live") %></span></header>
 <% if (error) { %><div class="error-banner"><%= error %></div><% } %>
 <section class="panel collection-create"><h2><%= t("customCommands.create") %></h2><form method="post" action="<%= basePath %>/g/<%= guild.id %>/custom-commands" class="form-grid"><input type="hidden" name="_csrf" value="<%= csrfToken %>" /><div class="field"><label for="custom-name"><%= t("customCommands.name") %></label><input id="custom-name" name="name" pattern="[a-z0-9_-]{1,32}" maxlength="32" required /></div><div class="field"><label for="custom-description"><%= t("customCommands.description") %></label><input id="custom-description" name="description" maxlength="100" /></div><div class="field field-wide"><button class="btn" type="submit"><%= t("common.create") %></button></div></form></section>
-<section class="panel"><div class="section-heading"><h2><%= t("customCommands.current") %></h2><span class="control-count"><%= commands.length %>/50</span></div><% if (!commands.length) { %><div class="empty"><%= t("customCommands.empty") %></div><% } else { %><div class="command-grid"><% commands.forEach((command) => { %><a class="command-card custom-command-card" href="<%= basePath %>/g/<%= guild.id %>/custom-commands/<%= command._id %>"><div><code><%= command.name %></code><span class="badge <%= command.enabled ? 'pass' : 'neutral' %>"><%= command.enabled ? t("customCommands.enabled") : t("customCommands.disabled") %></span></div><strong><%= command.description || t("customCommands.noDescription") %></strong><small><%= t("customCommands.actionCount", { count: command.actions.length }) %></small></a><% }) %></div><% } %></section>
+<section class="panel"><div class="section-heading"><h2><%= t("customCommands.current") %></h2><span class="control-count"><%= commands.length %>/<%= maxCustomCommands %></span></div>
+<% if (!commands.length) { %><div class="empty"><%= t("customCommands.empty") %></div>
+<% } else { %>
+  <% groups.forEach((entry) => { %>
+    <% if (entry.group) { %><h3 class="custom-command-group"><%= entry.group %></h3><% } %>
+    <div class="command-grid">
+      <% entry.commands.forEach((command) => { %>
+        <a class="command-card custom-command-card" href="<%= basePath %>/g/<%= guild.id %>/custom-commands/<%= command._id %>">
+          <div><code><%= command.name %></code><span class="badge <%= command.enabled ? 'pass' : 'neutral' %>"><%= command.enabled ? t("customCommands.enabled") : t("customCommands.disabled") %></span></div>
+          <strong><%= command.description || t("customCommands.noDescription") %></strong>
+          <small><%= t("customCommands.actionCount", { count: command.actions.length }) %></small>
+        </a>
+      <% }) %>
+    </div>
+  <% }) %>
+<% } %>
+</section>
 <%- include("../partials/foot") %>

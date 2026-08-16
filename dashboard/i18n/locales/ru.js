@@ -210,7 +210,8 @@ module.exports = {
   customCommands: {
     title: "Конструктор команд",
     eyebrow: "Автоматизация сервера",
-    subtitle: "Создавайте безопасные prefix-команды из сообщений, ЛС, реакций и ролевых действий.",
+    subtitle:
+      "Создавайте безопасные slash-, prefix- и контекстные команды с типизированными параметрами, формами, опросами и ролевыми действиями.",
     live: "Исполняется ботом",
     create: "Новая команда",
     name: "Имя команды",
@@ -275,7 +276,7 @@ module.exports = {
     embedTitle: "Заголовок карточки",
     embedDescription: "Описание карточки",
     variables:
-      "Переменные: {server}, {member:id}, {member:name}, {member:mention}, {channel}, {arguments}, {target:id}, {target:name}, {target:mention}, {target:content}, {option:<имя>}, {modal:<id поля>}.",
+      "Переменные: {server}, {member:id}, {member:name}, {member:mention}, {channel}, {arguments}, {target:id}, {target:name}, {target:mention}, {target:content}, {option:<имя>}, {modal:<id поля>}. {option:*} заполняется только для slash- и контекстных триггеров — у prefix-вызова доступен лишь {arguments}.",
     deleteCommand: "Удалить команду",
     triggers: "Способы запуска",
     triggerPrefix: "После префикса",

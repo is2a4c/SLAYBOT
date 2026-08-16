@@ -56,7 +56,7 @@ function ids(guild, value, kind) {
   });
 }
 
-async function createCommand(guild, input, actorId, client, commandModel = model) {
+async function createCommand(guild, input, client, commandModel = model) {
   const name = commandName(input.name);
   if (client.getCommand?.(name)) throw new CustomCommandError("That name belongs to a built-in command.");
   if ((await commandModel.countDocuments({ guild_id: guild.id })) >= MAX_CUSTOM_COMMANDS) {
@@ -70,7 +70,6 @@ async function createCommand(guild, input, actorId, client, commandModel = model
         String(input.description || "")
           .trim()
           .slice(0, 100) || null,
-      created_by: actorId,
       actions: [],
     });
   } catch (error) {
