@@ -141,6 +141,24 @@ test("the moderation team and mute groups are live now that a real moderation te
   }
 });
 
+test("the forbidden-words filter and mention limits are live, mirroring the legacy automod page", () => {
+  const fields = findModule("moderation").groups.flatMap((group) => group.fields);
+  for (const id of [
+    "filterEnabled",
+    "filterTerms",
+    "filterExceptions",
+    "filterMatchMode",
+    "filterCaseSensitive",
+    "filterDelete",
+    "filterStrikes",
+    "maxMentions",
+    "maxRoleMentions",
+    "antiMassMention",
+  ]) {
+    assert.equal(fields.find((field) => field.id === id).runtime, true, id);
+  }
+});
+
 test("notification controls backed by event handlers are live", () => {
   const fields = findModule("notifications").groups.flatMap((group) => group.fields);
   for (const id of [
