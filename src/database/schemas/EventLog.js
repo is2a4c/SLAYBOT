@@ -27,11 +27,29 @@ Schema.index({ guild_id: 1, type: 1, created_at: -1 });
 
 const Model = mongoose.models["event-log"] ? mongoose.model("event-log") : mongoose.model("event-log", Schema);
 
+// A voice-heavy server can log dozens of entries an hour; trimming on every
+// single write would mean a query on every single write. Checking on a small
+// fraction of them keeps a guild near its cap without that cost.
+const TRIM_CHECK_PROBABILITY = 0.02;
+
 module.exports = {
   model: Model,
   MAX_PER_GUILD,
 
-  createEventLog: (data) => Model.create(data),
+  createEventLog: async (data) => {
+    const entry = await Model.create(data);
+
+    if (Math.random() < TRIM_CHECK_PROBABILITY) {
+      const excess = await Model.find({ guild_id: data.guild_id })
+        .sort({ created_at: -1 })
+        .skip(MAX_PER_GUILD)
+        .select("_id")
+        .lean();
+      if (excess.length) await Model.deleteMany({ _id: { $in: excess.map((doc) => doc._id) } });
+    }
+
+    return entry;
+  },
 
   listEventLogs: ({ guildId, type, memberId, channelId, page = 1, pageSize = 25 }) => {
     const filter = { guild_id: guildId };

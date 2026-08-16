@@ -4,7 +4,7 @@ const { EVENT_DEFAULT_TEMPLATE, EVENT_GROUPS, EVENT_TYPES } = require("@src/serv
  * Turning the event router's whole-form submission into the stored route
  * list, and the stored route list back into what the form shows.
  *
- * One row per event type, always all ten of them - a route nobody has
+ * One row per event type, always every one of them - a route nobody has
  * touched yet is simply everything off, same as before this page existed.
  */
 
@@ -12,6 +12,27 @@ const SNOWFLAKE = /^\d{17,20}$/;
 
 function channelMatches(entry) {
   return Boolean(entry?.isTextBased?.() && !entry.isThread?.());
+}
+
+/**
+ * The ignored-channels list accepts any channel type, including whole
+ * categories - unlike a route's destination, which must be somewhere the
+ * bot can actually post.
+ *
+ * @param {import('discord.js').Guild} guild
+ * @param {string|string[]} raw
+ * @returns {string[]}
+ */
+function buildIgnoredChannels(guild, raw) {
+  const values = Array.isArray(raw) ? raw : String(raw || "").split(",");
+  return [
+    ...new Set(
+      values
+        .flatMap((value) => String(value ?? "").split(","))
+        .map((value) => value.trim())
+        .filter((id) => SNOWFLAKE.test(id) && guild.channels.cache.has(id))
+    ),
+  ].slice(0, 50);
 }
 
 /**
@@ -60,4 +81,4 @@ function routesForView(settings) {
   });
 }
 
-module.exports = { buildRoutes, routesForView };
+module.exports = { buildIgnoredChannels, buildRoutes, routesForView };

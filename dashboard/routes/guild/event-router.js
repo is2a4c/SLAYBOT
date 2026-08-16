@@ -4,7 +4,7 @@ const { getSettings } = require("@schemas/Guild");
 const { applyGuildConfigPatch } = require("@src/services/dashboard/guildConfig");
 const { listEventLogs } = require("@schemas/EventLog");
 const { EVENT_TYPES } = require("@src/services/eventRouter/catalog");
-const { buildRoutes, routesForView } = require("../../services/eventRouterSettings");
+const { buildIgnoredChannels, buildRoutes, routesForView } = require("../../services/eventRouterSettings");
 const { requireCsrf } = require("../../auth/csrf");
 
 const PAGE_SIZE = 25;
@@ -13,6 +13,7 @@ function options(guild) {
   return {
     channels: [...guild.channels.cache.filter((entry) => entry.isTextBased?.() && !entry.isThread?.()).values()],
     roles: [...guild.roles.cache.filter((entry) => entry.id !== guild.id && !entry.managed).values()],
+    allChannels: [...guild.channels.cache.filter((entry) => !entry.isThread?.()).values()],
   };
 }
 
@@ -39,6 +40,7 @@ router.get("/", async (req, res) => {
     guild: req.guild,
     routes: routesForView(settings),
     options: options(req.guild),
+    ignoredChannels: settings.event_router_ignored_channels || [],
     entries,
     page,
     totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
@@ -51,10 +53,11 @@ router.get("/", async (req, res) => {
 
 router.post("/", requireCsrf, async (req, res) => {
   const routes = buildRoutes(req.guild, req.body);
+  const ignoredChannels = buildIgnoredChannels(req.guild, req.body.ignored_channels);
 
   await applyGuildConfigPatch(
     req.guild,
-    { event_router: routes },
+    { event_router: routes, event_router_ignored_channels: ignoredChannels },
     {
       id: req.session.user.id,
       tag: req.session.user.username,

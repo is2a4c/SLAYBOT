@@ -4,7 +4,7 @@ require("module-alias/register");
 
 const { EVENT_DEFAULT_TEMPLATE, EVENT_GROUPS, EVENT_TYPES } = require("@src/services/eventRouter/catalog");
 const { renderEventTemplate, resolveAuditActor, routeEvent } = require("@src/services/eventRouter/EventRouter");
-const { buildRoutes, routesForView } = require("../dashboard/services/eventRouterSettings");
+const { buildIgnoredChannels, buildRoutes, routesForView } = require("../dashboard/services/eventRouterSettings");
 
 const GUILD_ID = "100000000000000000";
 const CHANNEL_ID = "100000000000000001";
@@ -12,6 +12,8 @@ const OTHER_CHANNEL_ID = "100000000000000002";
 const ROLE_ID = "100000000000000003";
 const ACTOR_ID = "100000000000000004";
 const TARGET_ID = "100000000000000005";
+const CATEGORY_ID = "100000000000000006";
+const CHANNEL_IN_CATEGORY_ID = "100000000000000007";
 
 /**
  * A guild good enough for routeEvent: channels/roles it can actually look up,
@@ -28,11 +30,17 @@ function testGuild() {
       return { id: "msg-1" };
     },
   };
+  const channelInCategory = { id: CHANNEL_IN_CATEGORY_ID, parentId: CATEGORY_ID, isTextBased: () => true };
 
   return {
     id: GUILD_ID,
     name: "Test Server",
-    channels: { cache: new Map([[CHANNEL_ID, channel]]) },
+    channels: {
+      cache: new Map([
+        [CHANNEL_ID, channel],
+        [CHANNEL_IN_CATEGORY_ID, channelInCategory],
+      ]),
+    },
     roles: { cache: new Map([[ROLE_ID, { id: ROLE_ID }]]) },
     _sent: sent,
   };
@@ -111,6 +119,45 @@ test("a channelId in context is stored on the log entry; omitting it leaves the 
 
   assert.equal(logged[0].channel_id, CHANNEL_ID);
   assert.equal(logged[1].channel_id, null, "an event with nothing channel-scoped about it stores no channel");
+});
+
+test("an ignored channel is skipped entirely - no log entry, no route post", async () => {
+  const guild = testGuild();
+  const { logged, deps } = testDependencies({
+    event_router: [
+      { event: "CHANNEL_CREATE", enabled: true, channel_id: CHANNEL_ID, template: null, mention_role_id: null },
+    ],
+    event_router_ignored_channels: [CHANNEL_ID],
+  });
+
+  await routeEvent(guild, "CHANNEL_CREATE", { detail: "general", channelId: CHANNEL_ID }, deps);
+
+  assert.equal(logged.length, 0);
+  assert.equal(guild._sent.length, 0);
+});
+
+test("ignoring a whole category also ignores every channel inside it", async () => {
+  const guild = testGuild();
+  const { logged, deps } = testDependencies({
+    event_router: [],
+    event_router_ignored_channels: [CATEGORY_ID],
+  });
+
+  await routeEvent(guild, "MESSAGE_DELETE", { channelId: CHANNEL_IN_CATEGORY_ID }, deps);
+
+  assert.equal(logged.length, 0);
+});
+
+test("an event with no channelId at all is never affected by the ignore list", async () => {
+  const guild = testGuild();
+  const { logged, deps } = testDependencies({
+    event_router: [],
+    event_router_ignored_channels: [CHANNEL_ID],
+  });
+
+  await routeEvent(guild, "WARN", { actor: { id: ACTOR_ID } }, deps);
+
+  assert.equal(logged.length, 1, "a member-level event has nothing for the channel ignore list to match");
 });
 
 test("an enabled route posts to its channel with the default template", async () => {
@@ -258,10 +305,27 @@ test("resolveAuditActor never throws - missing View Audit Log just means no attr
 function dashboardGuild() {
   return {
     id: GUILD_ID,
-    channels: { cache: new Map([[CHANNEL_ID, { id: CHANNEL_ID, isTextBased: () => true, isThread: () => false }]]) },
+    channels: {
+      cache: new Map([
+        [CHANNEL_ID, { id: CHANNEL_ID, isTextBased: () => true, isThread: () => false }],
+        [CATEGORY_ID, { id: CATEGORY_ID, isTextBased: () => false, isThread: () => false }],
+      ]),
+    },
     roles: { cache: new Map([[ROLE_ID, { id: ROLE_ID }]]) },
   };
 }
+
+test("buildIgnoredChannels keeps only real, unique ids and stays capped", () => {
+  const guild = dashboardGuild();
+  const result = buildIgnoredChannels(guild, [CHANNEL_ID, CATEGORY_ID, "999999999999999999", CHANNEL_ID, "not-an-id"]);
+  assert.deepEqual(result, [CHANNEL_ID, CATEGORY_ID]);
+});
+
+test("buildIgnoredChannels accepts a single value the way an unchecked form field arrives", () => {
+  assert.deepEqual(buildIgnoredChannels(dashboardGuild(), CHANNEL_ID), [CHANNEL_ID]);
+  assert.deepEqual(buildIgnoredChannels(dashboardGuild(), ""), []);
+  assert.deepEqual(buildIgnoredChannels(dashboardGuild(), undefined), []);
+});
 
 test("buildRoutes always returns exactly one entry per event type, in catalog order", () => {
   const routes = buildRoutes(dashboardGuild(), {});

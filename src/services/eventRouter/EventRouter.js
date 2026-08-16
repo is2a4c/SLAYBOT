@@ -31,6 +31,24 @@ function renderEventTemplate(template, { actor, target, detail, reason, guildNam
 }
 
 /**
+ * Whether this channel - or its category - is on the server's own
+ * do-not-audit list. Only ever narrows what gets logged, never widens it.
+ *
+ * @param {import('discord.js').Guild} guild
+ * @param {object|null} settings
+ * @param {string} channelId
+ * @returns {boolean}
+ */
+function isIgnoredChannel(guild, settings, channelId) {
+  const ignored = settings?.event_router_ignored_channels;
+  if (!ignored?.length) return false;
+  if (ignored.includes(channelId)) return true;
+
+  const channel = guild.channels.cache.get(channelId);
+  return Boolean(channel?.parentId && ignored.includes(channel.parentId));
+}
+
+/**
  * Best-effort "who did this" for a gateway event that does not carry an
  * actor of its own (Discord's role/channel create and delete events do not
  * say who triggered them - only the audit log does).
@@ -73,6 +91,9 @@ async function routeEvent(guild, eventType, context = {}, dependencies = {}) {
   const readSettings = dependencies.getSettings || getSettings;
   const writeLog = dependencies.createEventLog || createEventLog;
 
+  const settings = await readSettings(guild).catch(() => null);
+  if (channelId && isIgnoredChannel(guild, settings, channelId)) return;
+
   await writeLog({
     guild_id: guild.id,
     type: eventType,
@@ -83,7 +104,6 @@ async function routeEvent(guild, eventType, context = {}, dependencies = {}) {
     reason: reason ? String(reason).slice(0, 500) : null,
   }).catch((error) => logger?.error?.(`event router: could not log ${eventType} for ${guild.id}`, error));
 
-  const settings = await readSettings(guild).catch(() => null);
   const route = settings?.event_router?.find((entry) => entry.event === eventType);
   if (!route?.enabled || !route.channel_id) return;
 

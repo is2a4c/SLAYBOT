@@ -10,6 +10,15 @@
   <p class="hint"><%= t("eventRouter.routesHint") %></p>
   <form method="post" action="<%= basePath %>/g/<%= guild.id %>/event-router">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <div class="field field-wide">
+      <label for="ignored_channels"><%= t("eventRouter.ignoredChannels") %></label>
+      <select class="multi-select" id="ignored_channels" name="ignored_channels" multiple size="<%= Math.min(6, Math.max(3, options.allChannels.length)) %>">
+        <% options.allChannels.forEach((channel) => { %>
+          <option value="<%= channel.id %>" <%= ignoredChannels.includes(channel.id) ? "selected" : "" %>><%= channel.type === 4 ? "" : "#" %><%= channel.name %></option>
+        <% }) %>
+      </select>
+      <div class="hint"><%= t("eventRouter.ignoredChannelsHint") %></div>
+    </div>
     <% let currentGroup = null; %>
     <% routes.forEach((route) => { %>
       <% if (route.group !== currentGroup) { currentGroup = route.group; %>

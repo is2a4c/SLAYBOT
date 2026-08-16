@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const { getSettings } = require("@schemas/Guild");
 const { starboardHandler } = require("@src/handlers");
+const { routeEvent } = require("@src/services/eventRouter/EventRouter");
 
 /**
  * @param {import('@src/structures').BotClient} client
@@ -17,6 +18,13 @@ module.exports = async (client, message) => {
 
   if (message.partial) return;
   if (message.author.bot || !message.guild) return;
+
+  await routeEvent(message.guild, "MESSAGE_DELETE", {
+    actor: message.author,
+    detail: message.content ? message.content.slice(0, 200) : "(no text content)",
+    channelId: message.channelId,
+    logger: client.logger,
+  });
 
   const settings = await getSettings(message.guild);
   if (!settings.automod?.anti_ghostping || !settings.modlog_channel) return;

@@ -94,6 +94,7 @@ test("every editable guild setting is reachable from the control panel", () => {
     "farewell.fields",
     "farewell.buttons",
     "event_router",
+    "event_router_ignored_channels",
   ]);
 
   for (const path of Object.keys(schema.paths)) {

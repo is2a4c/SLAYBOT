@@ -1,8 +1,45 @@
 const { trackVoiceStats } = require("@handlers/stats");
 const { tempVoiceHandler, voiceRoleHandler } = require("@src/handlers");
 const { getSettings } = require("@schemas/Guild");
+const { routeEvent } = require("@src/services/eventRouter/EventRouter");
 
 const musicIdleTimers = new Map();
+
+/**
+ * @param {import('@src/structures').BotClient} client
+ * @param {import('discord.js').VoiceState} oldState
+ * @param {import('discord.js').VoiceState} newState
+ */
+async function routeVoiceEvent(client, oldState, newState) {
+  const member = newState.member || oldState.member;
+  if (!member || member.user.bot) return;
+
+  const guild = newState.guild || oldState.guild;
+  const logger = client.logger;
+
+  if (!oldState.channelId && newState.channelId) {
+    await routeEvent(guild, "VOICE_JOIN", {
+      actor: member,
+      detail: newState.channel?.name,
+      channelId: newState.channelId,
+      logger,
+    });
+  } else if (oldState.channelId && !newState.channelId) {
+    await routeEvent(guild, "VOICE_LEAVE", {
+      actor: member,
+      detail: oldState.channel?.name,
+      channelId: oldState.channelId,
+      logger,
+    });
+  } else if (oldState.channelId !== newState.channelId) {
+    await routeEvent(guild, "VOICE_MOVE", {
+      actor: member,
+      detail: `${oldState.channel?.name || "?"} → ${newState.channel?.name || "?"}`,
+      channelId: newState.channelId,
+      logger,
+    });
+  }
+}
 
 /**
  * @param {import('@src/structures').BotClient} client
@@ -15,6 +52,8 @@ module.exports = async (client, oldState, newState) => {
   // Voice roles and temporary channels - only when the channel actually changed
   if (oldState.channelId !== newState.channelId) {
     const guild = newState.guild || oldState.guild;
+
+    await routeVoiceEvent(client, oldState, newState).catch((ex) => client.logger.error("eventRouter: voice", ex));
 
     getSettings(guild)
       .then(async (settings) => {
@@ -81,3 +120,4 @@ function handleMusicIdleState(client, oldState, newState) {
 
 module.exports.handleMusicIdleState = handleMusicIdleState;
 module.exports.musicIdleTimers = musicIdleTimers;
+module.exports.routeVoiceEvent = routeVoiceEvent;

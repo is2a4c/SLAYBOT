@@ -418,6 +418,10 @@ const Schema = new mongoose.Schema({
     default: [],
     validate: [(value) => value.length <= EVENT_TYPES.length, "One route per event type."],
   },
+  // Channels (or whole categories) a server never wants audited at all - a
+  // bot-testing channel, for instance. Applies to every channel-scoped event
+  // type, before a route or the log itself ever sees it.
+  event_router_ignored_channels: { type: [String], default: [] },
   control_center: {
     common: {
       timezone: { type: String, default: "Europe/Moscow", maxlength: 64 },
