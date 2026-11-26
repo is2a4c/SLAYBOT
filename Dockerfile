@@ -8,6 +8,9 @@ RUN apk add --no-cache python3 make g++
 # Copy package files
 COPY package*.json ./
 
+# Inference runs on CPU; skip the CUDA binaries the postinstall downloads.
+ENV ONNXRUNTIME_NODE_INSTALL=skip
+
 # Install all dependencies (including dev)
 RUN npm ci
 
