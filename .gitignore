@@ -16,6 +16,9 @@ replit.nix
 dist/
 build/
 
+# Downloaded model and OCR data
+.cache/
+
 # OS files
 .DS_Store
 **/.DS_Store

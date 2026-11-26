@@ -14,6 +14,19 @@ const {
 } = require("../src/services/imageSpamClassifier");
 const { inspectImageSpam } = require("../src/handlers/automod");
 
+test("recognizes a ruble amount written with a suffix", () => {
+  for (const ocrText of ["ПОДАРОК 5000 ₽", "БОНУС 5000 руб", "БАЛАНС 5000Р"]) {
+    const result = scoreImageSpam({ ocrText, confidence: 90 });
+    assert.ok(
+      result.reasons.some((reason) => reason.includes("money amount")),
+      `expected an amount in ${ocrText}`
+    );
+  }
+
+  const resolution = scoreImageSpam({ ocrText: "stream quality 1080p", confidence: 90 });
+  assert.ok(!resolution.reasons.some((reason) => reason.includes("money amount")), "a video resolution is not money");
+});
+
 test("scores a fake withdrawal collage above the safe threshold", () => {
   const result = scoreImageSpam({
     caption: "bro",
@@ -619,4 +632,149 @@ test("an image with no readable text can still be judged", () => {
 
   assert.equal(result.text, "", "a screenshot may be a scam without legible words");
   assert.equal(result.verdict, "IMAGE_SPAM");
+});
+
+/* ------------------------------------------------ free local OCR fallback */
+
+const localOcr = require("../src/services/vision/localOcr");
+const { PRESETS } = require("../src/services/ai/visionProvider");
+
+function withoutImageProvider() {
+  const saved = new Map();
+  for (const preset of Object.values(PRESETS)) saved.set(preset.keyEnv, process.env[preset.keyEnv]);
+  saved.set("IMAGE_AI_API_KEY", process.env.IMAGE_AI_API_KEY);
+  for (const name of saved.keys()) delete process.env[name];
+
+  return () => {
+    for (const [name, value] of saved) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  };
+}
+
+test("local OCR can be turned off without touching tesseract", async () => {
+  process.env.IMAGE_SPAM_LOCAL_OCR = "false";
+  try {
+    assert.deepEqual(await localOcr.recognize(Buffer.from("png")), { text: "", confidence: 0 });
+  } finally {
+    delete process.env.IMAGE_SPAM_LOCAL_OCR;
+  }
+});
+
+test("local OCR languages come from the environment", () => {
+  process.env.IMAGE_SPAM_OCR_LANGS = "rus+eng";
+  try {
+    assert.deepEqual(localOcr.status().languages, ["rus", "eng"]);
+  } finally {
+    delete process.env.IMAGE_SPAM_OCR_LANGS;
+  }
+
+  process.env.IMAGE_SPAM_OCR_LANGS = "";
+  try {
+    assert.deepEqual(localOcr.status().languages, ["rus", "eng"], "an empty setting falls back to the default");
+  } finally {
+    delete process.env.IMAGE_SPAM_OCR_LANGS;
+  }
+});
+
+test("the free path reads the image locally when no provider is configured", async () => {
+  const restoreEnv = withoutImageProvider();
+  const originalRecognize = localOcr.recognize;
+  let calls = 0;
+  localOcr.recognize = async () => {
+    calls += 1;
+    return { text: "$4600 reward withdrawal", confidence: 88 };
+  };
+
+  try {
+    classifier.noteIoSuccess();
+    const result = await classifier.recognize(Buffer.from("png"));
+
+    assert.equal(calls, 1, "the image is read on this host, not left unchecked");
+    assert.match(result.text, /4600/);
+    assert.equal(result.confidence, 88);
+  } finally {
+    localOcr.recognize = originalRecognize;
+    restoreEnv();
+  }
+});
+
+test("a failed provider read hands the image to local OCR", async () => {
+  const previousKey = process.env.IO_INTELLIGENCE_API_KEY;
+  const previousFetch = global.fetch;
+  const originalRecognize = localOcr.recognize;
+  process.env.IO_INTELLIGENCE_API_KEY = "test-key";
+  global.fetch = async () => ({ ok: false, status: 429, text: async () => "no credits" });
+  let calls = 0;
+  localOcr.recognize = async () => {
+    calls += 1;
+    return { text: "Бонус 5000", confidence: 90 };
+  };
+
+  try {
+    classifier.noteIoSuccess();
+    const result = await classifier.recognize(Buffer.from("png"));
+
+    assert.equal(calls, 1);
+    assert.match(result.text, /Бонус/);
+  } finally {
+    localOcr.recognize = originalRecognize;
+    global.fetch = previousFetch;
+    classifier.noteIoSuccess();
+    if (previousKey === undefined) delete process.env.IO_INTELLIGENCE_API_KEY;
+    else process.env.IO_INTELLIGENCE_API_KEY = previousKey;
+  }
+});
+
+test("a successful empty provider read is not duplicated locally", async () => {
+  const previousKey = process.env.IO_INTELLIGENCE_API_KEY;
+  const previousFetch = global.fetch;
+  const originalRecognize = localOcr.recognize;
+  process.env.IO_INTELLIGENCE_API_KEY = "test-key";
+  global.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ choices: [{ message: { content: '{"text":"","confidence":0}' } }] }),
+  });
+  let calls = 0;
+  localOcr.recognize = async () => {
+    calls += 1;
+    return { text: "unused", confidence: 90 };
+  };
+
+  try {
+    classifier.noteIoSuccess();
+    const result = await classifier.recognize(Buffer.from("png"));
+
+    assert.equal(calls, 0, "an image with no text costs no second read");
+    assert.deepEqual(result, { text: "", confidence: 0 });
+  } finally {
+    localOcr.recognize = originalRecognize;
+    global.fetch = previousFetch;
+    classifier.noteIoSuccess();
+    if (previousKey === undefined) delete process.env.IO_INTELLIGENCE_API_KEY;
+    else process.env.IO_INTELLIGENCE_API_KEY = previousKey;
+  }
+});
+
+test("a messenger contact counts only beside a scam promotion", () => {
+  const promo = scoreImageSpam({ ocrText: "казино 1xbet бонус 5000", confidence: 85 }).score;
+  const withContact = scoreImageSpam({
+    ocrText: "казино 1xbet бонус 5000 t.me/casino_bonus",
+    confidence: 85,
+  });
+  const ordinary = scoreImageSpam({ ocrText: "напиши мне в телеграм", confidence: 85 });
+
+  assert.ok(withContact.score > promo);
+  assert.ok(withContact.reasons.some((reason) => reason.includes("messenger contact")));
+  assert.equal(ordinary.score, 0, "a plain messenger mention is not a scam");
+
+  for (const ocrText of ["казино 1xbet бонус 5000 пиши в телеграм", "казино 1xbet бонус 5000 пиши в тг"]) {
+    const russian = scoreImageSpam({ ocrText, confidence: 85 });
+    assert.ok(
+      russian.reasons.some((reason) => reason.includes("messenger contact")),
+      `a Russian messenger mention must count: ${ocrText}`
+    );
+  }
 });

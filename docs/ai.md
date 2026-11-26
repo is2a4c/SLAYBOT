@@ -27,6 +27,17 @@ npm run ai:check
 
 `IO_INTELLIGENCE_API_KEY` is also used by the existing remote image-spam classifier. Image analysis can keep a separate model override through `IMAGE_SPAM_REMOTE_MODEL`.
 
+### Image spam without a paid provider
+
+The image check does not require a key. With no provider configured — or while the configured one is failing — it runs entirely on the host:
+
+- Tesseract OCR reads Russian and English text from the full frame and the collage panels (`IMAGE_SPAM_OCR_LANGS`, `IMAGE_SPAM_LOCAL_OCR_REGIONS`).
+- The existing heuristics score that text, and the local SmolVLM model adds a verdict.
+
+There is no per-image cost. The model weights and OCR language data are downloaded once — by `npm run image-spam:model:download` or lazily on the first image — and cached under `.cache/`. `IMAGE_SPAM_LOCAL_OCR=false` turns the local reader off.
+
+A free remote model is also possible through the `openrouter` preset in `src/services/ai/visionProvider.js`: set `IMAGE_AI_PROVIDER=openrouter` and `OPENROUTER_API_KEY`, then pick a `:free` model with `IMAGE_AI_MODEL`. Free tiers have their own rate limits, so the local path remains the fallback.
+
 ### Optional fallback provider
 
 Text AI (moderation, tickets, knowledge, suggestions, forms) can fall back to a second OpenAI-compatible provider when io.net times out, errors, or is unreachable. This is opt-in: without `AI_FALLBACK_PROVIDER` nothing changes.

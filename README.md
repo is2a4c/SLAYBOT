@@ -123,8 +123,8 @@ npm start
 v3 умеет анализировать вложенные изображения на мошеннические выплаты, казино/ставки, фальшивые банковские переводы, криптокошельки и схемы с «бесплатными» наградами.
 
 ```text
-Attachment → image safety limits → io.net OCR (RU + EN) → visual preparation
-           → io.net vision classification → score fusion → AutoMod action
+Attachment → image safety limits → OCR (io.net, иначе локальный Tesseract RU + EN)
+           → visual preparation → vision classification → score fusion → AutoMod action
 ```
 
 ### Включение в сервере
@@ -135,8 +135,9 @@ Attachment → image safety limits → io.net OCR (RU + EN) → visual preparati
 ```
 
 - При настроенном <code>IO_INTELLIGENCE_API_KEY</code> изображения анализируются удалённой vision-моделью io.net, поэтому локальный ONNX не нагружает CPU бота.
-- Без ключа используется локальный fallback **SmolVLM 500M** в quantized-режиме <code>q4</code>.
-- Cache локального fallback по умолчанию: <code>.cache/image-spam</code>. Его можно перенести через <code>IMAGE_SPAM_MODEL_CACHE</code>.
+- Без ключа текст читает бесплатный локальный **Tesseract** (RU + EN) по всему кадру и панелям коллажа, а вердикт даёт локальный fallback **SmolVLM 500M** в quantized-режиме <code>q4</code>. Ни ключа, ни оплаты за изображение не нужно.
+- Языки и число регионов локального OCR задаются через <code>IMAGE_SPAM_OCR_LANGS</code> и <code>IMAGE_SPAM_LOCAL_OCR_REGIONS</code>; отключается через <code>IMAGE_SPAM_LOCAL_OCR=false</code>.
+- Cache локального fallback по умолчанию: <code>.cache/image-spam</code>, языковые данные OCR — <code>.cache/tesseract</code>. Их можно перенести через <code>IMAGE_SPAM_MODEL_CACHE</code> и <code>IMAGE_SPAM_OCR_CACHE</code>.
 - Локальную fallback-модель можно прогреть вручную, но это **не требуется** для старта: загрузка ленивая.
 
 ```bash
