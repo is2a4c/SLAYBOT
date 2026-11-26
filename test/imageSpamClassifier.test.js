@@ -24,10 +24,7 @@ test("recognizes a ruble amount written with a suffix", () => {
   }
 
   const resolution = scoreImageSpam({ ocrText: "stream quality 1080p", confidence: 90 });
-  assert.ok(
-    !resolution.reasons.some((reason) => reason.includes("money amount")),
-    "a video resolution is not money"
-  );
+  assert.ok(!resolution.reasons.some((reason) => reason.includes("money amount")), "a video resolution is not money");
 });
 
 test("scores a fake withdrawal collage above the safe threshold", () => {
