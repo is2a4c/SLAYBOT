@@ -1,5 +1,6 @@
 const sharp = require("sharp");
 const localVision = require("./vision/localVision");
+const localOcr = require("./vision/localOcr");
 
 const DEFAULT_THRESHOLD = 70;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -7,9 +8,6 @@ const DOWNLOAD_TIMEOUT_MS = 15_000;
 const MAX_PENDING_ANALYSES = 2;
 const IMAGE_EXTENSIONS = /\.(?:avif|gif|jpe?g|png|webp)$/i;
 const { proxyDispatcher, resolveProvider } = require("./ai/visionProvider");
-
-// How many of the prepared regions are transcribed. One is the full frame.
-const OCR_REGIONS = Math.max(1, Number.parseInt(process.env.IMAGE_SPAM_OCR_REGIONS, 10) || 1);
 
 // io.net is not always usable even with a valid key — an account out of credits
 // answers 429 to everything. Retrying it per image would add its latency to
@@ -244,20 +242,35 @@ async function runIoAnalysis(buffer, caption = "") {
 }
 
 /**
+ * Read the text in an image, free local OCR included.
+ *
+ * The remote provider reads better screenshots, but it needs a key and quota.
+ * When it is absent or failing, Tesseract reads the same picture on this host,
+ * so the heuristics keep working with no provider configured at all.
+ *
  * @param {Buffer} buffer
+ * @param {{localOnly?: boolean}} [options] skip the remote attempt for this image
  * @returns {Promise<{text: string, confidence: number}>}
  */
-async function recognize(buffer) {
+async function recognize(buffer, { localOnly = false } = {}) {
   // Kept serial: several attachments on one message would otherwise fire off
   // that many concurrent requests against the same rate limit.
-  const job = ocrQueue.then(() => runIoOcr(buffer));
+  const job = ocrQueue.then(async () => {
+    if (!localOnly && ioAvailable()) {
+      const remote = await runIoOcr(buffer);
+      // An image that genuinely has no text stays text-free; only a call that
+      // failed hands the picture to the local reader.
+      if (remote.text.trim() || remote.confidence > 0 || ioBreaker.failures === 0) return remote;
+    }
+    return localOcr.recognize(buffer);
+  });
   ocrQueue = job.catch(() => {});
   return job;
 }
 
-async function recognizeAll(buffers) {
+async function recognizeAll(buffers, options = {}) {
   const results = [];
-  for (const buffer of buffers) results.push(await recognize(buffer));
+  for (const buffer of buffers) results.push(await recognize(buffer, options));
   return {
     text: results
       .map((result) => result.text.trim())
@@ -324,10 +337,12 @@ async function prepareImage(buffer, { tiles = 4 } = {}) {
   const [ocrTiles, visionTiles] = await Promise.all([
     Promise.all(
       regions.map(([left, top]) =>
+        // No hard threshold: Tesseract binarises better on its own, and a
+        // thresholded tile loses the thin lowercase text that scams use for
+        // contact handles like t.me/promo.
         sharp(prepared)
           .extract({ left, top, width: tileWidth, height: tileHeight })
           .resize({ width: 1800, withoutEnlargement: false })
-          .threshold(180)
           .png()
           .toBuffer()
       )
@@ -353,6 +368,11 @@ async function prepareImage(buffer, { tiles = 4 } = {}) {
 }
 
 const VISION_SPLIT = process.env.IMAGE_SPAM_VISION_SPLIT !== "false";
+
+function localOcrRegions(available) {
+  const requested = Number.parseInt(process.env.IMAGE_SPAM_LOCAL_OCR_REGIONS, 10);
+  return Math.min(Number.isInteger(requested) && requested > 0 ? requested : available, available);
+}
 
 function buildVisionPrompt(caption, ocrHint = "") {
   return (
@@ -545,7 +565,11 @@ function scoreImageSpam({ caption = "", ocrText = "", confidence = 0, visual = {
     reasons.push(`${reason} (+${points})`);
   };
 
-  const amounts = [...combined.matchAll(/(?:[$€£]\s*|\b)(\d[\d,. ]{2,})(?:\s*(?:usd|eur|gbp|usdt))?\b/gi)]
+  const amounts = [
+    ...combined.matchAll(
+      /(?:[$€£₽]\s*|\b)(\d[\d,. ]{2,})(?:\s*(?:₽|руб(?:лей|ля|ль)?|rub|usd|eur|gbp|usdt|р))?(?!\w)/gi
+    ),
+  ]
     .map((match) => Number(match[1].replace(/[ ,.]/g, "")))
     .filter((amount) => amount >= 500);
   if (amounts.length) add(amounts.some((amount) => amount >= 1000) ? 25 : 15, `large money amount (${amounts[0]})`);
@@ -605,6 +629,14 @@ function scoreImageSpam({ caption = "", ocrText = "", confidence = 0, visual = {
     /(банк|баланс|перевод|сч[её]т|пополн|\bozon\b|сбер|тинькофф|tinkoff|qiwi|kaspi|перевести|₽|\bруб)/i.test(combined);
   const scamContext = gambling.length || giveawayRu.length || knownScamBrand;
   if (banking && amounts.length && scamContext) add(20, "banking payment proof with scam context");
+
+  // Scam promos route victims to a Telegram/WhatsApp contact. The messenger
+  // alone is ordinary, so it only counts next to a promo signal. `\b` is
+  // ASCII-only and never matches around Cyrillic, hence the letter guards.
+  const messenger =
+    /t\.me\//i.test(combined) ||
+    /(?<![\p{L}\p{N}])(?:telegram|телеграм|whatsapp|ватсап|тг)(?![\p{L}\p{N}])/iu.test(combined);
+  if (messenger && scamContext) add(15, "messenger contact in a scam promotion");
 
   const ocrLines = ocrText.split(/\n+/).filter((line) => line.trim().length >= 3).length;
   const landscape = visual.width > visual.height * 1.15;
@@ -729,6 +761,7 @@ async function classifyImageBuffer({
 
     let ocr;
     let vision;
+    let remoteFailed = false;
 
     if (remote) {
       // One call answers both questions about the same image.
@@ -750,14 +783,18 @@ async function classifyImageBuffer({
         };
       } catch (error) {
         noteIoFailure(error);
+        remoteFailed = true;
         ocr = undefined;
       }
     }
 
     if (!ocr) {
-      // Local path: no transcription is available, so the verdict carries it.
+      // Local path: OCR runs on this host, so the full frame and the collage
+      // panels are all read instead of the single region a remote model needs.
       const prepared = visionImages.length > 1 ? { ocrImages, visionImages } : await prepareImage(buffer, { tiles: 4 });
-      ocr = await recognizeAll(prepared.ocrImages.slice(0, OCR_REGIONS));
+      ocr = await recognizeAll(prepared.ocrImages.slice(0, localOcrRegions(prepared.ocrImages.length)), {
+        localOnly: remoteFailed,
+      });
       vision = await analyzeVisionImages(prepared.visionImages, ocr.candidates, caption);
     }
 
@@ -813,6 +850,7 @@ module.exports = {
   parseVisionResponse,
   preloadVisionModel,
   prepareImage,
+  recognize,
   recognizeAll,
   runIoOcr,
   runIoVision,

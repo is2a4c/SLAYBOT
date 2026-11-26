@@ -1,6 +1,8 @@
 require("module-alias/register");
 
 const { preloadVisionModel } = require("@src/services/imageSpamClassifier");
+const { resolveProvider } = require("@src/services/ai/visionProvider");
+const localOcr = require("@src/services/vision/localOcr");
 
 function readPositiveInteger(value, fallback) {
   const parsed = Number.parseInt(value, 10);
@@ -34,6 +36,16 @@ async function main() {
   try {
     const model = await preloadWithRetries();
     console.log(`Image-spam model ready: ${model}`);
+
+    // The free path also reads text locally; fetching its language data now
+    // keeps the first spam image from waiting for the download.
+    if (!resolveProvider().configured) {
+      try {
+        console.log(`Image-spam OCR ready: ${await localOcr.prepare()}`);
+      } catch (error) {
+        console.warn(`Image-spam OCR is not preloaded (it will still try at runtime): ${error.message}`);
+      }
+    }
   } catch (error) {
     console.error(`Failed to prepare image-spam model after ${attempts} attempts: ${error.message}`);
     process.exitCode = 1;
