@@ -2,6 +2,8 @@ FROM node:24-alpine AS dependencies
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 COPY package*.json ./
+# Inference runs on CPU; skip the CUDA binaries the postinstall downloads.
+ENV ONNXRUNTIME_NODE_INSTALL=skip
 RUN npm ci --omit=dev
 
 FROM node:24-alpine AS runtime
