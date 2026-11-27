@@ -3,6 +3,7 @@ const { MODERATION, EMBED_COLORS } = require("@root/config");
 
 // Utils
 const { containsLink } = require("@helpers/Utils");
+const { hasMediaContent } = require("@helpers/media");
 const { error } = require("@helpers/Logger");
 const { sendModerationDm, sendWarningDm } = require("@src/services/moderationNotifications");
 const { routeEvent } = require("@src/services/eventRouter/EventRouter");
@@ -225,7 +226,7 @@ module.exports = class ModUtils {
    * Delete the specified number of messages matching the type
    * @param {import('discord.js').GuildMember} issuer
    * @param {import('discord.js').BaseGuildTextChannel} channel
-   * @param {"ATTACHMENT"|"BOT"|"LINK"|"TOKEN"|"USER"|"ALL"} type
+   * @param {"ATTACHMENT"|"MEDIA"|"BOT"|"LINK"|"TOKEN"|"USER"|"ALL"} type
    * @param {number} amount
    * @param {any} argument
    */
@@ -277,6 +278,11 @@ module.exports = class ModUtils {
           messages = messages.filter((message) => message.attachments.size > 0).first(amount);
           break;
         }
+        case "MEDIA": {
+          messages = await search();
+          messages = messages.filter((message) => hasMediaContent(message)).first(amount);
+          break;
+        }
         case "USER": {
           messages = await search();
           messages = messages.filter((message) => message.author.id === argument).first(amount);
@@ -293,6 +299,10 @@ module.exports = class ModUtils {
           toDelete.set(message.id, message);
         } else if (type === "ATTACHMENT") {
           if (message.attachments.size > 0) {
+            toDelete.set(message.id, message);
+          }
+        } else if (type === "MEDIA") {
+          if (hasMediaContent(message)) {
             toDelete.set(message.id, message);
           }
         } else if (type === "BOT") {

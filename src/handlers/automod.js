@@ -194,9 +194,42 @@ const shouldModerate = (message, settings) => {
   return true;
 };
 
+/**
+ * Every image automod should look at: uploaded files, embed images and stickers.
+ * A link preview embeds the image it points to, so inspecting only attachments
+ * let casino graphics posted as links pass unchecked.
+ *
+ * @param {import('discord.js').Message} message
+ * @returns {Array<{url: string, name: string, contentType?: string}>}
+ */
+function collectImageSources(message) {
+  const sources = [];
+  const seen = new Set();
+  const add = (url, name, contentType) => {
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    sources.push({ url, name: name || "image", contentType });
+  };
+
+  for (const attachment of message.attachments?.values?.() || []) {
+    if (isImageAttachment(attachment)) add(attachment.url, attachment.name, attachment.contentType);
+  }
+
+  for (const embed of message.embeds || []) {
+    const url = embed?.image?.url || embed?.thumbnail?.url || embed?.data?.image?.url || embed?.data?.thumbnail?.url;
+    add(url, embed?.title || "embed image");
+  }
+
+  for (const sticker of message.stickers?.values?.() || []) {
+    add(sticker.url, sticker.name || "sticker");
+  }
+
+  return sources;
+}
+
 async function inspectImageSpam(message, automod, classifier = classifyImage) {
   const fields = [];
-  const images = [...message.attachments.values()].filter(isImageAttachment);
+  const images = collectImageSources(message);
   if (!images.length) return { shouldDelete: false, strikes: 0, fields };
 
   const threshold = Math.min(100, Math.max(50, automod.image_spam_threshold || DEFAULT_THRESHOLD));
@@ -309,7 +342,8 @@ async function inspectTextRisk(message, aiSettings, classifier) {
  * @param {import('discord.js').Message} message
  * @param {object} settings
  */
-async function performAutomod(message, settings, imageClassifier = classifyImage, textClassifier) {
+async function performAutomod(message, settings, imageClassifier = classifyImage, textClassifier, options = {}) {
+  const { skipAntiSpam = false, silent = false } = options || {};
   const { automod } = settings;
   const ordinaryMember = shouldModerate(message, settings);
 
@@ -465,7 +499,10 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
 
   // Anti Spam
   const antiSpamWhitelisted = isAntiSpamWhitelisted(message, automod);
-  if (automod.anti_spam && !antiSpamWhitelisted) {
+  // A retroactive scan reads messages long after they were sent, so the live
+  // anti-spam window would see unrelated history as a flood. Skipping it keeps
+  // the scan from inventing violations the chat never had.
+  if (automod.anti_spam && !antiSpamWhitelisted && !skipAntiSpam) {
     if (isRepeatedMessage(message, automod)) {
       fields.push({ name: "AntiSpam Detection", value: "✓", inline: true });
       shouldDelete = true;
@@ -488,7 +525,7 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
     try {
       await message.delete();
       deleted = true;
-      channel.safeSend("> Auto-Moderation! Message deleted", 5);
+      if (!silent) channel.safeSend("> Auto-Moderation! Message deleted", 5);
     } catch {
       // ignore message deletion failure
     }
@@ -571,6 +608,7 @@ async function performAutomod(message, settings, imageClassifier = classifyImage
 
 module.exports = {
   performAutomod,
+  collectImageSources,
   inspectImageSpam,
   inspectTextRisk,
   matchesContentFilter,
