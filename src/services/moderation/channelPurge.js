@@ -21,7 +21,7 @@ const PURGE_METHODS = Object.freeze([
   { id: "user", purgeType: "USER", emoji: "👤", needsUser: true },
   { id: "bots", purgeType: "BOT", emoji: "🤖" },
   { id: "links", purgeType: "LINK", emoji: "🔗" },
-  { id: "attachments", purgeType: "ATTACHMENT", emoji: "📎" },
+  { id: "media", purgeType: "MEDIA", emoji: "🖼️" },
   { id: "contains", purgeType: "TOKEN", emoji: "🔍", needsText: true },
 ]);
 

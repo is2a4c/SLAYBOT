@@ -23,7 +23,7 @@ description: 24 commands
 | **!purgelinks \[amount]**           | **/purge links**       | purge all messages with links                            |
 | **!purgetoken \<token> \[amount]**  | **/purge token**       | purge all messages containing the specified token        |
 | **!purgeuser \<user> \[amount]**    | **/purge user**        | purge all messages from the specified user               |
-| —                                  | **/moderate**          | interactively clean several channels at once, voice channels included |
+| —                                  | **/moderate**          | interactively purge or automod-scan several channels, voice channels included |
 | **!vmute \<member> \[amount]**      | **/voice mute**        | mute a member's voice                                    |
 | **!vunmute \<member> \[amount]**    | **/voice unmute**      | unmute a muted member's voice                            |
 | **!deafen \<member> \[reason]**     | **/voice deafen**      | deafen a member in voice channel                         |

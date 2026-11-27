@@ -17,12 +17,13 @@ const {
   MAX_PER_CHANNEL,
   MESSAGE_CHANNEL_TYPES,
   PURGE_METHODS,
-  getMethod,
   runChannelPurge,
 } = require("@src/services/moderation/channelPurge");
+const { AUTOMOD_METHOD, runChannelAutomod } = require("@src/services/moderation/channelAutomod");
 
 const IDLE_MS = 5 * 60 * 1000;
 const IDLE_MINUTES = IDLE_MS / 60000;
+const METHODS = [...PURGE_METHODS, AUTOMOD_METHOD];
 
 /**
  * @param {string} session
@@ -77,7 +78,7 @@ function channelPanel(t, ids) {
  * @param {Array} channels
  */
 function methodPanel(t, ids, channels) {
-  const options = PURGE_METHODS.map((method) => ({
+  const options = METHODS.map((method) => ({
     label: t(`moderate.methods.${method.id}`).slice(0, 100),
     description: t(`moderate.methodDescriptions.${method.id}`).slice(0, 100),
     value: method.id,
@@ -136,13 +137,20 @@ function userPanel(t, ids, channels, method) {
  * @param {object} ids
  * @param {{channels: Array, method: object, amount: number, target: string|null}} selection
  */
-function confirmPanel(t, ids, { channels, method, amount, target }) {
+function confirmPanel(t, ids, { channels, method, amount, target, automod, imageCheckEnabled }) {
   const fields = [
     { name: t("moderate.channelsField"), value: channelList(channels), inline: false },
     { name: t("moderate.methodField"), value: t(`moderate.methods.${method.id}`), inline: true },
     { name: t("moderate.amountField"), value: String(amount), inline: true },
   ];
   if (target) fields.push({ name: t("moderate.targetField"), value: target, inline: true });
+  if (automod && !imageCheckEnabled) {
+    fields.push({
+      name: t("moderate.imageCheckOff"),
+      value: t("moderate.imageCheckOffHint"),
+      inline: false,
+    });
+  }
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(ids.confirm).setLabel(t("moderate.confirm")).setStyle(ButtonStyle.Danger),
@@ -151,7 +159,7 @@ function confirmPanel(t, ids, { channels, method, amount, target }) {
 
   const panel = embed(EMBED_COLORS.WARNING)
     .setTitle(t("moderate.confirmTitle"))
-    .setDescription(t("moderate.confirmHint"))
+    .setDescription(automod ? t("moderate.automodConfirmHint") : t("moderate.confirmHint"))
     .setFields(fields);
 
   return { embeds: [panel], components: [row] };
@@ -196,6 +204,87 @@ function resultPanel(t, outcome) {
     );
 
   return { embeds: [panel], components: [] };
+}
+
+/**
+ * @param {Function} t
+ * @param {{channelName: string, checked: number, total: number, deleted: number, strikes: number}} progress
+ */
+function automodProgressPanel(t, progress) {
+  const panel = embed(EMBED_COLORS.INFO)
+    .setTitle(t("moderate.automodProgressTitle"))
+    .setDescription(
+      t("moderate.automodProgress", {
+        channel: progress.channelName ? `#${progress.channelName}` : "—",
+        checked: progress.checked,
+        total: progress.total,
+        deleted: progress.deleted,
+        strikes: progress.strikes,
+      })
+    );
+
+  return { embeds: [panel], components: [] };
+}
+
+/**
+ * @param {Function} t
+ * @param {object} outcome
+ */
+function automodResultPanel(t, outcome) {
+  if (outcome.error) {
+    return {
+      embeds: [embed(EMBED_COLORS.ERROR).setTitle(t("moderate.resultTitle")).setDescription(t("moderate.badAmount"))],
+      components: [],
+    };
+  }
+
+  const failed = outcome.results.filter((entry) => ["ERROR", "BOT_PERM", "MEMBER_PERM"].includes(entry.status)).length;
+  const color =
+    outcome.deleted > 0 || outcome.triggered > 0
+      ? failed > 0
+        ? EMBED_COLORS.WARNING
+        : EMBED_COLORS.SUCCESS
+      : failed > 0
+        ? EMBED_COLORS.ERROR
+        : EMBED_COLORS.WARNING;
+
+  const lines = outcome.results.map((entry) => {
+    const channel = entry.channelId ? `<#${entry.channelId}>` : entry.name || "—";
+    return `${resultIcon(entry.status)} ${channel} — ${automodLine(t, entry)}`;
+  });
+  const partial = outcome.partial ? `\n\n${t("moderate.automodPartial")}` : "";
+
+  const panel = embed(color)
+    .setTitle(t("moderate.resultTitle"))
+    .setDescription(
+      `${t("moderate.automodSummary", {
+        checked: outcome.checked,
+        deleted: outcome.deleted,
+        strikes: outcome.strikes,
+        triggered: outcome.triggered,
+        failed: failed + (outcome.failed || 0),
+      })}${partial}\n\n${lines.join("\n")}`
+    );
+
+  return { embeds: [panel], components: [] };
+}
+
+/**
+ * @param {Function} t
+ * @param {object} entry
+ */
+function automodLine(t, entry) {
+  if (entry.status === "OK" || entry.status === "PARTIAL") {
+    return t("moderate.automodChannel", {
+      checked: entry.checked || 0,
+      deleted: entry.deleted || 0,
+      strikes: entry.strikes || 0,
+      triggered: entry.triggered || 0,
+    });
+  }
+  if (entry.status === "SKIPPED") return t("moderate.results.timeLimit");
+  if (entry.status === "NO_MESSAGES") return t("moderate.results.empty");
+  return resultText(t, entry);
 }
 
 /**
@@ -350,7 +439,7 @@ async function askParameters(component, userId, t, modalId, method) {
  */
 module.exports = {
   name: "moderate",
-  description: "moderate messages in one or more channels, voice channels included",
+  description: "moderate messages in one or more channels with automod or a bulk purge",
   category: "MODERATION",
   userPermissions: ["ManageMessages"],
   botPermissions: ["ManageMessages", "ReadMessageHistory", "EmbedLinks"],
@@ -385,7 +474,7 @@ module.exports = {
     if (!methodPick) return expirePanel(interaction, t);
     if (methodPick.customId === ids.cancel) return methodPick.update(cancelledPanel(t));
 
-    const method = getMethod(methodPick.values[0]);
+    const method = METHODS.find((entry) => entry.id === methodPick.values[0]);
     if (!method) return methodPick.update(errorPanel(t, t("moderate.invalidSelection")));
 
     let user = null;
@@ -414,13 +503,47 @@ module.exports = {
     if (method.needsText && !text) return submit.update(errorPanel(t, t("moderate.badText")));
     const target = user ? `<@${user.id}>` : text ? `\`${text}\`` : null;
 
-    await submit.update(confirmPanel(t, ids, { channels, method, amount, target }));
+    const automod = method.id === AUTOMOD_METHOD.id;
+    await submit.update(
+      confirmPanel(t, ids, {
+        channels,
+        method,
+        amount,
+        target,
+        automod,
+        imageCheckEnabled: Boolean(data.settings?.automod?.anti_image_spam),
+      })
+    );
 
     const decision = await waitFor(message, userId, [ids.confirm, ids.cancel]);
     if (!decision) return expirePanel(interaction, t);
     if (decision.customId === ids.cancel) return decision.update(cancelledPanel(t));
 
     await decision.deferUpdate();
+
+    if (automod) {
+      let lastProgress = 0;
+      let progressEdit = Promise.resolve();
+      const outcome = await runChannelAutomod({
+        issuer: interaction.member,
+        channels,
+        amount,
+        settings: data.settings,
+        budgetMs: Math.min(
+          10 * 60 * 1000,
+          Math.max(60 * 1000, 14 * 60 * 1000 - (Date.now() - interaction.createdTimestamp))
+        ),
+        onProgress: (progress) => {
+          const now = Date.now();
+          if (now - lastProgress < 5000) return;
+          lastProgress = now;
+          progressEdit = progressEdit.then(() => decision.editReply(automodProgressPanel(t, progress))).catch(() => {});
+        },
+      });
+      await progressEdit;
+      return decision.editReply(automodResultPanel(t, outcome));
+    }
+
     const outcome = await runChannelPurge({
       issuer: interaction.member,
       channels,

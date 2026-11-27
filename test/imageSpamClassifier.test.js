@@ -849,3 +849,47 @@ test("local vision can be turned off for fast OCR-only scoring", async () => {
     restoreEnv();
   }
 });
+
+test("image moderation also inspects embed images and stickers", async () => {
+  const message = {
+    id: "message-media",
+    content: "",
+    attachments: new Map(),
+    embeds: [{ title: "casino", image: { url: "https://cdn.test/casino.png" } }],
+    stickers: new Map([["s", { name: "casino-sticker", url: "https://cdn.test/sticker.png" }]]),
+    client: { logger: { warn: () => assert.fail("unexpected warning") } },
+  };
+  const seen = [];
+  const classifier = async ({ url }) => {
+    seen.push(url);
+    return url.endsWith("casino.png")
+      ? { risky: true, score: 90, model: "test-vision", reasons: ["casino promo"], ocrText: "", confidence: 80 }
+      : { risky: false, score: 5, model: "test-vision", reasons: [], ocrText: "", confidence: 80 };
+  };
+
+  const result = await inspectImageSpam(message, { image_spam_threshold: 70 }, classifier);
+
+  assert.equal(result.shouldDelete, true);
+  assert.deepEqual(seen, ["https://cdn.test/casino.png", "https://cdn.test/sticker.png"]);
+});
+
+test("the same image attached and embedded is classified once", async () => {
+  const url = "https://cdn.test/same.png";
+  const message = {
+    id: "message-dupe",
+    content: "",
+    attachments: new Map([["a", { name: "same.png", contentType: "image/png", url }]]),
+    embeds: [{ image: { url } }],
+    stickers: new Map(),
+    client: { logger: { warn: () => assert.fail("unexpected warning") } },
+  };
+  const seen = [];
+  const classifier = async ({ url: seenUrl }) => {
+    seen.push(seenUrl);
+    return { risky: false, score: 5, model: "test-vision", reasons: [], ocrText: "", confidence: 80 };
+  };
+
+  await inspectImageSpam(message, { image_spam_threshold: 70 }, classifier);
+
+  assert.deepEqual(seen, [url]);
+});

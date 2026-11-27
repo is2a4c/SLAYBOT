@@ -36,7 +36,7 @@ test("voice and stage channels are accepted, categories are not", () => {
 });
 
 test("every offered method maps to a purge type", () => {
-  const expected = ["ALL", "USER", "BOT", "LINK", "ATTACHMENT", "TOKEN"];
+  const expected = ["ALL", "USER", "BOT", "LINK", "MEDIA", "TOKEN"];
   assert.deepEqual(
     PURGE_METHODS.map((method) => method.purgeType),
     expected
