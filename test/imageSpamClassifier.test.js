@@ -784,7 +784,9 @@ test("a messenger contact counts only beside a scam promotion", () => {
 /* ------------------------------------- local vision failure / disabled path */
 
 async function blankImage() {
-  return sharp({ create: { width: 360, height: 240, channels: 3, background: "#ffffff" } }).png().toBuffer();
+  return sharp({ create: { width: 360, height: 240, channels: 3, background: "#ffffff" } })
+    .png()
+    .toBuffer();
 }
 
 test("a local vision failure keeps the OCR verdict", async () => {
