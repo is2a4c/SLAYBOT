@@ -36,6 +36,8 @@ The image check does not require a key. With no provider configured — or while
 
 There is no per-image cost. The model weights and OCR language data are downloaded once — by `npm run image-spam:model:download` or lazily on the first image — and cached under `.cache/`. `IMAGE_SPAM_LOCAL_OCR=false` turns the local reader off.
 
+On a CPU-only host the local vision model can take longer than its timeout. The OCR verdict is kept when that happens. For CPU inference, disable image splitting (`IMAGE_SPAM_VISION_SPLIT=false`) and give the model all cores (`IMAGE_SPAM_ONNX_THREADS=8`): on 8 cores inference drops from ~112 s to ~12 s. `IMAGE_SPAM_VISION_MAX_REGIONS` caps how many regions are run, `IMAGE_SPAM_VISION_TIMEOUT_MS` changes the job timeout (a timed-out worker is restarted), and `IMAGE_SPAM_LOCAL_VISION=false` skips the model entirely so the check scores OCR text and the caption only.
+
 A free remote model is also possible through the `openrouter` preset in `src/services/ai/visionProvider.js`: set `IMAGE_AI_PROVIDER=openrouter` and `OPENROUTER_API_KEY`, then pick a `:free` model with `IMAGE_AI_MODEL`. Free tiers have their own rate limits, so the local path remains the fallback.
 
 ### Optional fallback provider

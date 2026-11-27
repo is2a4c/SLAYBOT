@@ -136,6 +136,7 @@ Attachment → image safety limits → OCR (io.net, иначе локальны�
 
 - При настроенном <code>IO_INTELLIGENCE_API_KEY</code> изображения анализируются удалённой vision-моделью io.net, поэтому локальный ONNX не нагружает CPU бота.
 - Без ключа текст читает бесплатный локальный **Tesseract** (RU + EN) по всему кадру и панелям коллажа, а вердикт даёт локальный fallback **SmolVLM 500M** в quantized-режиме <code>q4</code>. Ни ключа, ни оплаты за изображение не нужно.
+- Если на CPU-хосте vision-модель не успевает, OCR-результат сохраняется, а не выбрасывается. Для CPU отключи разбиение кадра (<code>IMAGE_SPAM_VISION_SPLIT=false</code>) и дай модели все ядра (<code>IMAGE_SPAM_ONNX_THREADS=8</code>): на 8 ядрах инференс падает со 112 с до ~12 с. На совсем слабых машинах модель можно отключить через <code>IMAGE_SPAM_LOCAL_VISION=false</code> — тогда проверка идёт по OCR и подписи за ~1–2 с.
 - Языки и число регионов локального OCR задаются через <code>IMAGE_SPAM_OCR_LANGS</code> и <code>IMAGE_SPAM_LOCAL_OCR_REGIONS</code>; отключается через <code>IMAGE_SPAM_LOCAL_OCR=false</code>.
 - Cache локального fallback по умолчанию: <code>.cache/image-spam</code>, языковые данные OCR — <code>.cache/tesseract</code>. Их можно перенести через <code>IMAGE_SPAM_MODEL_CACHE</code> и <code>IMAGE_SPAM_OCR_CACHE</code>.
 - Локальную fallback-модель можно прогреть вручную, но это **не требуется** для старта: загрузка ленивая.

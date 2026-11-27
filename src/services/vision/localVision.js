@@ -10,6 +10,11 @@ const { Worker } = require("worker_threads");
 const WORKER_PATH = path.join(__dirname, "localVisionWorker.js");
 const DEFAULT_MODEL = "HuggingFaceTB/SmolVLM-500M-Instruct";
 const JOB_TIMEOUT_MS = 120_000;
+
+function jobTimeoutMs() {
+  const parsed = Number.parseInt(process.env.IMAGE_SPAM_VISION_TIMEOUT_MS, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : JOB_TIMEOUT_MS;
+}
 // The first load downloads the weights, which is minutes on a cold cache.
 const PRELOAD_TIMEOUT_MS = 15 * 60_000;
 
@@ -36,7 +41,7 @@ function settle(id, handler) {
 function getWorker() {
   if (worker) return worker;
 
-  worker = new Worker(WORKER_PATH, {
+  const current = new Worker(WORKER_PATH, {
     workerData: {
       modelId: modelId(),
       dtype: process.env.IMAGE_SPAM_VISION_DTYPE || "q4",
@@ -44,46 +49,70 @@ function getWorker() {
       cacheDir: process.env.IMAGE_SPAM_MODEL_CACHE,
     },
   });
+  worker = current;
 
-  worker.on("message", ({ id, text, error }) => {
-    settle(id, (job) => (error ? job.reject(new Error(error)) : job.resolve(text)));
+  current.on("message", ({ id, text, error }) => {
+    const job = pending.get(id);
+    if (!job || job.worker !== current) return;
+    settle(id, (entry) => (error ? entry.reject(new Error(error)) : entry.resolve(text)));
   });
 
+  // Only this worker's jobs may be rejected here: `pending` is shared, and a
+  // discarded worker's late exit must not cancel its successor's job.
   const fail = (reason) => {
-    worker = null;
-    for (const id of [...pending.keys()]) settle(id, (job) => job.reject(new Error(reason)));
+    if (worker === current) worker = null;
+    for (const [id, job] of [...pending.entries()]) {
+      if (job.worker === current) settle(id, (entry) => entry.reject(new Error(reason)));
+    }
   };
 
-  worker.on("error", (error) => fail(`local vision worker failed: ${error.message}`));
-  worker.on("exit", (code) => {
+  current.on("error", (error) => fail(`local vision worker failed: ${error.message}`));
+  current.on("exit", (code) => {
+    if (worker === current) worker = null;
     if (code !== 0) fail(`local vision worker exited with code ${code}`);
-    worker = null;
   });
 
   // The worker must not hold the process open on shutdown.
-  worker.unref();
-  return worker;
+  current.unref();
+  return current;
 }
 
 /**
- * @param {object} job
- * @returns {Promise<string>}
+ * @param {Worker} [owner] the worker to drop, current by default
+ * @returns {Promise<void>}
  */
+function discardWorker(owner = worker) {
+  if (worker === owner) worker = null;
+  if (!owner) return Promise.resolve();
+  return owner.terminate().catch(() => {});
+}
+
 function send(job) {
   const id = nextJobId;
   nextJobId += 1;
-  const timeoutMs = job.type === "preload" ? PRELOAD_TIMEOUT_MS : JOB_TIMEOUT_MS;
+  const timeoutMs = job.type === "preload" ? PRELOAD_TIMEOUT_MS : jobTimeoutMs();
 
   return new Promise((resolve, reject) => {
+    let current;
+    try {
+      current = getWorker();
+    } catch (error) {
+      reject(error);
+      return;
+    }
+
     const timer = setTimeout(() => {
       settle(id, (entry) => entry.reject(new Error(`local vision timed out after ${timeoutMs} ms`)));
+      // A generation that outlived its job still owns the thread. Dropping only
+      // that worker lets the next job start a fresh one.
+      discardWorker(current);
     }, timeoutMs);
     timer.unref?.();
 
-    pending.set(id, { resolve, reject, timer });
+    pending.set(id, { resolve, reject, timer, worker: current });
 
     try {
-      getWorker().postMessage({ ...job, id });
+      current.postMessage({ ...job, id });
     } catch (error) {
       settle(id, (entry) => entry.reject(error));
     }
@@ -115,8 +144,6 @@ module.exports = {
    */
   stop: async () => {
     if (!worker) return;
-    const current = worker;
-    worker = null;
-    await current.terminate().catch(() => {});
+    await discardWorker(worker);
   },
 };

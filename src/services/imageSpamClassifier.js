@@ -369,6 +369,24 @@ async function prepareImage(buffer, { tiles = 4 } = {}) {
 
 const VISION_SPLIT = process.env.IMAGE_SPAM_VISION_SPLIT !== "false";
 
+function localVisionEnabled() {
+  return process.env.IMAGE_SPAM_LOCAL_VISION !== "false";
+}
+
+// A failed or disabled local model must not erase an OCR result that already
+// answered the question; the OCR text and the caption still go through scoring.
+function unavailableVision(error, regionsAvailable) {
+  return {
+    score: 0,
+    reasons: [`vision unavailable: ${error.message}`],
+    detectedText: "",
+    model: "unavailable",
+    index: 0,
+    regionsAnalyzed: 0,
+    regionsAvailable,
+  };
+}
+
 function localOcrRegions(available) {
   const requested = Number.parseInt(process.env.IMAGE_SPAM_LOCAL_OCR_REGIONS, 10);
   return Math.min(Number.isInteger(requested) && requested > 0 ? requested : available, available);
@@ -795,7 +813,15 @@ async function classifyImageBuffer({
       ocr = await recognizeAll(prepared.ocrImages.slice(0, localOcrRegions(prepared.ocrImages.length)), {
         localOnly: remoteFailed,
       });
-      vision = await analyzeVisionImages(prepared.visionImages, ocr.candidates, caption);
+      if (localVisionEnabled()) {
+        try {
+          vision = await analyzeVisionImages(prepared.visionImages, ocr.candidates, caption);
+        } catch (error) {
+          vision = unavailableVision(error, prepared.visionImages.length);
+        }
+      } else {
+        vision = unavailableVision(new Error("local vision is disabled"), prepared.visionImages.length);
+      }
     }
 
     const selected = selectVisionCandidate(ocr, visionImages, caption, visual);
@@ -850,6 +876,7 @@ module.exports = {
   parseVisionResponse,
   preloadVisionModel,
   prepareImage,
+  localVisionEnabled,
   recognize,
   recognizeAll,
   runIoOcr,

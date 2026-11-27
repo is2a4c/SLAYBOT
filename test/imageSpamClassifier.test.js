@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const sharp = require("sharp");
 
 require("module-alias/register");
 const {
@@ -637,6 +638,7 @@ test("an image with no readable text can still be judged", () => {
 /* ------------------------------------------------ free local OCR fallback */
 
 const localOcr = require("../src/services/vision/localOcr");
+const localVision = require("../src/services/vision/localVision");
 const { PRESETS } = require("../src/services/ai/visionProvider");
 
 function withoutImageProvider() {
@@ -776,5 +778,74 @@ test("a messenger contact counts only beside a scam promotion", () => {
       russian.reasons.some((reason) => reason.includes("messenger contact")),
       `a Russian messenger mention must count: ${ocrText}`
     );
+  }
+});
+
+/* ------------------------------------- local vision failure / disabled path */
+
+async function blankImage() {
+  return sharp({ create: { width: 360, height: 240, channels: 3, background: "#ffffff" } })
+    .png()
+    .toBuffer();
+}
+
+test("a local vision failure keeps the OCR verdict", async () => {
+  const restoreEnv = withoutImageProvider();
+  const originalOcr = localOcr.recognize;
+  const originalDescribe = localVision.describe;
+  localOcr.recognize = async () => ({ text: "КАЗИНО 1XBET БОНУС 5000 РУБ", confidence: 90 });
+  localVision.describe = async () => {
+    throw new Error("local vision timed out after 1 ms");
+  };
+
+  try {
+    classifier.noteIoSuccess();
+    const result = await classifier.classifyImageBuffer({
+      buffer: await blankImage(),
+      caption: "bro",
+      threshold: 50,
+    });
+
+    assert.match(result.reasons.join("\n"), /vision unavailable/);
+    assert.match(result.ocrText, /БОНУС/);
+    assert.ok(result.risky, "the OCR text alone crosses the threshold");
+  } finally {
+    localOcr.recognize = originalOcr;
+    localVision.describe = originalDescribe;
+    restoreEnv();
+  }
+});
+
+test("local vision can be turned off for fast OCR-only scoring", async () => {
+  const restoreEnv = withoutImageProvider();
+  const originalOcr = localOcr.recognize;
+  const originalDescribe = localVision.describe;
+  const previousFlag = process.env.IMAGE_SPAM_LOCAL_VISION;
+  let visionCalls = 0;
+  localOcr.recognize = async () => ({ text: "КАЗИНО 1XBET БОНУС 5000 РУБ", confidence: 90 });
+  localVision.describe = async () => {
+    visionCalls += 1;
+    return "IMAGE_SAFE";
+  };
+  process.env.IMAGE_SPAM_LOCAL_VISION = "false";
+
+  try {
+    classifier.noteIoSuccess();
+    assert.equal(classifier.localVisionEnabled(), false);
+    const result = await classifier.classifyImageBuffer({
+      buffer: await blankImage(),
+      caption: "bro",
+      threshold: 50,
+    });
+
+    assert.equal(visionCalls, 0, "the model is not invoked when it is disabled");
+    assert.match(result.reasons.join("\n"), /local vision is disabled/);
+    assert.equal(result.risky, true);
+  } finally {
+    localOcr.recognize = originalOcr;
+    localVision.describe = originalDescribe;
+    if (previousFlag === undefined) delete process.env.IMAGE_SPAM_LOCAL_VISION;
+    else process.env.IMAGE_SPAM_LOCAL_VISION = previousFlag;
+    restoreEnv();
   }
 });
