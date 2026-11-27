@@ -10,6 +10,11 @@ const { Worker } = require("worker_threads");
 const WORKER_PATH = path.join(__dirname, "localVisionWorker.js");
 const DEFAULT_MODEL = "HuggingFaceTB/SmolVLM-500M-Instruct";
 const JOB_TIMEOUT_MS = 120_000;
+
+function jobTimeoutMs() {
+  const parsed = Number.parseInt(process.env.IMAGE_SPAM_VISION_TIMEOUT_MS, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : JOB_TIMEOUT_MS;
+}
 // The first load downloads the weights, which is minutes on a cold cache.
 const PRELOAD_TIMEOUT_MS = 15 * 60_000;
 
@@ -69,14 +74,24 @@ function getWorker() {
  * @param {object} job
  * @returns {Promise<string>}
  */
+function discardWorker() {
+  const current = worker;
+  worker = null;
+  if (current) current.terminate().catch(() => {});
+}
+
 function send(job) {
   const id = nextJobId;
   nextJobId += 1;
-  const timeoutMs = job.type === "preload" ? PRELOAD_TIMEOUT_MS : JOB_TIMEOUT_MS;
+  const timeoutMs = job.type === "preload" ? PRELOAD_TIMEOUT_MS : jobTimeoutMs();
 
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       settle(id, (entry) => entry.reject(new Error(`local vision timed out after ${timeoutMs} ms`)));
+      // A generation that outlived its job still owns the thread. Dropping the
+      // worker keeps the next image from queueing behind it for another
+      // timeout; the next job starts a fresh one.
+      discardWorker();
     }, timeoutMs);
     timer.unref?.();
 
